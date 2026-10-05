@@ -5,3 +5,13 @@
 .dac-home-brand-card {
   max-width: 100%;
 }
+
+/*
+ * The custom home button opens an Owl popover, not a Bootstrap dropdown.
+ * Explicitly suppress Bootstrap's caret so its presence does not depend on
+ * which permission-specific navbar markup and CSS selectors are active.
+ */
+#home-menu-button.o_home_menu_button.dropdown-toggle::after {
+  display: none !important;
+  content: none !important;
+}

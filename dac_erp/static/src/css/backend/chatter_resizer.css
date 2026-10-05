@@ -53,6 +53,38 @@ body.dac-resizing-chatter .dac-chatter-resizer {
   pointer-events: auto !important;
 }
 
+/*
+ * Keep the Chatter action bar scrollable for every access-right variant.
+ *
+ * Odoo conditionally renders topbar actions according to the current user's
+ * permissions.  In this custom sale form the Chatter lives inside another
+ * flex column, so some action combinations made the column grow to its
+ * contents instead of overflowing inside the topbar.  `overflow-x-auto` then
+ * had no overflow area to scroll.  Allow each flex level to shrink and keep
+ * the actions at their natural width so the topbar owns the horizontal
+ * overflow consistently.
+ */
+.dac-sale-form .o-chatter-group,
+.dac-sale-form .o-mail-Form-chatter,
+.dac-sale-form .o-mail-Chatter {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.dac-sale-form .o-mail-Chatter-topbar {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+
+.dac-sale-form .o-mail-Chatter-topbar > * {
+  flex-shrink: 0;
+}
+
 /* Hide resizer on small/medium screens */
 @media (max-width: 992px) {
   .dac-chatter-resizer {
