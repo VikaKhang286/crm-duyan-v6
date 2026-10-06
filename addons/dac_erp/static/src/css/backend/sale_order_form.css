@@ -2,8 +2,138 @@
    Keep this file scoped to the sale order form and let conversation_widget.css
    own the floating Pancake widget styling. */
 
+/* ERP/CRM v6 prototype tokens */
+.dac-sale-form {
+  --dac-order-bg: #f7f8fb;
+  --dac-order-surface: #ffffff;
+  --dac-order-soft: #fafbfc;
+  --dac-order-text: #1d2433;
+  --dac-order-muted: #768195;
+  --dac-order-line: #e8ebf1;
+  --dac-order-primary: #ffc20e;
+  --dac-order-primary-hover: #e4aa00;
+  --dac-order-primary-soft: #fff5d1;
+  --dac-order-shadow: 0 6px 24px rgba(28, 38, 64, 0.055);
+}
+
 .dac-sale-form {
   position: relative;
+}
+
+/* Match the order workspace shown in the v6 reference Site. */
+.dac-sale-form .dac-box-card,
+.dac-sale-form .dac-action-bar-top,
+.dac-sale-form .dac-production-media-card {
+  border: 1px solid var(--dac-order-line) !important;
+  border-radius: 14px !important;
+  background: var(--dac-order-surface) !important;
+  box-shadow: var(--dac-order-shadow) !important;
+}
+
+.dac-sale-form .dac-box-card {
+  padding: 16px 18px;
+}
+
+.dac-sale-form .dac-box-title {
+  margin-bottom: 14px;
+  color: var(--dac-order-text);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.dac-sale-form .dac-box-title i {
+  color: #b38600;
+}
+
+.dac-sale-form .dac-action-bar-top {
+  padding: 8px 12px;
+}
+
+.dac-sale-form .dac-action-bar-flags,
+.dac-sale-form .dac-action-bar-money,
+.dac-sale-form .dac-action-bar-ai {
+  border-color: var(--dac-order-line) !important;
+  border-radius: 10px !important;
+  background: var(--dac-order-soft) !important;
+}
+
+.dac-sale-form .dac-deposit-cta,
+.dac-sale-form button.btn-warning {
+  border-color: var(--dac-order-primary) !important;
+  background: var(--dac-order-primary) !important;
+  color: #4d3900 !important;
+}
+
+.dac-sale-form .dac-deposit-cta:hover,
+.dac-sale-form button.btn-warning:hover {
+  border-color: var(--dac-order-primary-hover) !important;
+  background: var(--dac-order-primary-hover) !important;
+  color: #ffffff !important;
+}
+
+.dac-sale-form .o_notebook .nav-link.active {
+  background: var(--dac-order-primary-soft) !important;
+  color: #805b00 !important;
+}
+
+.dac-sale-form .o_notebook .tab-content {
+  border-radius: 0 0 14px 14px;
+}
+
+.dac-order-lines-panel .o_list_renderer .o_list_table {
+  border: 1px solid var(--dac-order-line);
+  border-spacing: 0;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.dac-order-lines-panel .o_list_renderer .o_list_table thead th {
+  padding: 10px 11px;
+  background: var(--dac-order-soft);
+  color: #8d96a6;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.dac-order-lines-panel .o_list_renderer .o_list_table tbody td {
+  padding: 12px 11px;
+  border: 0;
+  border-bottom: 1px solid #edf0f4;
+  background: #ffffff;
+  color: #455064;
+}
+
+.dac-order-lines-panel .o_list_renderer .o_list_table tbody tr:hover td {
+  background: #fffdf5;
+  border-color: #f1df9b;
+}
+
+.dac-control-panel-progress .o_arrow_button.btn-primary,
+.dac-control-panel-progress .o_arrow_button.active {
+  border-color: var(--dac-order-primary) !important;
+  background: var(--dac-order-primary) !important;
+  color: #4d3900 !important;
+}
+
+@media (max-width: 767.98px) {
+  .dac-sale-form .dac-box-card {
+    padding: 13px;
+  }
+
+  .dac-sale-form .dac-action-bar-top {
+    padding: 8px;
+  }
+}
+
+.dac-sale-form.o_form_view,
+.dac-sale-form .o_form_sheet_bg {
+  background: var(--dac-order-bg) !important;
+}
+
+.dac-sale-form .o_form_sheet {
+  color: var(--dac-order-text);
 }
 
 .o_control_panel.dac-sale-order-control-panel-active {
@@ -43,7 +173,7 @@
 
 .dac-control-panel-title {
   margin-bottom: 0;
-  color: #0f172a;
+  color: var(--dac-order-text);
   font-size: 24px;
   font-weight: 700;
   line-height: 1.1;
@@ -74,18 +204,18 @@
   background: #ffffff !important;
   background-image: none !important;
   background-color: #ffffff !important;
-  border-color: #2563eb !important;
-  color: #2563eb !important;
+  border-color: #dfb52f !important;
+  color: #805b00 !important;
 }
 
 .o_web_client .dac-control-panel-tools .dac-save-btn:hover,
 .o_web_client .dac-control-panel-tools .dac-save-btn:focus,
 .o_web_client .dac-control-panel-tools .dac-save-btn:active {
-  background: #2563eb !important;
+  background: var(--dac-order-primary) !important;
   background-image: none !important;
-  background-color: #2563eb !important;
-  color: #ffffff !important;
-  border-color: #2563eb !important;
+  background-color: var(--dac-order-primary) !important;
+  color: #4d3900 !important;
+  border-color: var(--dac-order-primary) !important;
 }
 
 .dac-control-panel-tools .dac-save-btn.dac-save-btn-dirty::after {
