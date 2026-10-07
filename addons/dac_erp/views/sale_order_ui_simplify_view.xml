@@ -67,6 +67,23 @@
                     </page>
                 </xpath>
 
+                <!-- Bố cục chi tiết đơn theo prototype: gom thông tin vào đúng hai card đầu. -->
+                <xpath expr="//div[hasclass('dac-box-client')]/group" position="after">
+                    <xpath expr="//div[hasclass('dac-box-internal')]" position="move"/>
+                    <div class="dac-v6-order-description">
+                        <h5 class="dac-v6-subtitle">
+                            <i class="fa fa-file-text-o me-2"/>Mô tả đơn hàng
+                        </h5>
+                        <xpath expr="//group[hasclass('dac-order-ai-fields')]" position="move"/>
+                        <xpath expr="//div[hasclass('dac-action-bar-ai')]" position="move"/>
+                    </div>
+                </xpath>
+
+                <xpath expr="//div[hasclass('dac-box-document')]/group" position="after">
+                    <div class="dac-v6-stage-divider"/>
+                    <xpath expr="//div[hasclass('dac-box-tasks')]" position="move"/>
+                </xpath>
+
                 <xpath expr="//div[@id='conversation-floating-widget']" position="replace"/>
             </field>
         </record>

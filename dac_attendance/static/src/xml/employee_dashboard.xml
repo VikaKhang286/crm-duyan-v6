@@ -20,9 +20,10 @@
             <t t-else="">
                 <!-- Header -->
                 <div class="o_dac_emp_header">
-                    <div>
-                        <h4 class="o_dac_emp_greeting">Xin chào, <strong t-esc="state.data.employee_name"/></h4>
-                        <span class="o_dac_emp_date text-muted" t-esc="todayLabel"/>
+                    <div class="o_dac_emp_heading">
+                        <div class="o_dac_emp_crumb">DAC Chấm công <span>/</span> Nhân viên</div>
+                        <h1>Dashboard Chấm công</h1>
+                        <p>Xin chào, <strong t-esc="state.data.employee_name"/> · <span t-esc="todayLabel"/></p>
                     </div>
                 </div>
 

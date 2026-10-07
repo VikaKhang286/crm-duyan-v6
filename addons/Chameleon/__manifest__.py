@@ -46,9 +46,11 @@
     ## + t
     'assets': {
         'web.assets_backend': [
-            'Chameleon/static/src/scss/theme_style.scss',
-            'Chameleon/static/src/scss/backend_modern.scss',
+            'Chameleon/static/src/scss/prototype_v6.scss',
             'Chameleon/static/src/js/settings.js',
+            'Chameleon/static/src/js/navbar_v6.js',
+            'Chameleon/static/src/xml/navbar_v6.xml',
+            'Chameleon/static/src/scss/layout_v6.scss',
         ],
        
         'point_of_sale.assets_prod': [

@@ -66,6 +66,23 @@ export class ManagerDashboard extends Component {
         return (this.state.data.present_list || []).filter(e => e.is_late);
     }
 
+    get totalEmployees() {
+        const stats = this.state.data.today_stats || EMPTY_DATA.today_stats;
+        return stats.present + stats.absent;
+    }
+
+    get presentRate() {
+        return this.totalEmployees
+            ? Math.round((this.state.data.today_stats.present / this.totalEmployees) * 100)
+            : 0;
+    }
+
+    get lateRate() {
+        return this.totalEmployees
+            ? Math.round((this.state.data.today_stats.late / this.totalEmployees) * 100)
+            : 0;
+    }
+
     // ── Approve ──────────────────────────────────────────────────────────────
 
     async onApproveLeave(leaveId) {

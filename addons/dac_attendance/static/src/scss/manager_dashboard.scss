@@ -344,3 +344,206 @@
 
     &:hover { background: #f1f5f9; border-color: #cbd5e1; color: #1e293b; }
 }
+
+// v6 — giao diện đồng bộ với prototype ERP/CRM
+.o_dac_manager_dashboard {
+    max-width: 1440px;
+    min-height: 100%;
+    margin: 0 auto;
+    padding: 28px 32px 48px;
+    color: #17191f;
+    background: #f7f8fb;
+
+    .o_dac_mgr_header {
+        align-items: flex-end;
+        margin-bottom: 24px;
+        gap: 20px;
+    }
+
+    .o_dac_mgr_crumb {
+        margin-bottom: 7px;
+        color: #8b909c;
+        font-size: 12px;
+        font-weight: 600;
+
+        span { margin: 0 5px; color: #c5c8cf; }
+    }
+
+    .o_dac_mgr_heading h1 {
+        margin: 0 0 7px;
+        color: #17191f;
+        font-size: 27px;
+        font-weight: 750;
+        letter-spacing: -0.6px;
+    }
+
+    .o_dac_mgr_heading p {
+        margin: 0;
+        color: #747985;
+        font-size: 13px;
+    }
+
+    .o_dac_mgr_header_actions {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .o_dac_today_label {
+        margin-right: 4px;
+        color: #747985;
+        font-size: 12px;
+    }
+
+    .o_dac_btn_reports,
+    .o_dac_btn_refresh {
+        min-height: 38px;
+        padding: 9px 14px;
+        border: 1px solid #dfe2e8;
+        border-radius: 9px;
+        background: #fff;
+        color: #343841;
+        font-size: 13px;
+        font-weight: 650;
+        box-shadow: 0 1px 2px rgba(20, 24, 35, .04);
+    }
+
+    .o_dac_btn_refresh {
+        border-color: #ffc20e;
+        background: #ffc20e;
+        color: #17191f;
+    }
+
+    .o_dac_kpi_row { gap: 14px; margin-bottom: 16px; }
+
+    .o_dac_kpi_card {
+        min-height: 132px;
+        padding: 18px 20px;
+        border: 1px solid #e8ebf1;
+        border-radius: 14px;
+        background: #fff;
+        box-shadow: 0 5px 18px rgba(20, 24, 35, .045);
+    }
+
+    .o_dac_kpi_top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 14px;
+    }
+
+    .o_dac_kpi_label {
+        color: #747985;
+        font-size: 12px;
+        font-weight: 650;
+        text-transform: uppercase;
+        letter-spacing: .45px;
+    }
+
+    .o_dac_kpi_icon {
+        position: static;
+        display: inline-flex;
+        width: 34px;
+        height: 34px;
+        align-items: center;
+        justify-content: center;
+        border-radius: 10px;
+        background: #fff6d5;
+        color: #9b7400;
+        font-size: 15px;
+        opacity: 1;
+    }
+
+    .o_dac_kpi_number {
+        margin: 0 0 7px;
+        color: #17191f;
+        font-size: 30px;
+        font-weight: 750;
+        letter-spacing: -.6px;
+    }
+
+    .o_dac_kpi_meta { color: #8b909c; font-size: 12px; }
+    .o_dac_kpi_meta strong { color: #20844a; font-weight: 700; }
+    .o_dac_kpi_card--late .o_dac_kpi_meta strong { color: #bb6b08; }
+
+    .o_dac_mgr_main_row { gap: 16px; }
+
+    .o_dac_card {
+        padding: 0;
+        overflow: hidden;
+        border: 1px solid #e8ebf1;
+        border-radius: 14px;
+        background: #fff;
+        box-shadow: 0 5px 18px rgba(20, 24, 35, .045);
+    }
+
+    .o_dac_card_header {
+        display: flex;
+        min-height: 68px;
+        align-items: center;
+        padding: 15px 18px 12px;
+        border-bottom: 1px solid #eef0f4;
+    }
+
+    .o_dac_card_title {
+        margin: 0;
+        color: #252830;
+        font-size: 14px;
+        font-weight: 700;
+        text-transform: none;
+        letter-spacing: 0;
+    }
+
+    .o_dac_card_subtitle { margin-top: 3px; color: #9297a2; font-size: 11px; }
+
+    .o_dac_tab_row {
+        gap: 5px;
+        margin: 0;
+        padding: 12px 18px;
+        border-bottom: 1px solid #eef0f4;
+    }
+
+    .o_dac_tab {
+        padding: 7px 11px;
+        border-radius: 8px;
+        color: #747985;
+        font-size: 12px;
+    }
+
+    .o_dac_tab--active {
+        margin-bottom: 0;
+        border-bottom: 0;
+        background: #fff3c2;
+        color: #2b2d32;
+    }
+
+    .o_dac_emp_list,
+    .o_dac_approval_list { padding: 5px 18px 10px; }
+
+    .o_dac_emp_row,
+    .o_dac_approval_item { padding: 13px 0; border-bottom-color: #eef0f4; }
+
+    .o_dac_btn_approve {
+        background: #ffc20e;
+        color: #252830;
+        &:hover { background: #eeb400; }
+    }
+
+    .o_dac_pending_badge { background: #fff0b3; color: #8a6500; }
+
+    @media (max-width: 900px) {
+        padding: 22px 18px 40px;
+        .o_dac_mgr_header { align-items: flex-start; }
+        .o_dac_mgr_header_actions { justify-content: flex-start; }
+        .o_dac_kpi_row { grid-template-columns: repeat(2, 1fr); }
+        .o_dac_mgr_main_row { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 520px) {
+        padding: 18px 12px 32px;
+        .o_dac_kpi_row { grid-template-columns: 1fr; }
+        .o_dac_today_label { width: 100%; }
+    }
+}

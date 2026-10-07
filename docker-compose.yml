@@ -1,13 +1,11 @@
 services:
   db:
     image: postgres:15-alpine
-    container_name: odoo-v6-db
     environment:
       POSTGRES_DB: postgres
       POSTGRES_USER: odoo
       POSTGRES_PASSWORD: odoo_local_secure_pass
       PGDATA: /var/lib/postgresql/data/pgdata
-    command: ["postgres", "-c", "fsync=off"]
     volumes:
       - odoo-db-data:/var/lib/postgresql/data/pgdata
       - ./backups:/backups
@@ -22,7 +20,6 @@ services:
 
   web:
     image: odoo:18.0
-    container_name: odoo-v6-web
     depends_on:
       db:
         condition: service_healthy

@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="Chameleon.NavBarV6" t-inherit="web.NavBar" t-inherit-mode="extension">
+        <xpath expr="//header" position="replace">
+            <aside class="o_navbar dac_v6_shell" t-ref="root" aria-label="Điều hướng chính">
+                <nav class="o_main_navbar d-print-none" data-command-category="disabled">
+                    <div class="dac_v6_brand">
+                        <span class="dac_v6_brandmark">
+                            <img src="/Chameleon/static/src/img/duyan-logo.png" alt="Duy An Company"/>
+                        </span>
+                        <span class="dac_v6_brandcopy">
+                            <strong>Duy An ERP</strong>
+                            <small>ERP / CRM · v6</small>
+                        </span>
+                        <button class="dac_v6_collapse" type="button" title="Thu gọn sidebar"
+                                aria-label="Thu gọn sidebar" t-on-click="toggleDacSidebar">
+                            <i class="fa fa-bars"/>
+                        </button>
+                    </div>
+
+                    <div class="dac_v6_tools" role="search">
+                        <label class="dac_v6_search">
+                            <i class="fa fa-search" aria-hidden="true"/>
+                            <input type="search" placeholder="Tìm chức năng..." aria-label="Tìm chức năng"
+                                   t-on-input="filterDacMenu"/>
+                        </label>
+                        <button class="dac_v6_tool_button" type="button" title="Làm mới trang"
+                                aria-label="Làm mới trang" t-on-click="refreshDacPage">
+                            <i class="fa fa-refresh" aria-hidden="true"/>
+                        </button>
+                        <button aria-expanded="false"
+                                class="o-dropdown dropdown-toggle dropdown dac_v6_tool_button dac_v6_messages"
+                                type="button" title="Tin nhắn" t-on-click="openDacMessages">
+                            <i class="fa fa-lg fa-comments" role="img" aria-label="Tin nhắn"/>
+                        </button>
+                        <button aria-expanded="false"
+                                class="o-dropdown dropdown-toggle dropdown dac_v6_tool_button dac_v6_activities"
+                                type="button" title="Hoạt động" t-on-click="openDacActivities">
+                            <i class="fa fa-lg fa-clock-o" role="img" aria-label="Hoạt động"/>
+                        </button>
+                    </div>
+
+                    <div class="o_navbar_breadcrumbs d-contents"/>
+
+                    <div class="dac_v6_navigation_grid">
+                        <div class="dac_v6_app_rail" aria-label="Ứng dụng">
+                            <button t-foreach="menuService.getApps()" t-as="app" t-key="app.id"
+                                    type="button"
+                                    t-attf-class="dac_v6_app_button {{ currentApp &amp;&amp; currentApp.id === app.id ? 'is-active' : '' }}"
+                                    t-att-title="app.name"
+                                    t-on-click="() => this.onNavBarDropdownItemSelection(app)">
+                                <span class="dac_v6_app_icon">
+                                    <img t-if="app.webIconData" t-att-src="app.webIconData" t-att-alt="app.name"/>
+                                    <i t-else="" class="fa fa-th-large"/>
+                                </span>
+                                <span class="dac_v6_app_name" t-esc="app.name"/>
+                            </button>
+                        </div>
+
+                        <div class="dac_v6_section_panel" aria-label="Chức năng">
+                            <div class="dac_v6_section_heading" t-if="currentApp">
+                                <strong t-esc="currentApp.name"/>
+                            </div>
+                            <div class="dac_v6_section_list">
+                                <t t-foreach="currentAppSections" t-as="section" t-key="section.id">
+                                    <t t-call="Chameleon.SidebarMenuItem">
+                                        <t t-set="menu" t-value="section"/>
+                                        <t t-set="level" t-value="0"/>
+                                    </t>
+                                </t>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="o_menu_systray d-flex flex-shrink-0 ms-auto" role="menu">
+                        <t t-foreach="systrayItems" t-as="item" t-key="item.key">
+                            <div t-att-data-index="item.index"/>
+                            <ErrorHandler onError="error => this.handleItemError(error, item)">
+                                <t t-component="item.Component" t-props="item.props"/>
+                            </ErrorHandler>
+                        </t>
+                    </div>
+                </nav>
+            </aside>
+        </xpath>
+    </t>
+
+    <t t-name="Chameleon.BurgerIdentity" t-inherit="web.BurgerMenu" t-inherit-mode="extension">
+        <xpath expr="//button[hasclass('o_mobile_menu_toggle')]" position="after">
+            <div class="dac_v6_user_identity">
+                <strong t-esc="user.name"/>
+                <small t-if="dacIdentity.roleLabel" t-esc="dacIdentity.roleLabel"/>
+            </div>
+        </xpath>
+    </t>
+
+    <t t-name="Chameleon.SidebarMenuItem">
+        <button t-if="!menu.childrenTree.length" type="button"
+                t-attf-class="dac_v6_section_item level-{{ level }}"
+                t-att-data-menu-xmlid="menu.xmlid"
+                t-on-click="() => this.onNavBarDropdownItemSelection(menu)">
+            <span class="dac_v6_section_dot"/>
+            <span t-esc="menu.name"/>
+        </button>
+        <div t-else="" t-attf-class="dac_v6_section_group level-{{ level }}">
+            <div class="dac_v6_section_group_title" t-esc="menu.name"/>
+            <t t-foreach="menu.childrenTree" t-as="child" t-key="child.id">
+                <t t-call="Chameleon.SidebarMenuItem">
+                    <t t-set="menu" t-value="child"/>
+                    <t t-set="level" t-value="level + 1"/>
+                </t>
+            </t>
+        </div>
+    </t>
+</templates>

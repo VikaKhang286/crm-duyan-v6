@@ -166,25 +166,50 @@
                                     <h5 class="dac-box-title dac-title-client">
                                         <i class="fa fa-user-circle me-2"/>Khách hàng
                                     </h5>
-                                    <group>
-                                        <field name="partner_vip_class" invisible="1"/>
-                                        <field name="partner_id"
-                                            groups="dac_erp.group_dac_erp_design,dac_erp.group_dac_erp_production"
-                                            options="{'no_create_edit': True}"
-                                            context="{'show_address': False, 'show_vat': False, 'list_view_ref': 'dac_erp.dac_customer_select_list'}"
-                                            readonly="1" string="Họ và tên"/>
-                                        <field name="partner_id"
-                                            groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager"
-                                            options="{'no_create_edit': True}"
-                                            context="{'show_address': False, 'show_vat': False, 'list_view_ref': 'dac_erp.dac_customer_select_list'}" string="Họ và tên"/>
-                                        <field name="customer_address" string="Địa chỉ" placeholder="Địa chỉ đầy đủ..."
-                                               readonly="is_design_user or is_production_user"/>
-                                        <field name="phone" string="Số điện thoại" placeholder="Số điện thoại" readonly="is_design_user or is_production_user"/>
+                                    <field name="partner_vip_class" invisible="1"/>
+                                    <group class="dac-v6-customer-anchor">
+                                    <div class="dac-v6-customer-strip">
+                                        <div class="dac-v6-customer-fields-grid">
+                                            <div class="dac-v6-customer-row" title="Tên khách hàng">
+                                                <span class="dac-v6-customer-icon"><i class="fa fa-user"/><span class="visually-hidden">Tên khách hàng</span></span>
+                                                <span class="dac-v6-customer-value">
+                                                    <field name="partner_id" nolabel="1" placeholder="Chọn khách hàng"
+                                                        groups="dac_erp.group_dac_erp_design,dac_erp.group_dac_erp_production"
+                                                        options="{'no_create_edit': True}"
+                                                        context="{'show_address': False, 'show_vat': False, 'list_view_ref': 'dac_erp.dac_customer_select_list'}"
+                                                        readonly="1"/>
+                                                    <field name="partner_id" nolabel="1" placeholder="Chọn khách hàng"
+                                                        groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager"
+                                                        options="{'no_create_edit': True}"
+                                                        context="{'show_address': False, 'show_vat': False, 'list_view_ref': 'dac_erp.dac_customer_select_list'}"/>
+                                                    <span class="dac-v6-customer-placeholder" invisible="partner_id">Chọn khách hàng</span>
+                                                </span>
+                                            </div>
+                                            <div class="dac-v6-customer-row" title="Điện thoại">
+                                                <span class="dac-v6-customer-icon"><i class="fa fa-phone"/><span class="visually-hidden">Điện thoại</span></span>
+                                                <span class="dac-v6-customer-value">
+                                                    <field name="phone" nolabel="1" placeholder="Nhập số điện thoại" readonly="is_design_user or is_production_user"/>
+                                                </span>
+                                            </div>
+                                            <div class="dac-v6-customer-row dac-v6-address-row" title="Địa chỉ giao hàng">
+                                                <span class="dac-v6-customer-icon"><i class="fa fa-map-marker"/><span class="visually-hidden">Địa chỉ giao hàng</span></span>
+                                                <span class="dac-v6-customer-value">
+                                                    <field name="customer_address" nolabel="1" placeholder="Nhập địa chỉ giao hàng" readonly="is_design_user or is_production_user"/>
+                                                </span>
+                                                <button name="action_view_conversations" type="object"
+                                                        class="btn btn-sm dac-v6-channel-button"
+                                                        invisible="conversation_count &lt;= 0"
+                                                        groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager,base.group_system">
+                                                    <i class="fa fa-facebook-square me-1"/>Fanpage Facebook
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
                                     </group>
                                 </div>
                                 <div class="col-md-6 col-12 dac-box-card dac-box-document">
                                     <h5 class="dac-box-title dac-title-document">
-                                        <i class="fa fa-file-text me-2"/>Chi tiết Chứng từ
+                                        <i class="fa fa-calendar-check-o me-2"/>Báo giá &amp; lịch hẹn
                                     </h5>
                                     <group>
                                         <field name="order_number" string="Số đặt hàng" placeholder="VD: 8766" readonly="is_design_user or is_production_user"/>
@@ -612,23 +637,43 @@
                         <!-- Cột 2: Nghiệp vụ - Nội bộ (Phụ trách | Thiết kế | Sản xuất) -->
                                 <div class="col-12 mb-3">
                                     <div class="dac-box-card dac-box-internal h-100">
-                                        <h5 class="dac-box-title dac-title-internal">
-                                            <i class="fa fa-users me-2"/>Nghiệp vụ - Nội bộ
-                                        </h5>
-                                        <group>
-                                            <field name="user_id" widget="many2one_avatar_user" string="Phụ trách" readonly="is_design_user or is_production_user"/>
-                                        </group>
-                                        <div class="border-top my-2"/>
-                                        <group>
-                                            <field name="user_id_design" widget="many2one_avatar_user" string="Phân công thiết kế" readonly="is_design_user"/>
-                                            <field name="design_deadline" string="Deadline thiết kế" invisible="order_state_custom == 'quotation'" readonly="design_done or order_state_custom in ['completed', 'cancelled']"/>
-                                        </group>
-                                        <div class="border-top my-2"/>
-                                        <group>
-                                            <field name="user_id_production" widget="many2one_avatar_user" string="Phân công sản xuất" readonly="is_design_user"/>
-                                            <field name="production_deadline" string="Deadline sản xuất" invisible="order_state_custom == 'quotation'" readonly="order_state_custom not in ['quotation', 'deposit']"/>
-                                            <field name="production_group_ids" widget="many2many_tags" string="Nhóm sản xuất" readonly="is_design_user" invisible="order_state_custom == 'quotation'"/>
-                                        </group>
+                                        <div class="dac-v6-metric-list order-metrics">
+                                            <div class="dac-v6-metric-row">
+                                                <span class="dac-v6-metric-icon" title="Sale phụ trách">
+                                                    <i class="fa fa-users"/><span class="visually-hidden">Sale phụ trách</span>
+                                                </span>
+                                                <span class="dac-v6-metric-value">
+                                                    <field name="user_id" widget="many2one_avatar_user" nolabel="1" placeholder="Chọn Sale phụ trách" readonly="is_design_user or is_production_user"/>
+                                                </span>
+                                            </div>
+                                            <div class="dac-v6-metric-row">
+                                                <span class="dac-v6-metric-icon" title="Người thiết kế">
+                                                    <i class="fa fa-pencil"/><span class="visually-hidden">Người thiết kế</span>
+                                                </span>
+                                                <span class="dac-v6-metric-value">
+                                                    <field name="user_id_design" widget="many2one_avatar_user" nolabel="1" placeholder="Chọn người thiết kế" readonly="is_design_user"/>
+                                                </span>
+                                            </div>
+                                            <div class="dac-v6-metric-row">
+                                                <span class="dac-v6-metric-icon" title="Xưởng sản xuất">
+                                                    <i class="fa fa-cogs"/><span class="visually-hidden">Xưởng sản xuất</span>
+                                                </span>
+                                                <span class="dac-v6-metric-value">
+                                                    <field name="user_id_production" widget="many2one_avatar_user" nolabel="1" placeholder="Chọn người sản xuất" readonly="is_design_user"/>
+                                                    <field name="production_group_ids" widget="many2many_tags" nolabel="1" placeholder="Chọn xưởng sản xuất" readonly="is_design_user" invisible="order_state_custom == 'quotation'"/>
+                                                </span>
+                                            </div>
+                                            <div class="dac-v6-metric-row">
+                                                <span class="dac-v6-metric-icon" title="Deadline">
+                                                    <i class="fa fa-clock-o"/><span class="visually-hidden">Deadline</span>
+                                                </span>
+                                                <span class="dac-v6-metric-value">
+                                                    <field name="design_deadline" nolabel="1" placeholder="Chọn deadline" invisible="order_state_custom not in ['deposit']" readonly="design_done or order_state_custom in ['completed', 'cancelled']"/>
+                                                    <field name="production_deadline" nolabel="1" placeholder="Chọn deadline" invisible="order_state_custom in ['quotation', 'deposit']" readonly="order_state_custom not in ['quotation', 'deposit']"/>
+                                                    <span class="dac-v6-empty-value" invisible="order_state_custom != 'quotation'">Chưa đặt</span>
+                                                </span>
+                                            </div>
+                                        </div>
                                         <div class="border-top my-2" invisible="order_state_custom == 'quotation' or fulfillment_method not in ['delivery', 'installation']"/>
                                         <group invisible="order_state_custom == 'quotation' or fulfillment_method != 'delivery'">
                                             <field name="delivery_address" string="Địa chỉ giao hàng" readonly="is_delivery_confirmed or is_design_user" widget="text" placeholder="Địa chỉ giao hàng..."/>
@@ -644,7 +689,7 @@
                                 <div class="col-12 mb-3">
                                     <div class="dac-box-card dac-box-tasks h-100">
                                         <h5 class="dac-box-title dac-title-tasks d-flex justify-content-between align-items-center">
-                                            <span><i class="fa fa-tasks me-2"/>Tiến độ công việc</span>
+                                            <span><i class="fa fa-tasks me-2"/>Công việc liên quan</span>
                                             <button name="action_quick_create_task" type="object"
                                                     string="+ Task"
                                                     class="btn btn-sm btn-outline-primary py-0 px-2"

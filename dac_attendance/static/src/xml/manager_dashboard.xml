@@ -18,9 +18,16 @@
             <t t-else="">
                 <!-- Header -->
                 <div class="o_dac_mgr_header">
-                    <h4>Dashboard Quản lý Chấm công</h4>
-                    <div class="d-flex align-items-center gap-3">
-                        <span class="text-muted" t-esc="todayLabel"/>
+                    <div class="o_dac_mgr_heading">
+                        <div class="o_dac_mgr_crumb">DAC Chấm công <span>/</span> Quản lý</div>
+                        <h1>Dashboard Chấm công</h1>
+                        <p>Tình trạng nhân sự hôm nay và các yêu cầu đang chờ duyệt.</p>
+                    </div>
+                    <div class="o_dac_mgr_header_actions">
+                        <span class="o_dac_today_label" t-esc="todayLabel"/>
+                        <button class="o_dac_btn_reports" t-on-click="openReports">
+                            <i class="fa fa-bar-chart me-2"/>Báo cáo tháng
+                        </button>
                         <button class="o_dac_btn_refresh" t-on-click="loadDashboard"
                                 t-att-disabled="state.loading">
                             <i class="fa fa-refresh me-1"/>Làm mới
@@ -32,27 +39,27 @@
                 <div class="o_dac_kpi_row">
                     <div class="o_dac_kpi_card o_dac_kpi_card--present"
                          t-on-click="() => this.state.activeTab = 'present'">
+                        <div class="o_dac_kpi_top"><div class="o_dac_kpi_label">Có mặt</div><span class="o_dac_kpi_icon"><i class="fa fa-users"/></span></div>
                         <div class="o_dac_kpi_number" t-esc="state.data.today_stats.present"/>
-                        <div class="o_dac_kpi_label">Có mặt</div>
-                        <i class="fa fa-user-check o_dac_kpi_icon"/>
-                    </div>
-                    <div class="o_dac_kpi_card o_dac_kpi_card--absent"
-                         t-on-click="() => this.state.activeTab = 'absent'">
-                        <div class="o_dac_kpi_number" t-esc="state.data.today_stats.absent"/>
-                        <div class="o_dac_kpi_label">Vắng mặt</div>
-                        <i class="fa fa-user-times o_dac_kpi_icon"/>
+                        <div class="o_dac_kpi_meta"><strong><t t-esc="presentRate"/>%</strong> tổng nhân sự</div>
                     </div>
                     <div class="o_dac_kpi_card o_dac_kpi_card--late"
                          t-on-click="() => this.state.activeTab = 'late'">
+                        <div class="o_dac_kpi_top"><div class="o_dac_kpi_label">Đi muộn</div><span class="o_dac_kpi_icon"><i class="fa fa-clock-o"/></span></div>
                         <div class="o_dac_kpi_number" t-esc="state.data.today_stats.late"/>
-                        <div class="o_dac_kpi_label">Đi trễ</div>
-                        <i class="fa fa-clock-o o_dac_kpi_icon"/>
+                        <div class="o_dac_kpi_meta"><strong><t t-esc="lateRate"/>%</strong> tổng nhân sự</div>
+                    </div>
+                    <div class="o_dac_kpi_card o_dac_kpi_card--absent"
+                         t-on-click="() => this.state.activeTab = 'absent'">
+                        <div class="o_dac_kpi_top"><div class="o_dac_kpi_label">Vắng</div><span class="o_dac_kpi_icon"><i class="fa fa-user-times"/></span></div>
+                        <div class="o_dac_kpi_number" t-esc="state.data.today_stats.absent"/>
+                        <div class="o_dac_kpi_meta">Chưa check-in hôm nay</div>
                     </div>
                     <div class="o_dac_kpi_card o_dac_kpi_card--pending"
                          t-on-click="() => this.state.approvalTab = 'leaves'">
+                        <div class="o_dac_kpi_top"><div class="o_dac_kpi_label">Chờ duyệt</div><span class="o_dac_kpi_icon"><i class="fa fa-list-alt"/></span></div>
                         <div class="o_dac_kpi_number" t-esc="state.data.today_stats.pending_approvals"/>
-                        <div class="o_dac_kpi_label">Chờ duyệt</div>
-                        <i class="fa fa-bell o_dac_kpi_icon"/>
+                        <div class="o_dac_kpi_meta">Nghỉ phép và điều chỉnh</div>
                     </div>
                 </div>
 
@@ -61,7 +68,9 @@
 
                     <!-- Attendance List -->
                     <div class="o_dac_card o_dac_mgr_list_card">
-                        <div class="o_dac_card_title">Nhân viên hôm nay</div>
+                        <div class="o_dac_card_header">
+                            <div><div class="o_dac_card_title">Nhân viên hôm nay</div><div class="o_dac_card_subtitle">Hiện diện và thời gian vào / ra</div></div>
+                        </div>
                         <div class="o_dac_tab_row">
                             <button t-attf-class="o_dac_tab {{ state.activeTab === 'present' ? 'o_dac_tab--active' : '' }}"
                                     t-on-click="() => this.state.activeTab = 'present'">
@@ -133,12 +142,14 @@
 
                     <!-- Approvals Panel -->
                     <div class="o_dac_card o_dac_approval_card">
-                        <div class="o_dac_card_title">
-                            Chờ phê duyệt
+                        <div class="o_dac_card_header">
+                          <div><div class="o_dac_card_title">
+                            Yêu cầu chờ duyệt
                             <span t-if="state.data.today_stats.pending_approvals > 0"
                                   class="o_dac_pending_badge">
                                 <t t-esc="state.data.today_stats.pending_approvals"/>
                             </span>
+                          </div><div class="o_dac_card_subtitle">Xử lý trực tiếp tại dashboard</div></div>
                         </div>
 
                         <div class="o_dac_tab_row">
@@ -246,12 +257,6 @@
                     </div>
                 </div>
 
-                <!-- Quick link to reports -->
-                <div class="o_dac_mgr_footer">
-                    <button class="o_dac_btn_reports" t-on-click="openReports">
-                        <i class="fa fa-bar-chart me-2"/>Xem báo cáo chi tiết
-                    </button>
-                </div>
             </t>
         </t>
     </div>

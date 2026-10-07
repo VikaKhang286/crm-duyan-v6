@@ -325,3 +325,80 @@
 .o_dac_pulse_dot {
     animation: dac_pulse_inline 2s infinite;
 }
+
+// v6 — giao diện action-525 đồng bộ với prototype ERP/CRM
+.o_dac_employee_dashboard {
+    max-width: 1440px;
+    min-height: 100%;
+    margin: 0 auto;
+    padding: 28px 32px 48px;
+    color: #17191f;
+    background: #f7f8fb;
+
+    .o_dac_emp_header { margin-bottom: 24px; }
+    .o_dac_emp_crumb { margin-bottom: 7px; color: #8b909c; font-size: 12px; font-weight: 600; }
+    .o_dac_emp_crumb span { margin: 0 5px; color: #c5c8cf; }
+    .o_dac_emp_heading h1 { margin: 0 0 7px; font-size: 27px; font-weight: 750; letter-spacing: -.6px; }
+    .o_dac_emp_heading p { margin: 0; color: #747985; font-size: 13px; }
+
+    .o_dac_today_card,
+    .o_dac_card {
+        border: 1px solid #e8ebf1;
+        border-radius: 14px;
+        background: #fff;
+        box-shadow: 0 5px 18px rgba(20, 24, 35, .045);
+    }
+
+    .o_dac_today_card {
+        position: relative;
+        padding: 20px 22px;
+        overflow: hidden;
+    }
+
+    .o_dac_today_card::before {
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: 4px;
+        background: #ffc20e;
+        content: "";
+    }
+
+    .o_dac_status_label { color: #252830; font-size: 13px; }
+    .o_dac_today_hours { color: #252830; font-size: 28px; }
+
+    .o_dac_btn_checkin,
+    .o_dac_btn_checkout,
+    .o_dac_btn_leave_request {
+        border-radius: 9px;
+        background: #ffc20e;
+        color: #17191f;
+        box-shadow: none;
+    }
+
+    .o_dac_btn_checkin:hover,
+    .o_dac_btn_checkout:hover,
+    .o_dac_btn_leave_request:hover { background: #eeb400; }
+
+    .o_dac_btn_amendment {
+        border: 1px solid #dfe2e8;
+        border-radius: 9px;
+        background: #fff;
+        color: #343841;
+    }
+
+    .o_dac_middle_row { gap: 16px; }
+    .o_dac_card { padding: 18px; }
+    .o_dac_card_title { color: #252830; font-size: 14px; text-transform: none; letter-spacing: 0; }
+    .o_dac_leave_progress { background: #f0f1f4; }
+    .o_dac_leave_progress_bar { background: #ffc20e; }
+    .o_dac_leave_progress_bar--sick { background: #f59e0b; }
+    .o_dac_leave_progress_bar--unpaid { background: #8b909c; }
+    .o_dac_history_row { border-bottom-color: #eef0f4; }
+    .o_dac_history_row--late { background: #fff9e6; }
+    .o_dac_history_row--leave { background: #f7f8fb; }
+    .o_dac_pending_icon.o_dac_icon_leave,
+    .o_dac_pending_icon.o_dac_icon_amendment { background: #fff3c2; color: #8a6500; }
+
+    @media (max-width: 900px) { padding: 22px 18px 40px; }
+    @media (max-width: 520px) { padding: 18px 12px 32px; }
+}

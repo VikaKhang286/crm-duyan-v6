@@ -16,6 +16,663 @@
   --dac-order-shadow: 0 6px 24px rgba(28, 38, 64, 0.055);
 }
 
+/* --------------------------------------------------------------------------
+   v6 order workspace — based on the prototype order detail screen.
+   This block is intentionally last so it wins over legacy form declarations.
+   -------------------------------------------------------------------------- */
+@media (min-width: 768px) {
+  .o_action_manager:has(.dac-sale-form) .o_content {
+    background: #f4f6f9 !important;
+  }
+
+  .o_action_manager:has(.dac-sale-form) .o_form_view .o_form_renderer {
+    background: #f4f6f9 !important;
+  }
+
+  .o_action_manager:has(.dac-sale-form) .o_form_view .o_form_sheet_bg {
+    padding: 14px 16px 30px !important;
+    background: #f4f6f9 !important;
+  }
+
+  .o_action_manager:has(.dac-sale-form) .o_form_view .o_form_sheet {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  .o_control_panel.dac-sale-order-control-panel-active {
+    padding: 14px 16px 0 !important;
+    border: 0 !important;
+    background: #f4f6f9 !important;
+  }
+
+  .o_control_panel.dac-sale-order-control-panel-active .dac-sale-order-control-panel-slot {
+    overflow: hidden;
+    border: 1px solid #e4e7ed;
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 5px 20px rgba(28, 38, 64, .055);
+  }
+
+  .dac-control-panel-bar {
+    display: grid;
+    padding: 0 !important;
+    grid-template-columns: minmax(220px, .72fr) minmax(520px, 1.55fr);
+    grid-template-areas:
+      "title progress"
+      "tools tools";
+    gap: 0 !important;
+    white-space: normal;
+  }
+
+  .dac-control-panel-main {
+    grid-area: title;
+    min-height: 78px;
+    padding: 17px 18px;
+    align-items: flex-start;
+  }
+
+  .dac-control-panel-title {
+    color: #202734 !important;
+    font-size: 19px !important;
+    font-weight: 850 !important;
+    letter-spacing: -.02em;
+  }
+
+  .dac-control-panel-title::after {
+    display: block;
+    margin-top: 8px;
+    color: #7f8999;
+    content: "Đơn bán hàng · Theo dõi từ báo giá đến hoàn thành";
+    font-size: 10px;
+    font-weight: 550;
+    letter-spacing: 0;
+  }
+
+  .dac-control-panel-progress {
+    grid-area: progress;
+    min-height: 78px;
+    padding: 11px 16px;
+    border-left: 1px solid #eef0f4;
+    display: flex;
+    align-items: center;
+  }
+
+  .dac-control-panel-progress .o_field_widget,
+  .dac-control-panel-progress .o_statusbar_status {
+    width: 100%;
+  }
+
+  .dac-control-panel-progress .o_statusbar_status {
+    display: grid !important;
+    grid-template-columns: repeat(6, minmax(76px, 1fr));
+    gap: 4px !important;
+    overflow: visible !important;
+  }
+
+  .dac-control-panel-progress .o_arrow_button {
+    min-height: 44px;
+    padding: 7px 6px !important;
+    justify-content: center;
+    border: 0 !important;
+    border-radius: 9px !important;
+    background: transparent !important;
+    color: #6f7887 !important;
+    font-size: 10px !important;
+    font-weight: 750 !important;
+    text-align: center;
+  }
+
+  .dac-control-panel-progress .o_arrow_button.btn-primary,
+  .dac-control-panel-progress .o_arrow_button.active,
+  .dac-control-panel-progress .o_arrow_button:hover {
+    background: #fff6d8 !important;
+    color: #715400 !important;
+    box-shadow: inset 0 0 0 1px #e7ca67;
+  }
+
+  .dac-control-panel-progress .dac-substatus-chips {
+    display: none !important;
+  }
+
+  .dac-control-panel-tools {
+    grid-area: tools;
+    min-height: 58px;
+    width: 100%;
+    margin: 0 !important;
+    padding: 10px 18px;
+    border-top: 1px solid #e9ecf1;
+    background: #fafbfc;
+    justify-content: flex-start;
+    gap: 8px;
+  }
+
+  .dac-control-panel-tools .btn {
+    min-height: 34px;
+    padding: 7px 13px !important;
+    border-radius: 8px !important;
+    font-size: 11px !important;
+    font-weight: 750 !important;
+  }
+
+  .dac-control-panel-tools .btn-primary,
+  .dac-control-panel-tools .btn-warning,
+  .dac-control-panel-tools .btn-success {
+    border-color: #ffc20e !important;
+    background: #ffc20e !important;
+    color: #4b3900 !important;
+  }
+
+  .dac-control-panel-pancake {
+    display: none !important;
+  }
+
+  .dac-sale-form .dac-core-info-row {
+    margin: 0 0 14px !important;
+  }
+
+  .dac-sale-form .dac-core-info-row > .d-flex {
+    display: grid !important;
+    padding: 0 !important;
+    grid-template-columns: minmax(0, 1fr) minmax(360px, .65fr);
+    gap: 14px !important;
+  }
+
+  .dac-sale-form .dac-core-info-row .dac-box-card {
+    width: 100% !important;
+    max-width: none !important;
+    padding: 0 16px 14px !important;
+    border: 1px solid #e4e7ed !important;
+    border-radius: 13px !important;
+    background: #fff !important;
+    box-shadow: 0 4px 17px rgba(28, 38, 64, .045) !important;
+  }
+
+  .dac-sale-form .dac-core-info-row .dac-box-title {
+    min-height: 47px;
+    margin: 0 -16px 12px !important;
+    padding: 0 16px;
+    border-bottom: 1px solid #e9ecf1;
+    color: #252c38 !important;
+    font-size: 13px !important;
+    font-weight: 850;
+  }
+
+  .dac-sale-form .dac-core-info-row .dac-box-title i {
+    color: #8c96a5 !important;
+  }
+
+  .dac-sale-form .dac-core-info-row .o_inner_group {
+    grid-template-columns: minmax(110px, .42fr) minmax(0, 1fr) !important;
+    gap: 9px 13px !important;
+  }
+
+  .dac-sale-form .dac-core-info-row .o_form_label {
+    color: #8a93a2;
+    font-size: 10px;
+    font-weight: 650;
+  }
+
+  .dac-sale-form .dac-core-info-row .o_field_widget {
+    color: #2e3643;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .dac-sale-form .dac-action-bar-top {
+    margin: 0 0 14px !important;
+    padding: 9px 12px !important;
+    border: 1px solid #eadb9e !important;
+    border-radius: 11px !important;
+    background: #fffbeb !important;
+    box-shadow: none !important;
+  }
+
+  .dac-sale-form .o_notebook {
+    overflow: hidden;
+    border: 1px solid #e4e7ed;
+    border-radius: 13px;
+    background: #fff;
+    box-shadow: 0 4px 18px rgba(28, 38, 64, .045);
+  }
+
+  .dac-sale-form .o_notebook_headers {
+    padding: 6px 10px 0;
+    border-bottom: 1px solid #e9ecf1;
+    background: #fafbfc;
+  }
+
+  .dac-sale-form .o_notebook .nav-link {
+    min-height: 38px;
+    padding: 9px 12px;
+    border: 0 !important;
+    border-radius: 8px 8px 0 0 !important;
+    color: #778193;
+    font-size: 10px;
+    font-weight: 750;
+  }
+
+  .dac-sale-form .o_notebook .nav-link.active {
+    background: #fff !important;
+    color: #674d00 !important;
+    box-shadow: inset 0 -3px #ffc20e;
+  }
+
+  .dac-sale-form .o_notebook .tab-content,
+  .dac-sale-form .o_notebook .tab-pane {
+    padding: 0 !important;
+    background: #fff !important;
+  }
+
+  .dac-order-lines-panel {
+    padding: 14px 14px 18px !important;
+  }
+
+  .dac-order-lines-panel::before {
+    display: block;
+    margin: 0 0 12px;
+    color: #252c38;
+    content: "Sản phẩm";
+    font-size: 13px;
+    font-weight: 850;
+  }
+
+  .dac-order-lines-panel .o_list_renderer .o_list_table {
+    margin: 0 !important;
+    border: 1px solid #e7eaf0 !important;
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+    border-radius: 10px !important;
+  }
+
+  .dac-order-lines-panel .o_list_renderer .o_list_table thead th {
+    padding: 10px 11px !important;
+    border-bottom: 1px solid #e5e8ee !important;
+    background: #fafbfc !important;
+    color: #8a94a4 !important;
+    font-size: 9px !important;
+  }
+
+  .dac-order-lines-panel .o_list_renderer .o_list_table tbody td {
+    padding: 12px 11px !important;
+    border: 0 !important;
+    border-bottom: 1px solid #edf0f4 !important;
+    border-radius: 0 !important;
+    background: #fff !important;
+    color: #455064;
+    font-size: 10px;
+  }
+
+  .dac-order-lines-panel .o_list_renderer .o_list_table tbody tr:hover td {
+    background: #fffdf5 !important;
+  }
+}
+
+@media (max-width: 1100px) and (min-width: 768px) {
+  .dac-control-panel-bar {
+    grid-template-columns: 1fr;
+    grid-template-areas: "title" "progress" "tools";
+  }
+
+  .dac-control-panel-progress {
+    border-top: 1px solid #eef0f4;
+    border-left: 0;
+  }
+
+  .dac-sale-form .dac-core-info-row > .d-flex {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Exact block composition from the v6 order detail prototype. */
+.dac-sale-form .dac-v6-customer-divider,
+.dac-sale-form .dac-v6-stage-divider {
+  height: 1px;
+  margin: 14px 0;
+  background: #eceef3;
+}
+
+.dac-sale-form .dac-box-client > .dac-box-internal,
+.dac-sale-form .dac-box-document > .dac-box-tasks {
+  height: auto !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.dac-sale-form .dac-box-client > .dac-box-internal .dac-box-title,
+.dac-sale-form .dac-box-document > .dac-box-tasks .dac-box-title {
+  min-height: auto !important;
+  margin: 0 0 10px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  font-size: 11px !important;
+}
+
+.dac-sale-form .dac-box-client > .dac-box-internal .o_inner_group {
+  grid-template-columns: minmax(108px, .4fr) minmax(0, 1fr) !important;
+}
+
+.dac-sale-form .dac-v6-metric-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 22px;
+}
+
+.dac-sale-form .dac-v6-metric-row {
+  display: grid;
+  min-width: 0;
+  min-height: 50px;
+  grid-template-columns: 30px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  border-bottom: 1px solid #edf0f4;
+}
+
+.dac-sale-form .dac-v6-metric-icon {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 8px;
+  background: #f1f3f6;
+  color: #7d8796;
+  font-size: 13px;
+}
+
+.dac-sale-form .dac-v6-metric-value {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+  color: #303846;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.dac-sale-form .dac-v6-metric-value > .o_field_widget {
+  width: 100%;
+  min-width: 0;
+  margin: 0 !important;
+}
+
+.dac-sale-form .dac-v6-metric-value .o_field_many2one_selection,
+.dac-sale-form .dac-v6-metric-value .o_input_dropdown,
+.dac-sale-form .dac-v6-metric-value .o-autocomplete {
+  width: 100%;
+}
+
+.dac-sale-form .dac-v6-metric-value .o_input {
+  min-height: 31px;
+  border-color: transparent !important;
+  background: transparent !important;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.dac-sale-form .dac-v6-metric-value .o_input:focus {
+  border-color: #e0bc42 !important;
+  background: #fffdf5 !important;
+}
+
+.dac-sale-form .dac-v6-empty-value {
+  color: #9aa2af;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.dac-sale-form .dac-v6-customer-strip,
+.dac-sale-form .dac-v6-customer-fields-grid {
+  width: 100%;
+}
+
+.dac-sale-form .dac-v6-customer-anchor {
+    display: block;
+    width: 100%;
+}
+
+.dac-sale-form .dac-v6-customer-value {
+    position: relative;
+}
+
+.dac-sale-form .dac-v6-customer-placeholder {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    color: #9ca3af;
+    font-weight: 600;
+    pointer-events: none;
+}
+
+.dac-sale-form .dac-v6-customer-fields-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 22px;
+}
+
+.dac-sale-form .dac-v6-customer-row {
+  display: grid;
+  min-width: 0;
+  min-height: 50px;
+  grid-template-columns: 30px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  border-bottom: 1px solid #edf0f4;
+}
+
+.dac-sale-form .dac-v6-customer-row.dac-v6-address-row {
+  grid-column: 1 / -1;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+}
+
+.dac-sale-form .dac-v6-customer-icon {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 8px;
+  background: #f1f3f6;
+  color: #7d8796;
+  font-size: 13px;
+}
+
+.dac-sale-form .dac-v6-customer-value {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  color: #303846;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.dac-sale-form .dac-v6-customer-value > .o_field_widget,
+.dac-sale-form .dac-v6-customer-value .o_field_many2one_selection,
+.dac-sale-form .dac-v6-customer-value .o_input_dropdown,
+.dac-sale-form .dac-v6-customer-value .o-autocomplete {
+  width: 100%;
+  min-width: 0;
+}
+
+.dac-sale-form .dac-v6-customer-value .o_input {
+  min-height: 31px;
+  margin: 0 !important;
+  border-color: transparent !important;
+  background: transparent !important;
+  color: #303846;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.dac-sale-form .dac-v6-customer-value .o_input:focus {
+  border-color: #e0bc42 !important;
+  background: #fffdf5 !important;
+}
+
+.dac-sale-form .dac-v6-channel-button {
+  min-height: 31px;
+  padding: 6px 10px !important;
+  border: 1px solid #ead58a !important;
+  border-radius: 8px !important;
+  background: #fff9df !important;
+  color: #775a00 !important;
+  font-size: 9px !important;
+  font-weight: 800 !important;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .dac-sale-form .dac-v6-customer-fields-grid { grid-template-columns: 1fr; }
+  .dac-sale-form .dac-v6-customer-row.dac-v6-address-row { grid-column: auto; }
+}
+
+/* Prototype customer-strip: customer data and ownership share one row. */
+.dac-sale-form .dac-box-client {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(190px, 0.85fr);
+  align-content: start;
+  gap: 14px;
+}
+
+.dac-sale-form .dac-box-client > .dac-box-title,
+.dac-sale-form .dac-box-client > .dac-v6-order-description {
+  grid-column: 1 / -1;
+}
+
+.dac-sale-form .dac-box-client > .dac-v6-customer-anchor {
+  grid-column: 1 / -1;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.dac-sale-form .dac-v6-customer-owner {
+  grid-column: 2;
+  min-width: 0;
+  padding: 12px 13px;
+  border: 1px solid #e4e7ed;
+  border-radius: 10px;
+  background: #f8f9fb;
+}
+
+.dac-sale-form .dac-box-client > .dac-box-internal {
+  grid-column: 1 / -1;
+  min-width: 0;
+  min-height: 0 !important;
+  padding: 12px 13px !important;
+  border: 1px solid #e4e7ed !important;
+  border-radius: 10px !important;
+  background: #f8f9fb !important;
+  box-shadow: none !important;
+}
+
+.dac-sale-form .dac-box-client > .dac-box-internal .dac-v6-metric-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.dac-sale-form .dac-v6-customer-owner > h4 {
+  margin: 0 0 7px;
+  color: #313946;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.dac-sale-form .dac-v6-customer-owner .dac-box-internal {
+  min-height: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.dac-sale-form .dac-v6-customer-owner .dac-v6-metric-list {
+  grid-template-columns: 1fr;
+  gap: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.dac-sale-form .dac-v6-customer-owner .dac-v6-metric-row {
+  min-height: 34px;
+}
+
+.dac-sale-form .dac-v6-order-description {
+  margin-top: 0;
+  cursor: pointer;
+}
+
+.dac-sale-form .dac-v6-order-description > .o_inner_group {
+  display: none !important;
+}
+
+@media (max-width: 900px) {
+  .dac-sale-form .dac-box-client { grid-template-columns: 1fr; }
+  .dac-sale-form .dac-box-client > .dac-v6-customer-anchor,
+  .dac-sale-form .dac-v6-customer-owner,
+  .dac-sale-form .dac-box-client > .dac-box-internal { grid-column: 1; }
+}
+
+@media (max-width: 900px) {
+  .dac-sale-form .dac-v6-metric-list { grid-template-columns: 1fr; }
+}
+
+.dac-sale-form .dac-v6-order-description {
+  position: relative;
+  margin-top: 14px;
+  padding: 12px 13px;
+  border: 1px solid #e4e7ed;
+  border-radius: 10px;
+  background: #f8f9fb;
+}
+
+.dac-sale-form .dac-v6-subtitle {
+  margin: 0 0 9px;
+  color: #313946;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.dac-sale-form .dac-v6-subtitle i { color: #8c96a5; }
+
+.dac-sale-form .dac-v6-order-description .dac-order-ai-fields {
+  margin: 0 !important;
+}
+
+.dac-sale-form .dac-v6-order-description .dac-action-bar-ai {
+  margin-top: 9px;
+  justify-content: flex-end;
+}
+
+.dac-sale-form .dac-box-document > .dac-box-tasks .o_kanban_renderer {
+  max-height: 240px;
+}
+
+.dac-sale-form .o-chatter-group > .container-fluid:empty,
+.dac-sale-form .o-chatter-group > .container-fluid > .col-12:empty {
+  display: none !important;
+}
+
+@media (min-width: 1101px) {
+  .dac-sale-form .dac-core-info-row .dac-box-client {
+    min-height: 410px;
+  }
+  .dac-sale-form .dac-core-info-row .dac-box-document {
+    min-height: 410px;
+  }
+}
+
 .dac-sale-form {
   position: relative;
 }
@@ -1153,5 +1810,81 @@
   .conversation-toggle,
   .dac-ticket {
     transition: none !important;
+  }
+}
+
+/* Final cascade guards for the v6 order workspace. */
+@media (min-width: 768px) {
+  .o_web_client .dac-control-panel-bar {
+    display: grid !important;
+    padding: 0 !important;
+    grid-template-columns: minmax(220px, .72fr) minmax(520px, 1.55fr) !important;
+    grid-template-areas: "title progress" "tools tools" !important;
+    gap: 0 !important;
+    white-space: normal !important;
+  }
+  .o_web_client .dac-control-panel-main { grid-area: title; min-height: 78px; padding: 17px 18px; }
+  .o_web_client .dac-control-panel-progress {
+    grid-area: progress; min-height: 78px; padding: 11px 16px;
+    border-left: 1px solid #eef0f4; display: flex; align-items: center;
+  }
+  .o_web_client .dac-control-panel-progress .o_statusbar_status { direction: rtl; }
+  .o_web_client .dac-control-panel-progress .o_arrow_button { direction: ltr; }
+  .o_action_manager:has(.dac-sale-form) .o_form_renderer {
+    height: auto !important;
+    flex-flow: column nowrap !important;
+    overflow-y: auto !important;
+  }
+  .o_action_manager:has(.dac-sale-form) .o_form_sheet_bg {
+    width: 100% !important;
+    flex: 0 0 auto !important;
+  }
+  .o_action_manager:has(.dac-sale-form) .o-chatter-group {
+    width: auto !important;
+    max-width: none !important;
+    margin: 0 16px 30px !important;
+    padding: 16px !important;
+    border: 1px solid #e4e7ed;
+    border-radius: 13px;
+    background: #fff;
+    box-shadow: 0 4px 18px rgba(28, 38, 64, .045);
+  }
+  .o_action_manager:has(.dac-sale-form) .o-chatter-group .dac-order-ai-fields {
+    width: 100%;
+  }
+  .o_web_client .dac-control-panel-tools {
+    grid-area: tools; width: 100%; min-height: 58px; margin: 0 !important;
+    padding: 10px 18px; border-top: 1px solid #e9ecf1;
+    background: #fafbfc; justify-content: flex-start;
+  }
+  .o_web_client .dac-sale-form .dac-core-info-row > .d-flex {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(360px, .65fr) !important;
+    gap: 14px !important;
+  }
+  .o_web_client .dac-sale-form .dac-core-info-row .dac-box-card {
+    width: 100% !important; max-width: none !important; padding: 0 !important;
+    border: 1px solid #e4e7ed !important; border-radius: 13px !important;
+    background: #fff !important; box-shadow: 0 4px 17px rgba(28, 38, 64, .045) !important;
+  }
+  .o_web_client .dac-order-lines-panel .o_list_renderer .o_list_table {
+    margin: 0 !important; border: 1px solid #e7eaf0 !important;
+    border-collapse: separate !important; border-spacing: 0 !important;
+    border-radius: 10px !important;
+  }
+  .o_web_client .dac-order-lines-panel .o_list_renderer .o_list_table tbody td {
+    padding: 12px 11px !important; border: 0 !important;
+    border-bottom: 1px solid #edf0f4 !important; border-radius: 0 !important;
+    background: #fff !important;
+  }
+}
+
+@media (max-width: 1100px) and (min-width: 768px) {
+  .o_web_client .dac-control-panel-bar {
+    grid-template-columns: 1fr !important;
+    grid-template-areas: "title" "progress" "tools" !important;
+  }
+  .o_web_client .dac-sale-form .dac-core-info-row > .d-flex {
+    grid-template-columns: 1fr !important;
   }
 }
