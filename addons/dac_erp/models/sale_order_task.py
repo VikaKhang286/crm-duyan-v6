@@ -84,10 +84,20 @@ class SaleOrderTask(models.Model):
 
     def action_quick_create_task(self):
         self.ensure_one()
+        is_design_flow = self.order_state_custom == 'deposit'
+        task_type = 'design' if is_design_flow else 'production'
+        assigned_user = self.user_id_design if is_design_flow else self.user_id_production
+        deadline = self.design_deadline if is_design_flow else self.production_deadline
         return {
             'type': 'ir.actions.act_window',
             'res_model': 'dac.quick.task.wizard',
             'view_mode': 'form',
             'target': 'new',
-            'context': {'active_id': self.id},
+            'context': {
+                'active_id': self.id,
+                'default_order_id': self.id,
+                'default_task_type': task_type,
+                'default_assigned_user_id': assigned_user.id or False,
+                'default_deadline': (str(deadline) + ' 23:59:00') if deadline else False,
+            },
         }

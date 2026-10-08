@@ -2,7 +2,7 @@ from odoo import models, fields, api, _
 from odoo.exceptions import UserError, ValidationError
 from odoo.osv import expression
 import logging
-from datetime import date, timedelta
+from datetime import date, datetime, time, timedelta
 
 
 _logger = logging.getLogger(__name__)
@@ -41,6 +41,35 @@ class SaleOrder(models.Model):
     ], string='Trạng thái đơn hàng', default='quotation', tracking=True)
 
     date = fields.Datetime(string='Ngày đơn hàng', default=fields.Datetime.now)
+    delivery_date = fields.Date(
+        string='Ngày giao hàng',
+        compute='_compute_delivery_date',
+        inverse='_inverse_delivery_date',
+        store=False,
+    )
+
+    @api.depends('commitment_date')
+    def _compute_delivery_date(self):
+        """Expose the delivery commitment as a date-only field for the UI."""
+        for order in self:
+            order.delivery_date = (
+                fields.Date.to_date(order.commitment_date)
+                if order.commitment_date else False
+            )
+
+    def _inverse_delivery_date(self):
+        """Persist the selected date back to Odoo's commitment_date field.
+
+        Keep the existing time component, if any, so editing the visible date
+        never changes any hidden delivery-time data.
+        """
+        for order in self:
+            if not order.delivery_date:
+                order.commitment_date = False
+                continue
+            previous = fields.Datetime.to_datetime(order.commitment_date)
+            delivery_time = previous.time() if previous else time.min
+            order.commitment_date = datetime.combine(order.delivery_date, delivery_time)
 
     # Sale phụ trách
     user_id = fields.Many2one(
@@ -188,6 +217,35 @@ class SaleOrder(models.Model):
 
     # Tiến trình giao hàng
     delivery_address = fields.Text(string="Địa chỉ giao hàng", tracking=True)
+    shipping_method = fields.Selection([
+        ('carrier', 'Đơn vị vận chuyển'),
+        ('bus', 'Chành xe'),
+    ], string="Phương thức giao", default='carrier', tracking=True)
+    shipping_carrier = fields.Selection([
+        ('choose-option', 'Chọn đơn vị vận chuyển'),
+        ('viettel-post', 'Viettel Post'),
+        ('ghn', 'GHN'),
+        ('j&t-express', 'J&T Express'),
+        ('other', 'Đối tác vận chuyển khác'),
+    ], string="Đơn vị vận chuyển", default='choose-option', tracking=True)
+    shipping_tracking_code = fields.Char(string="Mã vận đơn", tracking=True)
+    shipping_status = fields.Selection([
+        ('waiting', 'Chờ lấy hàng'),
+        ('shipping', 'Đang giao'),
+        ('failed', 'Giao chưa thành công'),
+        ('delivered', 'Giao thành công'),
+        ('returned', 'Trả hàng'),
+    ], string="Trạng thái giao hàng", default='waiting', tracking=True)
+    shipping_cod = fields.Monetary(string="Số tiền thu hộ (COD)", currency_field='currency_id', tracking=True)
+    bus_carrier_name = fields.Char(string="Chành xe / nhà xe", tracking=True)
+    bus_shipping_info = fields.Char(string="Thông tin gửi hàng", tracking=True)
+    bus_shipping_status = fields.Selection([
+        ('waiting', 'Chờ gửi hàng'),
+        ('shipping', 'Đang vận chuyển'),
+        ('failed', 'Gửi chưa thành công'),
+        ('delivered', 'Giao thành công'),
+        ('returned', 'Trả hàng'),
+    ], string="Trạng thái giao hàng", default='waiting', tracking=True)
 
     # Tiến trình thi công - lắp đặt
     installation_address = fields.Text(string="Địa chỉ thi công/lắp đặt", tracking=True)
@@ -791,6 +849,42 @@ class SaleOrder(models.Model):
     )
     task_count = fields.Integer(
         string='Số task', compute='_compute_task_count', store=False,
+    )
+    order_display_title = fields.Char(
+        string='Tiêu đề đơn hàng', compute='_compute_order_display_title', store=False,
+    )
+    product_line_count = fields.Integer(
+        string='Số dòng sản phẩm', compute='_compute_product_line_count', store=False,
+    )
+    internal_note_draft = fields.Text(string='Ghi chú nội bộ mới', copy=False)
+    internal_note_count = fields.Integer(
+        string='Số ghi chú nội bộ', compute='_compute_sidebar_activity', store=False,
+    )
+    internal_notes_html = fields.Html(
+        string='Trò chuyện nội bộ', compute='_compute_sidebar_activity', sanitize=False,
+    )
+    order_history_html = fields.Html(
+        string='Lịch sử đơn hàng', compute='_compute_sidebar_activity', sanitize=False,
+    )
+    production_task_count = fields.Integer(
+        string='Tổng task sản xuất', compute='_compute_task_count', store=False,
+    )
+    production_task_done_count = fields.Integer(
+        string='Task sản xuất hoàn thành', compute='_compute_task_count', store=False,
+    )
+    design_task_count = fields.Integer(
+        string='Tổng task thiết kế', compute='_compute_task_count', store=False,
+    )
+    design_task_done_count = fields.Integer(
+        string='Task thiết kế hoàn thành', compute='_compute_task_count', store=False,
+    )
+    design_task_display_ids = fields.One2many(
+        'dac.work.task', 'order_id', string='Task hiển thị ở bước Thiết kế',
+        domain=[('task_type', '=', 'design'), ('state', '!=', 'cancelled')],
+    )
+    production_task_display_ids = fields.One2many(
+        'dac.work.task', 'order_id', string='Task hiển thị ở bước Sản xuất',
+        domain=[('task_type', '=', 'production'), ('state', '!=', 'cancelled')],
     )
 
     # ===== VIP Customer Class for styling =====

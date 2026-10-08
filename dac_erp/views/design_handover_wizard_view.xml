@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_dac_design_handover_wizard_form" model="ir.ui.view">
+        <field name="name">dac.design.handover.wizard.form</field>
+        <field name="model">dac.design.handover.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Thiết kế &amp; bàn giao" class="dac-v6-dialog-form">
+                <div class="dac-v6-dialog-order"><field name="order_label" nolabel="1" readonly="1"/></div>
+                <group>
+                    <field name="design_version" placeholder="V3"/>
+                    <field name="designer_id" options="{'no_open': True}"/>
+                </group>
+                <p class="text-muted">Đối chiếu kích thước, chất liệu và nội dung sản phẩm trước khi duyệt.</p>
+                <footer>
+                    <button string="Hủy" special="cancel" class="btn-secondary"/>
+                    <button name="action_confirm_handover" string="Duyệt &amp; bàn giao" type="object" class="btn-warning"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

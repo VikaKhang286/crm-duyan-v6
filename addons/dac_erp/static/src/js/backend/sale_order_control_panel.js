@@ -92,6 +92,49 @@ function positionActionMenu(toggle, menu) {
   menu.style.bottom = "auto";
 }
 
+function replacePrintFormControls(root) {
+  for (const control of root.querySelectorAll("input, textarea, select")) {
+    const value = control.tagName === "SELECT"
+      ? control.options[control.selectedIndex]?.text || ""
+      : control.value || "";
+    const text = document.createElement("span");
+    text.className = "dac-print-field-value";
+    text.textContent = value;
+    control.replaceWith(text);
+  }
+}
+
+function openBrowserPrintPreview() {
+  document.querySelector(".dac-browser-print-view")?.remove();
+
+  const orderTitle = document.querySelector(".dac-control-panel-title")?.textContent?.trim() || "Đơn hàng";
+  const sourceTable = document.querySelector(".dac-order-lines-panel .o_list_table");
+  const rowCount = sourceTable?.querySelectorAll("tbody tr.o_data_row").length || 0;
+
+  const printView = document.createElement("section");
+  printView.className = "dac-browser-print-view";
+  printView.innerHTML = `
+    <h1></h1>
+    <div class="dac-print-section-title"><h2>Sản phẩm</h2><b>${rowCount} dòng</b></div>
+    <div class="dac-print-products"></div>
+  `;
+  printView.querySelector("h1").textContent = orderTitle;
+
+  if (sourceTable) {
+    const table = sourceTable.cloneNode(true);
+    table.querySelectorAll(".o_list_record_selector, .o_list_record_remove, .o_handle_cell, .o_optional_columns_dropdown").forEach((el) => el.remove());
+    replacePrintFormControls(table);
+    printView.querySelector(".dac-print-products").appendChild(table);
+  } else {
+    printView.querySelector(".dac-print-products").textContent = "Chưa có sản phẩm.";
+  }
+
+  document.body.appendChild(printView);
+  const cleanup = () => printView.remove();
+  window.addEventListener("afterprint", cleanup, { once: true });
+  window.requestAnimationFrame(() => window.print());
+}
+
 patch(FormController.prototype, {
   setup() {
     super.setup();
@@ -145,7 +188,26 @@ patch(FormController.prototype, {
     this.syncSaleOrderStateClass();
     this.bindNewSaleOrderButton(sourceBar);
     this.bindSaleOrderActionMenu();
+    this.syncInternalNoteBadge();
     this.syncSaleOrderDirtyState();
+  },
+
+  syncInternalNoteBadge() {
+    const notebook = document.querySelector(".dac-v6-side-notebook");
+    const count = document.querySelector(".dac-v6-internal-count")?.textContent?.trim() || "0";
+    const tab = Array.from(notebook?.querySelectorAll(".nav-link") || []).find(
+      (item) => item.textContent.trim().startsWith("Nội bộ")
+    );
+    if (!tab) {
+      return;
+    }
+    let badge = tab.querySelector(".dac-v6-tab-count");
+    if (!badge) {
+      badge = document.createElement("span");
+      badge.className = "dac-v6-tab-count";
+      tab.appendChild(badge);
+    }
+    badge.textContent = count;
   },
 
   bindNewSaleOrderButton(sourceBar) {
@@ -154,6 +216,12 @@ patch(FormController.prototype, {
     }
     this.__dacNewOrderCleanup?.();
     const onClick = (event) => {
+      if (event.target.closest(".dac-print-quotation-btn")) {
+        event.preventDefault();
+        event.stopPropagation();
+        openBrowserPrintPreview();
+        return;
+      }
       if (!event.target.closest(".dac-new-order-btn")) {
         return;
       }

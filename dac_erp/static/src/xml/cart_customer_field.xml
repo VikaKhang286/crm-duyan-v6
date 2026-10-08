@@ -8,14 +8,12 @@
                 <textarea t-ref="customerAddress" class="o_input mt-1" rows="1"
                           placeholder="Địa chỉ" aria-label="Địa chỉ"
                           t-on-keydown="onAddressKeydown"/>
-
             </t>
             <t t-else="">
                 <div t-if="props.record.data.customer_address" class="text-muted small mt-1"
                      style="white-space: pre-wrap; overflow-wrap: anywhere; max-width: 320px;">
                     <t t-esc="props.record.data.customer_address"/>
                 </div>
-                
             </t>
             </div>
             <div>
@@ -26,9 +24,9 @@
             <t t-else="">
                 <div t-if="props.record.data.phone" class="text-muted small mt-1">
                     <t t-esc="props.record.data.phone"/>
-                    </div>
+                </div>
             </t>
-            </div>
+        </div>
         </div>
     </t>
 </templates>

@@ -5,19 +5,23 @@
             <field name="name">deposit.confirm.wizard.form</field>
             <field name="model">deposit.confirm.wizard</field>
             <field name="arch" type="xml">
-                <form string="Xác nhận đặt cọc">
+                <form string="Ghi nhận thanh toán" class="dac-v6-dialog-form">
                     <field name="currency_id" invisible="1"/>
 
-                    <p class="text-muted mb-3">Chọn phương thức thanh toán để xác nhận khoản cọc.</p>
+                    <div class="dac-v6-dialog-order">
+                        <field name="order_name" nolabel="1" readonly="1"/> · Còn thanh toán
+                        <strong><field name="amount_total_order" nolabel="1" readonly="1" widget="monetary"/></strong>
+                    </div>
 
                     <group>
-                        <field name="deposit_amount" widget="monetary" options="{'currency_field': 'currency_id'}" readonly="1"/>
-                        <field name="journal_id" options="{'no_create': True, 'no_open': True}"/>
-                        <field name="payment_date"/>
+                        <field name="deposit_amount" widget="monetary" options="{'currency_field': 'currency_id'}"/>
+                        <field name="journal_id" string="Phương thức" options="{'no_create': True, 'no_open': True}"/>
+                        <field name="payment_date" invisible="1"/>
                     </group>
 
                     <footer>
-                        <button string="Xác nhận cọc" type="object" name="action_confirm" class="btn-primary" invisible="not journal_id or not payment_date"/>
+                        <button string="Hủy" special="cancel" class="btn-secondary"/>
+                        <button string="Ghi nhận" type="object" name="action_confirm" class="btn-warning" invisible="not journal_id or not payment_date"/>
                     </footer>
                 </form>
             </field>

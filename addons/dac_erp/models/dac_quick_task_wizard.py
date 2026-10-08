@@ -11,6 +11,13 @@ class DacQuickTaskWizard(models.TransientModel):
     description = fields.Text(string='Mô tả')
     deadline = fields.Datetime(string='Hạn chót')
     assigned_user_id = fields.Many2one('res.users', string='Người thực hiện')
+    task_type = fields.Selection([
+        ('survey', 'Khảo sát'),
+        ('supplement', 'Bổ sung yêu cầu'),
+        ('design', 'Thiết kế'),
+        ('production', 'Thi công / Sản xuất'),
+        ('other', 'Khác'),
+    ], string='Loại công việc', default='production', required=True)
 
     @api.model
     def default_get(self, fields_list):
@@ -18,6 +25,12 @@ class DacQuickTaskWizard(models.TransientModel):
         active_id = self.env.context.get('active_id')
         if active_id and 'order_id' in fields_list:
             res['order_id'] = active_id
+        order = self.env['sale.order'].browse(active_id).exists() if active_id else False
+        if order:
+            if 'task_type' in fields_list:
+                res.setdefault('task_type', 'production')
+            if 'assigned_user_id' in fields_list and order.user_id_production:
+                res.setdefault('assigned_user_id', order.user_id_production.id)
         return res
 
     def action_create_task(self):
@@ -30,7 +43,7 @@ class DacQuickTaskWizard(models.TransientModel):
             'deadline': self.deadline,
             'assigned_user_id': self.assigned_user_id.id if self.assigned_user_id else False,
             'order_id': self.order_id.id,
-            'task_type': 'other',
+            'task_type': self.task_type,
             'state': 'draft',
         })
         return {'type': 'ir.actions.client', 'tag': 'reload'}

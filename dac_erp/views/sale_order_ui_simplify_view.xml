@@ -67,7 +67,291 @@
                     </page>
                 </xpath>
 
+                <!-- Main 9/12 product area + sticky 3/12 information rail. -->
+                <xpath expr="//sheet/notebook" position="attributes">
+                    <attribute name="invisible">0</attribute>
+                    <attribute name="class" add="dac-v6-legacy-notebook" separator=" "/>
+                </xpath>
+                <xpath expr="//button[@name='action_proceed_to_delivery']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+                <xpath expr="//button[@name='action_proceed_to_installation']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+                <xpath expr="//div[hasclass('dac-core-info-row')]" position="after">
+                    <div class="dac-v6-lower-grid">
+                        <section class="dac-v6-products-card">
+                            <div class="dac-v6-products-head">
+                                <h3>Sản phẩm</h3>
+                                <span class="dac-v6-line-count"><i class="fa fa-circle"/><field name="product_line_count" nolabel="1" readonly="1"/> dòng</span>
+                            </div>
+                            <div class="dac-order-lines-panel">
+                                <field name="order_line" widget="section_and_note_one2many" mode="list,kanban"
+                                       readonly="state == 'cancel' or locked"
+                                       can_delete="can_delete_products"
+                                       context="{'list_view_ref': 'dac_erp.sale_order_line_list_view'}">
+                                    <list editable="bottom">
+                                        <control>
+                                            <create name="add_product_control" string="Thêm sản phẩm"/>
+                                            <create name="add_catalog_control" string="Chọn từ danh mục" context="{'default_focus_product': True}"/>
+                                            <create name="add_note_control" string="Thêm ghi chú" context="{'default_display_type': 'line_note'}"/>
+                                        </control>
+                                        <field name="sequence" widget="handle" optional="show"/>
+                                        <field name="product_id" string="Sản phẩm" context="{'display_default_code': False, 'dac_variant_display': True, 'dac_cart_accessory_prefix': True, 'dac_cart_product_create': parent.order_type == 'cart', 'default_type': 'cart' if parent.order_type == 'cart' else 'consu'}" domain="[('sale_ok', '=', True), ('type', 'in', ['cart', 'cart_accessory'])] if parent.order_type == 'cart' else [('sale_ok', '=', True)]" invisible="display_type"/>
+                                        <field name="description" string="Nội dung" invisible="display_type"/>
+                                        <field name="material_id" string="Chất liệu" invisible="display_type" options="{'no_create': True, 'no_open': True}" column_invisible="parent.order_type == 'general'"/>
+                                        <field name="cart_dimension_id" string="Kích thước" invisible="display_type" domain="[('is_standard', '=', True)]" options="{'no_quick_create': True}" column_invisible="parent.order_type != 'cart'"/>
+                                        <field name="accessory_price_applied" column_invisible="True" force_save="1"/>
+                                        <field name="product_uom_qty" string="Số lượng" invisible="display_type"/>
+                                        <field name="price_unit" string="Đơn giá" widget="integer" invisible="display_type" column_invisible="parent.is_design_user or parent.is_production_user"/>
+                                        <field name="price_subtotal" string="Thành tiền" readonly="1" invisible="display_type" column_invisible="parent.is_design_user or parent.is_production_user"/>
+                                        <field name="company_id" invisible="1"/>
+                                        <field name="currency_id" invisible="1"/>
+                                    </list>
+                                </field>
+                            </div>
+                            <div class="dac-summary-container" groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager" invisible="is_design_user or is_production_user">
+                                <field name="currency_id" invisible="1"/>
+                                <div class="dac-summary-row"><span class="dac-summary-label">Tạm tính</span><span class="dac-summary-value"><field name="amount_untaxed_original" readonly="1" widget="monetary" nolabel="1"/></span></div>
+                                <div class="dac-summary-row" invisible="order_type == 'cart'"><span class="dac-summary-label">Thuế</span><span class="dac-summary-value"><field name="amount_tax" readonly="1" widget="monetary" nolabel="1"/></span></div>
+                                <div class="dac-summary-row"><span class="dac-summary-label">Khuyến mãi/Giảm giá</span><span class="dac-summary-value"><field name="promotion_amount" widget="monetary" nolabel="1"/></span></div>
+                                <div class="dac-summary-row"><span class="dac-summary-label">Phí vận chuyển</span><span class="dac-summary-value"><field name="shipping_fee" widget="monetary" nolabel="1"/></span></div>
+                                <div class="dac-summary-row"><span class="dac-summary-label">Tổng</span><span class="dac-summary-value dac-summary-value--large"><field name="amount_total" readonly="1" widget="monetary" nolabel="1"/></span></div>
+                                <div class="dac-summary-row" invisible="deposit_paid_display == 0"><span class="dac-summary-label">Cọc / Đã thanh toán</span><span class="dac-summary-value dac-summary-value--deposit"><field name="deposit_paid_display" readonly="1" widget="monetary" nolabel="1"/></span></div>
+                                <div class="dac-summary-row dac-summary-row--remaining" invisible="order_state_custom == 'cancel'"><span class="dac-summary-label dac-summary-label--highlight">Còn thanh toán</span><span class="dac-summary-value--highlight"><field name="remaining_amount_display" readonly="1" widget="monetary" nolabel="1"/></span></div>
+                            </div>
+                        </section>
+                        <aside class="dac-v6-sticky-rail">
+                            <notebook class="dac-v6-side-notebook">
+                                <page string="Chi tiết">
+                                    <div class="dac-v6-side-title">
+                                        <strong invisible="order_state_custom != 'quotation'">Báo giá &amp; lịch hẹn</strong>
+                                        <strong invisible="order_state_custom != 'deposit'">Thiết kế &amp; Đặt cọc</strong>
+                                        <strong invisible="order_state_custom != 'production'">Sản xuất</strong>
+                                        <strong invisible="order_state_custom != 'delivery'">Giao hàng &amp; Thu hộ</strong>
+                                        <strong invisible="order_state_custom != 'installation'">Thi công &amp; Lắp đặt</strong>
+                                        <strong invisible="order_state_custom not in ['payment', 'completed']">Thanh toán</strong>
+                                        <small><field name="name" nolabel="1" readonly="1"/></small>
+                                    </div>
+                                    <div class="dac-v6-side-details" invisible="order_state_custom != 'quotation'">
+                                        <div><span>Giá trị báo giá</span><b><field name="amount_total" nolabel="1" readonly="1" widget="monetary"/></b></div>
+                                        <div><span>Sale</span><b><field name="user_id" nolabel="1" readonly="1"/></b></div>
+                                        <div><span>Ngày hẹn</span><b><field name="quotation_appointment_date" nolabel="1" readonly="1"/></b></div>
+                                        <div><span>Thuế</span><b><field name="quotation_tax_display" nolabel="1" readonly="1"/></b></div>
+                                        <div><span>Giảm giá</span><b><field name="promotion_amount" nolabel="1" readonly="1" widget="monetary"/></b></div>
+                                        <div><span>Phí vận chuyển</span><b><field name="shipping_fee" nolabel="1" readonly="1" widget="monetary"/></b></div>
+                                    </div>
+                                    <div class="dac-v6-side-details" invisible="order_state_custom != 'deposit'">
+                                        <div invisible="order_state_custom != 'deposit'"><span>Người thiết kế</span><b><field name="user_id_design" nolabel="1" readonly="1"/></b></div>
+                                        <div invisible="order_state_custom != 'deposit'"><span>Bản vẽ</span><b><field name="design_revision_display" nolabel="1" readonly="1"/></b></div>
+                                        <div invisible="order_state_custom != 'deposit'"><span>Trạng thái</span><b><field name="design_status_display" nolabel="1" readonly="1"/></b></div>
+                                        <div invisible="order_state_custom != 'deposit'"><span>Cọc đã nhận</span><b><field name="deposit_paid_display" nolabel="1" readonly="1" widget="monetary"/></b></div>
+                                    </div>
+                                    <div class="dac-v6-side-details" invisible="order_state_custom != 'production'">
+                                        <div><span>Xưởng</span><b><field name="user_id_production" nolabel="1" readonly="1"/></b></div>
+                                        <div><span>Sale giao</span><b><field name="user_id" nolabel="1" readonly="1"/></b></div>
+                                        <div><span>Deadline</span><b><field name="production_deadline" nolabel="1" readonly="1"/></b></div>
+                                        <div><span>Thiết kế</span><b><field name="design_summary_display" nolabel="1" readonly="1"/></b></div>
+                                        <div><span>Task hoàn thành</span><b><field name="production_task_done_count" nolabel="1" readonly="1"/>/<field name="production_task_count" nolabel="1" readonly="1"/></b></div>
+                                    </div>
+                                    <div class="dac-v6-design-actions" invisible="order_state_custom != 'deposit'">
+                                        <button name="action_open_design_handover" string="Xem thiết kế" type="object" class="btn btn-outline-secondary"/>
+                                        <button name="action_open_deposit_payment" string="Ghi nhận cọc" type="object" class="btn btn-outline-secondary" groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager,base.group_system"/>
+                                    </div>
+                                    <p class="dac-v6-side-help" invisible="order_state_custom != 'deposit'">Duyệt thiết kế và xác nhận cọc trước khi sản xuất.</p>
+                                    <div class="dac-v6-side-link" invisible="order_state_custom != 'production' or not design_link">
+                                        <field name="design_link" widget="url" nolabel="1" readonly="1" text="Xem bản vẽ"/>
+                                    </div>
+                                    <p class="dac-v6-side-help" invisible="order_state_custom != 'production'">Sản xuất theo nội dung, chất liệu và kích thước trong bảng sản phẩm.</p>
+                                    <div class="dac-v6-delivery-panel" invisible="order_state_custom != 'delivery'">
+                                        <field name="shipping_method" widget="radio" options="{'horizontal': true}" nolabel="1"/>
+                                        <label for="shipping_carrier" string="Đơn vị vận chuyển" invisible="shipping_method != 'carrier'"/>
+                                        <field name="shipping_carrier" nolabel="1" invisible="shipping_method != 'carrier'"/>
+                                        <label for="shipping_tracking_code" string="Mã vận đơn" invisible="shipping_method != 'carrier'"/>
+                                        <field name="shipping_tracking_code" nolabel="1" placeholder="Nhập mã đơn để theo dõi" invisible="shipping_method != 'carrier'"/>
+                                        <label for="shipping_status" string="Trạng thái giao hàng" invisible="shipping_method != 'carrier'"/>
+                                        <field name="shipping_status" nolabel="1" invisible="shipping_method != 'carrier'"/>
+                                        <label for="shipping_cod" string="Số tiền thu hộ (COD)" invisible="shipping_method != 'carrier'"/>
+                                        <field name="shipping_cod" nolabel="1" widget="monetary" invisible="shipping_method != 'carrier'"/>
+                                        <label for="bus_carrier_name" string="Chành xe / nhà xe" invisible="shipping_method != 'bus'"/>
+                                        <field name="bus_carrier_name" nolabel="1" placeholder="Tên chành xe" invisible="shipping_method != 'bus'"/>
+                                        <label for="bus_shipping_info" string="Thông tin gửi hàng" invisible="shipping_method != 'bus'"/>
+                                        <field name="bus_shipping_info" nolabel="1" placeholder="Số xe / số điện thoại / biên nhận" invisible="shipping_method != 'bus'"/>
+                                        <label for="bus_shipping_status" string="Trạng thái giao hàng" invisible="shipping_method != 'bus'"/>
+                                        <field name="bus_shipping_status" nolabel="1" invisible="shipping_method != 'bus'"/>
+                                        <div class="dac-v6-delivery-message dac-v6-delivery-message--waiting" invisible="shipping_method != 'carrier' or shipping_status != 'waiting'">Nhập mã vận đơn để bắt đầu theo dõi hành trình giao hàng.</div>
+                                        <div class="dac-v6-delivery-message dac-v6-delivery-message--shipping" invisible="shipping_method != 'carrier' or shipping_status != 'shipping'">Đơn đang được vận chuyển. Tiền COD vẫn được theo dõi tại bước Giao hàng.</div>
+                                        <div class="dac-v6-delivery-message dac-v6-delivery-message--failed" invisible="shipping_method != 'carrier' or shipping_status != 'failed'">Giao chưa thành công: giữ đơn ở bước Giao hàng để Sale tiếp tục xử lý và hẹn giao lại.</div>
+                                        <div class="dac-v6-delivery-message dac-v6-delivery-message--delivered" invisible="shipping_method != 'carrier' or shipping_status != 'delivered'">Giao thành công: đơn đủ trạng thái để chuyển sang Hoàn thành.</div>
+                                        <div class="dac-v6-delivery-message dac-v6-delivery-message--returned" invisible="shipping_method != 'carrier' or shipping_status != 'returned'">Đơn bị trả hàng: giữ tại bước Giao hàng và yêu cầu xử lý lại hàng hóa / công nợ trước khi tiếp tục.</div>
+                                        <div class="dac-v6-delivery-message dac-v6-delivery-message--waiting" invisible="shipping_method != 'bus' or bus_shipping_status != 'waiting'">Thông tin thanh toán sẽ được hệ thống kiểm tra khi bạn bấm <b>Bắt đầu giao hàng.</b></div>
+                                        <div class="dac-v6-delivery-message dac-v6-delivery-message--shipping" invisible="shipping_method != 'bus' or bus_shipping_status != 'shipping'">Hàng đang được chành xe vận chuyển. Tiếp tục theo dõi thông tin nhà xe và biên nhận.</div>
+                                        <div class="dac-v6-delivery-message dac-v6-delivery-message--failed" invisible="shipping_method != 'bus' or bus_shipping_status != 'failed'">Gửi chưa thành công: giữ đơn ở bước Giao hàng để Sale liên hệ chành xe và xử lý lại.</div>
+                                        <div class="dac-v6-delivery-message dac-v6-delivery-message--delivered" invisible="shipping_method != 'bus' or bus_shipping_status != 'delivered'">Giao thành công: đơn đủ trạng thái để chuyển sang Hoàn thành.</div>
+                                        <div class="dac-v6-delivery-message dac-v6-delivery-message--returned" invisible="shipping_method != 'bus' or bus_shipping_status != 'returned'">Đơn bị trả hàng: giữ tại bước Giao hàng và xử lý lại hàng hóa / công nợ trước khi tiếp tục.</div>
+                                        <div class="dac-v6-cod-summary" invisible="shipping_method != 'carrier'">
+                                            <span>Còn phải thu khách<b><field name="remaining_amount_display" nolabel="1" readonly="1" widget="monetary"/></b></span>
+                                            <span>Thu hộ dự kiến<b><field name="shipping_cod" nolabel="1" readonly="1" widget="monetary"/></b></span>
+                                            <span>Đã đối soát<b>0đ</b></span>
+                                        </div>
+                                        <div class="dac-v6-delivery-actions" invisible="(shipping_method == 'carrier' and shipping_status != 'waiting') or (shipping_method == 'bus' and bus_shipping_status != 'waiting')">
+                                            <button name="action_start_delivery_tracking" string="Bắt đầu giao hàng" type="object" class="btn btn-warning"/>
+                                        </div>
+                                    </div>
+                                    <div class="dac-v6-side-details" invisible="order_state_custom not in ['installation', 'payment', 'completed']">
+                                        <div><span>Hình thức</span><b><field name="fulfillment_method" nolabel="1" readonly="1"/></b></div>
+                                        <div><span>Còn thanh toán</span><b><field name="remaining_amount_display" nolabel="1" readonly="1" widget="monetary"/></b></div>
+                                    </div>
+                                </page>
+                                <page string="Nội bộ">
+                                    <div class="dac-v6-internal-tab">
+                                        <span class="dac-v6-internal-count"><field name="internal_note_count" nolabel="1" readonly="1"/></span>
+                                        <h3>Trò chuyện nội bộ</h3>
+                                        <p class="dac-v6-tab-subtitle">Trong đơn hàng</p>
+                                        <field name="internal_notes_html" widget="html" nolabel="1" readonly="1"/>
+                                        <label for="internal_note_draft" string="Ghi chú cho nhóm"/>
+                                        <field name="internal_note_draft" string="Ghi chú cho nhóm" widget="text" nolabel="1" placeholder="Nhập trao đổi cho Sale, Thiết kế, Xưởng..."/>
+                                        <div class="dac-v6-internal-send">
+                                            <button name="action_post_internal_note" string="Gửi nội bộ" type="object" class="btn btn-warning"/>
+                                        </div>
+                                    </div>
+                                </page>
+                                <page string="Lịch sử">
+                                    <div class="dac-v6-history-tab">
+                                        <h3>Lịch sử đơn hàng</h3>
+                                        <field name="order_history_html" widget="html" nolabel="1" readonly="1"/>
+                                    </div>
+                                </page>
+                            </notebook>
+                        </aside>
+                    </div>
+                </xpath>
+
                 <!-- Bố cục chi tiết đơn theo prototype: gom thông tin vào đúng hai card đầu. -->
+                <xpath expr="//div[hasclass('dac-box-document')]/h5" position="replace">
+                    <h5 class="dac-box-title dac-title-document d-flex justify-content-between align-items-center" invisible="order_state_custom == 'delivery'">
+                        <span>
+                            <i class="fa fa-calendar-check-o me-2" title="Báo giá" invisible="order_state_custom != 'quotation'"/>
+                            <i class="fa fa-pencil me-2" title="Thiết kế" invisible="order_state_custom != 'deposit'"/>
+                            <i class="fa fa-industry me-2" title="Sản xuất" invisible="order_state_custom != 'production'"/>
+                            <i class="fa fa-truck me-2" title="Giao hàng" invisible="order_state_custom != 'delivery'"/>
+                            <span invisible="order_state_custom != 'quotation'">Báo giá &amp; lịch hẹn</span>
+                            <span invisible="order_state_custom != 'deposit'">Thiết kế &amp; Đặt cọc</span>
+                            <span invisible="order_state_custom != 'production'">Sản xuất</span>
+                            <span invisible="order_state_custom != 'delivery'">Giao hàng &amp; thu hộ</span>
+                            <span invisible="order_state_custom not in ['installation', 'payment', 'completed']">Kết quả &amp; công nợ</span>
+                        </span>
+                        <button name="action_quick_create_task" type="object" string="+ Task" class="btn btn-sm btn-outline-primary py-0 px-2" invisible="order_state_custom not in ['deposit', 'production']" groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager"/>
+                    </h5>
+                </xpath>
+                <xpath expr="//div[hasclass('dac-box-document')]/group" position="attributes">
+                    <attribute name="invisible">order_state_custom in ['deposit', 'production', 'delivery']</attribute>
+                </xpath>
+                <xpath expr="//div[hasclass('dac-box-document')]//field[@name='order_number']" position="before">
+                    <p class="dac-v6-quotation-intro" invisible="order_state_custom != 'quotation'">Chốt nội dung, chất liệu và kích thước trong bảng sản phẩm.</p>
+                </xpath>
+                <xpath expr="//div[hasclass('dac-control-panel-tools')]/button[@name='action_confirm_info'][1]" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+                <xpath expr="//div[hasclass('dac-control-panel-tools')]/button[@name='action_next_step'][1]" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+                <xpath expr="//form/header//button[@name='action_confirm_info'][1]" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+                <xpath expr="//form/header//button[@name='action_next_step'][1]" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+                <xpath expr="//div[hasclass('dac-box-tasks')]" position="attributes">
+                    <attribute name="invisible">order_state_custom not in ['deposit', 'production']</attribute>
+                </xpath>
+                <xpath expr="//div[hasclass('dac-box-tasks')]/field[@name='task_ids']" position="replace">
+                    <field name="design_task_display_ids" nolabel="1" invisible="order_state_custom != 'deposit'">
+                        <kanban create="false" delete="false" quick_create="false" limit="100">
+                            <field name="name"/>
+                            <field name="priority"/>
+                            <field name="state"/>
+                            <field name="quick_state"/>
+                            <field name="assigned_user_id"/>
+                            <field name="sale_user_id"/>
+                            <field name="deadline_date_display"/>
+                            <field name="description_plain"/>
+                            <templates>
+                                <t t-name="card">
+                                    <div t-attf-class="dac-task-card-inner dac-task-state-#{record.state.raw_value} dac-task-priority-#{record.priority.raw_value}">
+                                        <div class="dac-task-card-header">
+                                            <span class="dac-task-name"><i t-if="record.state.raw_value === 'done'" class="fa fa-check me-2"/><t t-esc="record.name.value"/></span>
+                                            <div class="dropdown dac-task-state-menu">
+                                                <button name="dac_task_state_menu" type="button" class="btn dropdown-toggle dac-task-state-trigger" data-bs-toggle="dropdown" aria-expanded="false">
+                                                    <t t-if="record.state.raw_value === 'draft'">Chưa làm</t>
+                                                    <t t-elif="record.state.raw_value === 'in_progress'">Đang làm</t>
+                                                    <t t-else="">Hoàn thành</t>
+                                                </button>
+                                                <div class="dropdown-menu dropdown-menu-end">
+                                                    <button name="action_set_card_state" type="object" class="dropdown-item" context="{'dac_card_state': 'draft'}">Chưa làm</button>
+                                                    <button name="action_set_card_state" type="object" class="dropdown-item" context="{'dac_card_state': 'in_progress'}">Đang làm</button>
+                                                    <button name="action_set_card_state" type="object" class="dropdown-item" context="{'dac_card_state': 'done'}">Hoàn thành</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div t-if="record.description_plain.value" class="dac-task-desc text-muted small" style="overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:100%;margin-top:2px">
+                                            <t t-esc="record.description_plain.value"/>
+                                        </div>
+                                        <div class="dac-task-production-meta">
+                                            <span>Nhận: <b t-esc="record.assigned_user_id.value || 'Chưa giao'"/></span>
+                                            <span>Sale giao: <b t-esc="record.sale_user_id.value || '—'"/></span>
+                                            <span>Hạn: <b t-esc="record.deadline_date_display.value"/></span>
+                                        </div>
+                                    </div>
+                                </t>
+                            </templates>
+                        </kanban>
+                    </field>
+                    <field name="production_task_display_ids" nolabel="1" invisible="order_state_custom != 'production'">
+                        <kanban create="false" delete="false" quick_create="false" limit="100">
+                            <field name="name"/>
+                            <field name="priority"/>
+                            <field name="state"/>
+                            <field name="quick_state"/>
+                            <field name="assigned_user_id"/>
+                            <field name="sale_user_id"/>
+                            <field name="deadline_date_display"/>
+                            <field name="description_plain"/>
+                            <templates>
+                                <t t-name="card">
+                                    <div t-attf-class="dac-task-card-inner dac-task-state-#{record.state.raw_value} dac-task-priority-#{record.priority.raw_value}">
+                                        <div class="dac-task-card-header">
+                                            <span class="dac-task-name"><i t-if="record.state.raw_value === 'done'" class="fa fa-check me-2"/><t t-esc="record.name.value"/></span>
+                                            <div class="dropdown dac-task-state-menu">
+                                                <button name="dac_task_state_menu" type="button" class="btn dropdown-toggle dac-task-state-trigger" data-bs-toggle="dropdown" aria-expanded="false">
+                                                    <t t-if="record.state.raw_value === 'draft'">Chưa làm</t>
+                                                    <t t-elif="record.state.raw_value === 'in_progress'">Đang làm</t>
+                                                    <t t-else="">Hoàn thành</t>
+                                                </button>
+                                                <div class="dropdown-menu dropdown-menu-end">
+                                                    <button name="action_set_card_state" type="object" class="dropdown-item" context="{'dac_card_state': 'draft'}">Chưa làm</button>
+                                                    <button name="action_set_card_state" type="object" class="dropdown-item" context="{'dac_card_state': 'in_progress'}">Đang làm</button>
+                                                    <button name="action_set_card_state" type="object" class="dropdown-item" context="{'dac_card_state': 'done'}">Hoàn thành</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div t-if="record.description_plain.value" class="dac-task-desc text-muted small" style="overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:100%;margin-top:2px">
+                                            <t t-esc="record.description_plain.value"/>
+                                        </div>
+                                        <div class="dac-task-production-meta">
+                                            <span>Nhận: <b t-esc="record.assigned_user_id.value || 'Chưa giao'"/></span>
+                                            <span>Sale giao: <b t-esc="record.sale_user_id.value || '—'"/></span>
+                                            <span>Hạn: <b t-esc="record.deadline_date_display.value"/></span>
+                                        </div>
+                                    </div>
+                                </t>
+                            </templates>
+                        </kanban>
+                    </field>
+                </xpath>
+                <xpath expr="//form/header//button[@name='action_proceed_to_production']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
                 <xpath expr="//div[hasclass('dac-box-client')]/group" position="after">
                     <xpath expr="//div[hasclass('dac-box-internal')]" position="move"/>
                     <div class="dac-v6-order-description">
@@ -80,11 +364,85 @@
                 </xpath>
 
                 <xpath expr="//div[hasclass('dac-box-document')]/group" position="after">
-                    <div class="dac-v6-stage-divider"/>
+                    <div class="dac-v6-delivery-stage-card" invisible="order_state_custom != 'delivery'">
+                        <div class="dac-v6-delivery-stage-head">
+                            <h3>Giao hàng &amp; thu hộ</h3>
+                            <span>4 / 5</span>
+                            <b>Chi tiết</b>
+                        </div>
+                        <div class="dac-v6-delivery-stage-body">
+                            <strong><field name="delivery_status_display" nolabel="1" readonly="1"/></strong>
+                            <span><field name="delivery_method_display" nolabel="1" readonly="1"/> · <field name="name" nolabel="1" readonly="1"/></span>
+                            <span>Thu hộ: <field name="shipping_cod" nolabel="1" readonly="1" widget="monetary"/></span>
+                        </div>
+                        <div class="dac-v6-delivery-stage-footer dac-v6-delivery-stage-footer--pending" invisible="delivery_can_complete or (shipping_method == 'carrier' and shipping_status == 'returned') or (shipping_method == 'bus' and bus_shipping_status == 'returned')">
+                            <div><b>Bước tiếp theo: Hoàn thành</b><span><field name="delivery_next_message" nolabel="1" readonly="1"/></span></div>
+                            <button name="dac_disabled_delivery_completion" string="Hoàn thành đơn" type="button" class="btn btn-secondary" disabled="1"/>
+                        </div>
+                        <div class="dac-v6-delivery-stage-footer dac-v6-delivery-stage-footer--returned" invisible="delivery_can_complete or (shipping_method == 'carrier' and shipping_status != 'returned') or (shipping_method == 'bus' and bus_shipping_status != 'returned')">
+                            <div><b>Bước tiếp theo: Hoàn thành</b><span><field name="delivery_next_message" nolabel="1" readonly="1"/></span></div>
+                            <button name="dac_disabled_delivery_completion" string="Hoàn thành đơn" type="button" class="btn btn-secondary" disabled="1"/>
+                        </div>
+                        <div class="dac-v6-delivery-stage-footer dac-v6-delivery-stage-footer--success" invisible="not delivery_can_complete">
+                            <div><b>Bước tiếp theo: Hoàn thành</b><span><field name="delivery_next_message" nolabel="1" readonly="1"/></span></div>
+                            <button name="action_confirm_info" string="Hoàn thành đơn" type="object" class="btn btn-success"/>
+                        </div>
+                    </div>
+                    <div class="dac-v6-quotation-next-step" invisible="order_state_custom != 'quotation'">
+                        <div>
+                            <b>Bước tiếp theo: Thiết kế/Cọc</b>
+                            <span>Bấm tiếp tục để chuyển đơn sang bước kế tiếp.</span>
+                        </div>
+                        <button name="action_complete_quotation_and_proceed" string="Chốt báo giá" type="object" class="btn btn-warning" groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager,base.group_system"/>
+                    </div>
+                    <div class="dac-v6-task-progress" invisible="order_state_custom != 'production'">
+                        <field name="production_task_done_count" nolabel="1" readonly="1"/>/<field name="production_task_count" nolabel="1" readonly="1"/> task hoàn thành
+                    </div>
+                    <div class="dac-v6-design-summary" invisible="order_state_custom != 'deposit'">
+                        <div><field name="design_revision_display" nolabel="1" readonly="1"/> · <span invisible="not design_done">Thiết kế đã duyệt</span><span invisible="design_done">Thiết kế chờ duyệt</span></div>
+                        <div>Cọc: <field name="deposit_paid_display" nolabel="1" readonly="1" widget="monetary"/></div>
+                    </div>
+                    <div class="dac-v6-task-progress" invisible="order_state_custom != 'deposit'">
+                        <field name="design_task_done_count" nolabel="1" readonly="1"/>/<field name="design_task_count" nolabel="1" readonly="1"/> task hoàn thành
+                    </div>
                     <xpath expr="//div[hasclass('dac-box-tasks')]" position="move"/>
+                    <div class="dac-v6-design-next-step dac-v6-design-next-step--blocked" invisible="order_state_custom != 'deposit' or design_tasks_complete">
+                        <div><b>Bước tiếp theo: Sản xuất</b><span>Chưa thể chuyển: Thiết kế chưa hoàn tất (<field name="design_task_progress_percent" nolabel="1" readonly="1"/>%). Hoàn tất công việc thiết kế rồi bấm tiếp tục lại.</span></div>
+                        <button name="dac_disabled_design_transition" string="Bắt đầu sản xuất" type="button" class="btn btn-danger" disabled="1"/>
+                    </div>
+                    <div class="dac-v6-design-next-step" invisible="order_state_custom != 'deposit' or not design_tasks_complete">
+                        <div><b>Bước tiếp theo: Sản xuất</b><span>Bấm tiếp tục để chuyển đơn sang bước kế tiếp.</span></div>
+                        <button name="action_proceed_to_production" string="Bắt đầu sản xuất" type="object" class="btn btn-warning" context="{'from_ui_button': True}" groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager,base.group_system"/>
+                    </div>
+                    <div class="dac-v6-production-next-step dac-v6-production-next-step--blocked" invisible="order_state_custom != 'production' or production_tasks_complete">
+                        <div>
+                            <b invisible="fulfillment_method != 'delivery'">Bước tiếp theo: Giao hàng</b>
+                            <b invisible="fulfillment_method != 'installation'">Bước tiếp theo: Thi công</b>
+                            <span>Chưa thể chuyển: Sản xuất chưa hoàn tất (<field name="production_task_progress_percent" nolabel="1" readonly="1"/>%). Hoàn tất công việc sản xuất rồi bấm tiếp tục lại.</span>
+                        </div>
+                        <button name="dac_disabled_production_delivery" string="Bắt đầu giao hàng" type="button" class="btn btn-danger" disabled="1" invisible="fulfillment_method != 'delivery'"/>
+                        <button name="dac_disabled_production_installation" string="Bắt đầu thi công" type="button" class="btn btn-danger" disabled="1" invisible="fulfillment_method != 'installation'"/>
+                    </div>
+                    <div class="dac-v6-production-next-step" invisible="order_state_custom != 'production' or not production_tasks_complete">
+                        <div>
+                            <b invisible="fulfillment_method != 'delivery'">Bước tiếp theo: Giao hàng</b>
+                            <b invisible="fulfillment_method != 'installation'">Bước tiếp theo: Thi công</b>
+                            <span>Bấm tiếp tục để chuyển đơn sang bước kế tiếp.</span>
+                        </div>
+                        <button name="action_proceed_to_delivery" string="Bắt đầu giao hàng" type="object" class="btn btn-warning" invisible="fulfillment_method != 'delivery'" groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager,dac_erp.group_dac_erp_production"/>
+                        <button name="action_proceed_to_installation" string="Bắt đầu thi công" type="object" class="btn btn-warning" invisible="fulfillment_method != 'installation'" groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager,dac_erp.group_dac_erp_production"/>
+                    </div>
                 </xpath>
 
+                <!-- The product card above replaces the legacy content that used to
+                     continue below the notebook. These removals run after moving the
+                     description and owner blocks out of the old chatter container. -->
+                <xpath expr="//sheet/div[hasclass('dac-summary-container')]" position="replace"/>
+                <xpath expr="//sheet/div[hasclass('dac-action-buttons')]" position="replace"/>
                 <xpath expr="//div[@id='conversation-floating-widget']" position="replace"/>
+                <xpath expr="//div[hasclass('o-chatter-group')]" position="attributes">
+                    <attribute name="class" add="d-none" separator=" "/>
+                </xpath>
             </field>
         </record>
     </data>

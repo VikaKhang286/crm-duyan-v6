@@ -109,3 +109,8 @@ access_dac_erp_mcp_staff_identity_log_system,access_dac_erp_mcp_staff_identity_l
 access_dac_erp_mcp_staff_identity_log_manager,access_dac_erp_mcp_staff_identity_log_manager,model_dac_erp_mcp_staff_identity_log,group_dac_erp_manager,1,0,0,0
 
 access_dac_sale_material_user,dac.sale.material user,model_dac_sale_material,base.group_user,1,0,0,0
+access_dac_design_handover_wizard_user,dac.design.handover.wizard user,model_dac_design_handover_wizard,base.group_user,1,1,1,1
+access_dac_design_revision_manager,dac.design.revision manager,model_dac_design_revision,group_dac_erp_manager,1,1,1,0
+access_dac_design_revision_sale,dac.design.revision sale,model_dac_design_revision,group_dac_erp_sale,1,1,1,0
+access_dac_design_revision_design,dac.design.revision design,model_dac_design_revision,group_dac_erp_design,1,1,1,0
+access_dac_design_revision_system,dac.design.revision system,model_dac_design_revision,base.group_system,1,1,1,1

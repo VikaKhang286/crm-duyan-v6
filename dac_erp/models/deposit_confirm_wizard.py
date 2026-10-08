@@ -10,7 +10,7 @@ class DepositConfirmWizard(models.TransientModel):
     partner_name = fields.Char(string="Khách hàng", readonly=True)
     currency_id = fields.Many2one('res.currency', string='Tiền tệ', readonly=True)
     amount_total_order = fields.Monetary(string="Tổng giá trị đơn hàng", currency_field='currency_id', readonly=True)
-    deposit_amount = fields.Monetary(string="Số tiền đặt cọc", currency_field='currency_id', readonly=True)
+    deposit_amount = fields.Monetary(string="Số tiền (đ)", currency_field='currency_id', required=True)
 
     # === Thông tin thanh toán (user nhập) ===
     journal_id = fields.Many2one('account.journal', string='Phương thức thanh toán', domain=[('type', 'in', ('bank', 'cash'))], required=True)
@@ -29,8 +29,8 @@ class DepositConfirmWizard(models.TransientModel):
                 res['order_name'] = order.name
                 res['partner_name'] = order.partner_id.name or ''
                 res['currency_id'] = order.currency_id.id
-                res['amount_total_order'] = order.amount_total
-                res['deposit_amount'] = order.deposit_amount
+                res['amount_total_order'] = order.remaining_amount_display
+                res['deposit_amount'] = order.deposit_amount or order.remaining_amount_display or order.amount_total
         if 'journal_id' in fields_list and not res.get('journal_id'):
             bank_journal = self.env['account.journal'].search([
                 ('type', '=', 'bank'),
@@ -46,8 +46,17 @@ class DepositConfirmWizard(models.TransientModel):
 
         active_id = self.env.context.get('active_id')
         order = self.env['sale.order'].browse(active_id)
-        if order.deposit_amount <= 0:
+        if self.deposit_amount <= 0:
             raise UserError("Vui lòng nhập số tiền đặt cọc hợp lệ trước khi xác nhận!")
+        if order.is_deposit_confirmed:
+            # Khoản cọc đã có chứng từ: write() sẽ đi qua cơ chế đồng bộ an toàn
+            # trong sale_order_deposit_sync, điều chỉnh hóa đơn + phiếu thu hiện có
+            # thay vì tạo thêm một lần thanh toán trùng.
+            order.write({'deposit_amount': self.deposit_amount})
+            return {'type': 'ir.actions.client', 'tag': 'reload'}
+        if self.deposit_amount > order.remaining_amount_display:
+            raise UserError("Số tiền đặt cọc không được lớn hơn số tiền còn thanh toán!")
+        order.deposit_amount = self.deposit_amount
         if not order.has_deposit:
             order.has_deposit = True
 
@@ -105,7 +114,7 @@ class DepositConfirmWizard(models.TransientModel):
             active_model='account.move',
             active_ids=invoice.ids
         ).create({
-            'amount': order.deposit_amount,
+            'amount': self.deposit_amount,
             'journal_id': self.journal_id.id,
             'payment_date': self.payment_date,
         })

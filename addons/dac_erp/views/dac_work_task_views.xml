@@ -284,7 +284,7 @@
         <field name="model">sale.order</field>
         <field name="inherit_id" ref="dac_erp.dac_sale_order_custom_view_form"/>
         <field name="arch" type="xml">
-            <xpath expr="//notebook" position="inside">
+            <xpath expr="(//sheet/notebook)[1]" position="inside">
                 <page string="Tasks" name="tasks_tab">
                     <field name="task_ids" context="{'default_order_id': id}">
                         <list string="Tasks" editable="bottom"

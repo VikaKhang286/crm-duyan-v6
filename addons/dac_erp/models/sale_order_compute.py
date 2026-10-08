@@ -1,6 +1,9 @@
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
 from odoo.tools import html_escape
+from markupsafe import Markup
+import re
+from html import unescape
 import logging
 
 _logger = logging.getLogger(__name__)
@@ -8,6 +11,67 @@ _logger = logging.getLogger(__name__)
 
 class SaleOrderCompute(models.Model):
     _inherit = 'sale.order'
+
+    @api.depends('name', 'partner_id', 'partner_id.name')
+    def _compute_order_display_title(self):
+        for order in self:
+            order_code = order.name if order.name and order.name != 'New' else 'Đơn mới'
+            customer_name = order.partner_id.name if order.partner_id else ''
+            order.order_display_title = (
+                f'{order_code} · {customer_name}' if customer_name else order_code
+            )
+
+    @api.depends('order_line', 'order_line.display_type')
+    def _compute_product_line_count(self):
+        for order in self:
+            order.product_line_count = len(order.order_line.filtered(lambda line: not line.display_type))
+
+    @api.depends('message_ids.body', 'message_ids.date', 'message_ids.author_id', 'message_ids.tracking_value_ids')
+    def _compute_sidebar_activity(self):
+        for order in self:
+            messages = order.message_ids.sorted(key=lambda message: message.date or fields.Datetime.now(), reverse=True)
+            internal_messages = messages.filtered(
+                lambda message: 'dac-internal-note-message' in (message.body or '')
+            )
+            order.internal_note_count = len(internal_messages)
+
+            note_cards = []
+            for message in internal_messages[:20]:
+                body = re.sub(r'<[^>]+>', '', unescape(message.body or '')).strip()
+                author = message.author_id.name or 'Nội bộ'
+                time_label = fields.Datetime.context_timestamp(order, message.date).strftime('%d/%m/%Y %H:%M') if message.date else ''
+                note_cards.append(
+                    '<article class="dac-v6-internal-card">'
+                    f'<header><b>{html_escape(author)}</b><span>{html_escape(time_label)}</span></header>'
+                    f'<p>{html_escape(body)}</p>'
+                    '</article>'
+                )
+            order.internal_notes_html = Markup(''.join(note_cards) or '<p class="dac-v6-empty-log">Chưa có trao đổi nội bộ.</p>')
+
+            history_items = []
+            for message in messages.filtered(lambda item: item not in internal_messages)[:30]:
+                body = re.sub(r'<[^>]+>', '', unescape(message.body or '')).strip()
+                changes = []
+                for tracking_value in message.tracking_value_ids:
+                    field_label = tracking_value.field_id.field_description or tracking_value.field_id.name
+                    old_value = tracking_value.old_value_char or ''
+                    new_value = tracking_value.new_value_char or ''
+                    if old_value or new_value:
+                        changes.append(f'{field_label}: {old_value or "—"} → {new_value or "—"}')
+                    else:
+                        changes.append(f'Cập nhật {field_label}')
+                content = body or '; '.join(changes)
+                if not content:
+                    continue
+                time_label = fields.Datetime.context_timestamp(order, message.date).strftime('%H:%M') if message.date else ''
+                history_items.append(
+                    '<li><span class="dac-v6-history-dot"></span>'
+                    f'<time>{html_escape(time_label)}</time><p>{html_escape(content)}</p></li>'
+                )
+            order.order_history_html = Markup(
+                '<ol class="dac-v6-history-timeline">' + ''.join(history_items) + '</ol>'
+                if history_items else '<p class="dac-v6-empty-log">Chưa có lịch sử cập nhật.</p>'
+            )
 
     @api.depends('invoice_ids', 'invoice_ids.payment_state', 'invoice_ids.amount_total', 'invoice_ids.dac_deposit_invoice')
     def _compute_total_deposit_paid(self):
@@ -367,9 +431,24 @@ class SaleOrderCompute(models.Model):
                     label = f'{label} / Chờ TK'
             rec.order_state_badge = rec._dac_make_badge(key, label)
 
+    @api.depends('task_ids', 'task_ids.task_type', 'task_ids.state')
     def _compute_task_count(self):
         for rec in self:
             rec.task_count = len(rec.task_ids)
+            production_tasks = rec.task_ids.filtered(
+                lambda task: task.task_type == 'production' and task.state != 'cancelled'
+            )
+            rec.production_task_count = len(production_tasks)
+            rec.production_task_done_count = len(
+                production_tasks.filtered(lambda task: task.state == 'done')
+            )
+            design_tasks = rec.task_ids.filtered(
+                lambda task: task.task_type == 'design' and task.state != 'cancelled'
+            )
+            rec.design_task_count = len(design_tasks)
+            rec.design_task_done_count = len(
+                design_tasks.filtered(lambda task: task.state == 'done')
+            )
 
     @api.depends('partner_id')
     def _compute_partner_vip_class(self):

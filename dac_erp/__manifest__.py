@@ -58,6 +58,7 @@
         'views/sale_order_ui_simplify_view.xml',
         'views/sale_order_design_view.xml',
         'views/deposit_confirm_wizard_view.xml',
+        'views/design_handover_wizard_view.xml',
         'views/final_payment_confirm_wizard_view.xml',
         'views/no_deposit_confirm_wizard_view.xml',
         'views/production_deadline_wizard_view.xml',

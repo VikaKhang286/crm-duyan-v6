@@ -1,5 +1,6 @@
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError
+from markupsafe import Markup
 import logging
 from datetime import date, timedelta
 
@@ -190,6 +191,14 @@ class SaleOrderWorkflow(models.Model):
         if self.order_state_custom != 'deposit':
             raise UserError("Chỉ có thể tiến hành sản xuất từ trạng thái đặt cọc!")
 
+        if self.design_task_count and self.design_task_done_count < self.design_task_count:
+            percent = round((self.design_task_done_count / self.design_task_count) * 100)
+            raise UserError(_(
+                "Chưa thể chuyển: Thiết kế chưa hoàn tất (%(percent)s%%). "
+                "Hoàn tất công việc thiết kế rồi bấm tiếp tục lại.",
+                percent=percent,
+            ))
+
         if not self.production_deadline:
             return self._open_production_deadline_wizard()
 
@@ -226,6 +235,16 @@ class SaleOrderWorkflow(models.Model):
         if self.order_state_custom != 'delivery':
             raise UserError(_("Chỉ có thể xác nhận giao hàng ở bước giao hàng!"))
 
+        delivery_status = (
+            self.bus_shipping_status
+            if self.shipping_method == 'bus'
+            else self.shipping_status
+        )
+        if delivery_status != 'delivered':
+            raise UserError(_(
+                "Chưa thể chuyển bước: trạng thái giao hàng phải là 'Giao thành công'."
+            ))
+
         address = self.delivery_address if delivery_address is None else delivery_address
         address = (address or '').strip()
 
@@ -252,6 +271,29 @@ class SaleOrderWorkflow(models.Model):
 
     def action_save_custom(self):
         return True
+
+    def action_open_sales_list(self):
+        return {
+            'type': 'ir.actions.act_url',
+            'url': '/odoo/sales',
+            'target': 'self',
+        }
+
+    def action_print_quotation(self):
+        self.ensure_one()
+        return self.env.ref('sale.action_report_saleorder').report_action(self)
+
+    def action_post_internal_note(self):
+        self.ensure_one()
+        note = (self.internal_note_draft or '').strip()
+        if not note:
+            raise UserError('Vui lòng nhập nội dung trao đổi nội bộ.')
+        self.message_post(
+            body=Markup('<div class="dac-internal-note-message">{}</div>').format(note),
+            subtype_xmlid='mail.mt_note',
+        )
+        self.internal_note_draft = False
+        return {'type': 'ir.actions.client', 'tag': 'reload'}
 
     def action_cancel_order(self):
         """Hủy đơn hàng - chỉ cho phép ở trạng thái báo giá và chưa có hóa đơn cọc"""
@@ -350,6 +392,31 @@ class SaleOrderWorkflow(models.Model):
                 order.order_state_custom = state_order[idx + 1]
         return True
 
+    def action_complete_quotation_and_proceed(self):
+        """Chốt báo giá và chuyển đơn sang bước Thiết kế/Cọc.
+
+        Form v6 chỉ dùng một nút ở chân khối Báo giá.  Trước đây người dùng
+        phải bấm hai nút ở thanh công cụ (xác nhận, rồi mới chuyển bước), nên
+        gộp hai thao tác này ở đúng nơi hiển thị của luồng.
+        """
+        for order in self:
+            if order.order_state_custom != 'quotation':
+                raise UserError(_("Chỉ có thể chốt báo giá khi đơn đang ở bước Báo giá."))
+
+            if not order.is_quotation_confirmed:
+                result = order.action_confirm_info()
+                if isinstance(result, dict):
+                    return result
+                # action_confirm_info() của luồng Báo giá đã chuyển đơn sang
+                # Thiết kế/Cọc. Không gọi action_next_step() lần nữa, vì khi
+                # đó đơn đang ở bước Đặt cọc và chưa có xác nhận cọc.
+                continue
+
+            # Hỗ trợ dữ liệu cũ đã được xác nhận Báo giá nhưng vẫn còn ở bước
+            # Báo giá: chỉ khi đó mới dùng action chuyển bước cũ.
+            order.action_next_step()
+        return True
+
     def action_confirm_info(self):
         state_order = ['quotation', 'deposit', 'production', 'delivery', 'installation', 'payment']
         for order in self:
@@ -430,6 +497,13 @@ class SaleOrderWorkflow(models.Model):
         for order in self:
             if order.order_state_custom != 'production':
                 raise UserError(_("Chỉ có thể tiến hành giao hàng từ trạng thái sản xuất!"))
+            if order.production_task_count and order.production_task_done_count < order.production_task_count:
+                percent = round((order.production_task_done_count / order.production_task_count) * 100)
+                raise UserError(_(
+                    "Chưa thể chuyển: Sản xuất chưa hoàn tất (%(percent)s%%). "
+                    "Hoàn tất công việc sản xuất rồi bấm tiếp tục lại.",
+                    percent=percent,
+                ))
 
             # Đã xác nhận sản xuất (được set khi bấm "Tiến hành sản xuất")
             if not order.is_production_confirmed:
@@ -471,6 +545,13 @@ class SaleOrderWorkflow(models.Model):
         for order in self:
             if order.order_state_custom != 'production':
                 raise UserError(_("Chỉ có thể tiến hành từ trạng thái sản xuất!"))
+            if order.production_task_count and order.production_task_done_count < order.production_task_count:
+                percent = round((order.production_task_done_count / order.production_task_count) * 100)
+                raise UserError(_(
+                    "Chưa thể chuyển: Sản xuất chưa hoàn tất (%(percent)s%%). "
+                    "Hoàn tất công việc sản xuất rồi bấm tiếp tục lại.",
+                    percent=percent,
+                ))
             if not order.is_production_confirmed:
                 raise UserError(_("Vui lòng xác nhận sản xuất trước!"))
 

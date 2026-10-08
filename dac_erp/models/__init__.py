@@ -13,6 +13,7 @@ from . import sale_order_override_validation
 from . import product_template_inherit
 from . import pancake_sync_helper
 from . import deposit_confirm_wizard
+from . import design_handover_wizard
 from . import account_move
 from . import account_payment_register
 from . import account_payment

@@ -67,6 +67,13 @@ class DacWorkTask(models.Model):
     assigned_user_id = fields.Many2one(
         'res.users', string='Người thực hiện', tracking=True,
     )
+    sale_user_id = fields.Many2one('res.users', related='order_id.user_id', string='Sale giao', readonly=True)
+    deadline_date_display = fields.Char(string='Hạn hiển thị', compute='_compute_deadline_date_display')
+    quick_state = fields.Selection([
+        ('draft', 'Chưa làm'),
+        ('in_progress', 'Đang làm'),
+        ('done', 'Hoàn thành'),
+    ], string='Trạng thái', compute='_compute_quick_state', inverse='_inverse_quick_state', readonly=False)
     created_by_agent = fields.Char(
         string='Tạo bởi Agent', readonly=True,
     )
@@ -111,6 +118,30 @@ class DacWorkTask(models.Model):
                     task.days_left_display = 'Đến hạn hôm nay'
                 else:
                     task.days_left_display = f'Còn {delta} ngày'
+
+    @api.depends('deadline')
+    def _compute_deadline_date_display(self):
+        for task in self:
+            task.deadline_date_display = task.deadline.strftime('%d/%m/%Y') if task.deadline else 'Chưa đặt'
+
+    @api.depends('state')
+    def _compute_quick_state(self):
+        for task in self:
+            task.quick_state = task.state if task.state in ('draft', 'in_progress', 'done') else 'draft'
+
+    def _inverse_quick_state(self):
+        for task in self:
+            if task.quick_state:
+                task.state = task.quick_state
+
+    def action_set_card_state(self):
+        """Set a task state from the compact card menu on sale orders."""
+        target = self.env.context.get('dac_card_state')
+        allowed_states = {'draft', 'in_progress', 'done'}
+        if target not in allowed_states:
+            raise ValidationError('Trạng thái task không hợp lệ.')
+        self.write({'state': target})
+        return True
 
     # Timestamps ghi nhận lần cuối gửi từng loại thông báo
     x_openclaw_last_reminder_at = fields.Datetime(

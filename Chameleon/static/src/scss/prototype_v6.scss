@@ -1,23 +1,17 @@
-/* Duy An ERP/CRM v6 visual system.
- * This layer mirrors the approved prototype while preserving Odoo's native
- * components, keyboard navigation and role-based menus. */
+/* Duy An ERP/CRM v6 visual system (Docker-mounted addon copy). */
 :root {
   --dac-v6-bg: #f7f8fb;
   --dac-v6-surface: #ffffff;
-  --dac-v6-surface-soft: #fafbfc;
+  --dac-v6-soft: #fafbfc;
   --dac-v6-text: #1d2433;
   --dac-v6-muted: #768195;
   --dac-v6-line: #e8ebf1;
   --dac-v6-primary: #ffc20e;
   --dac-v6-primary-hover: #e4aa00;
   --dac-v6-primary-soft: #fff5d1;
-  --dac-v6-success: #20b26b;
   --dac-v6-danger: #ef476f;
-  --dac-v6-info: #2d7ff9;
   --dac-v6-shadow: 0 6px 24px rgba(28, 38, 64, 0.055);
   --dac-v6-shadow-raised: 0 18px 38px rgba(28, 38, 64, 0.1);
-  --dac-v6-radius: 14px;
-  --dac-v6-radius-sm: 10px;
   --dac-ui-bg: var(--dac-v6-bg);
   --dac-ui-surface: var(--dac-v6-surface);
   --dac-ui-surface-strong: var(--dac-v6-surface);
@@ -28,7 +22,7 @@
   --dac-ui-accent: var(--dac-v6-primary-hover);
   --dac-ui-shadow-sm: var(--dac-v6-shadow);
   --dac-ui-shadow-md: var(--dac-v6-shadow-raised);
-  --dac-ui-radius-lg: var(--dac-v6-radius);
+  --dac-ui-radius-lg: 14px;
   --o-brand-primary: var(--dac-v6-primary);
 }
 
@@ -501,24 +495,17 @@ html body .o_main_navbar {
   backdrop-filter: blur(14px);
 }
 
-html body .o_main_navbar .o_navbar_apps_menu .dropdown-toggle,
-html body .o_main_navbar .o_menu_sections .o_nav_entry,
-html body .o_main_navbar .o_menu_sections .dropdown-toggle,
-html body .o_main_navbar .o_menu_systray .dropdown-toggle,
-html body .o_main_navbar .o_menu_brand,
-html body .o_main_navbar .o_nav_entry {
+html body .o_main_navbar .dropdown-toggle,
+html body .o_main_navbar .o_nav_entry,
+html body .o_main_navbar .o_menu_brand {
   min-height: 40px;
-  border-radius: var(--dac-v6-radius-sm);
+  border-radius: 10px;
   color: #5d687b !important;
   font-size: 13px;
 }
 
-html body .o_main_navbar .o_navbar_apps_menu .dropdown-toggle:hover,
-html body .o_main_navbar .o_menu_sections .o_nav_entry:hover,
-html body .o_main_navbar .o_menu_sections .dropdown-toggle:hover,
-html body .o_main_navbar .o_menu_systray .dropdown-toggle:hover,
-html body .o_main_navbar .o_nav_entry:hover,
-html body .o_main_navbar .dropdown-toggle:hover {
+html body .o_main_navbar .dropdown-toggle:hover,
+html body .o_main_navbar .o_nav_entry:hover {
   background: var(--dac-v6-primary-soft) !important;
   color: #8a6500 !important;
   transform: none;
@@ -529,16 +516,12 @@ html body .o_main_navbar .o_menu_brand {
   font-weight: 800;
 }
 
-html body .o_main_navbar .o_menu_systray .badge {
-  background: var(--dac-v6-danger) !important;
-}
-
 html body .o_control_panel {
-  margin: 18px 24px 0;
+  margin: 18px 16px 0;
   padding: 14px 16px;
   background: rgba(255, 255, 255, 0.96) !important;
   border: 1px solid var(--dac-v6-line);
-  border-radius: var(--dac-v6-radius);
+  border-radius: 14px;
   box-shadow: var(--dac-v6-shadow);
 }
 
@@ -567,14 +550,12 @@ html body .btn {
   border-radius: 9px;
   font-size: 13px;
   font-weight: 700;
-  box-shadow: none;
 }
 
 html body.o_web_client .btn-primary,
 html body.o_web_client .btn-info,
 html body.o_web_client .btn-outline-primary:hover,
-html body.o_web_client .btn-outline-primary.active,
-html body.o_web_client .btn-outline-primary.dropdown-toggle.show {
+html body.o_web_client .btn-outline-primary.active {
   background: var(--dac-v6-primary) !important;
   border-color: var(--dac-v6-primary) !important;
   color: #4d3900 !important;
@@ -593,27 +574,20 @@ html body.o_web_client .btn-outline-primary {
   color: #8a6500 !important;
 }
 
-html body.o_web_client .btn-secondary,
-html body.o_web_client .btn-outline-secondary {
-  background: #ffffff !important;
-  border-color: var(--dac-v6-line) !important;
-  color: #586378 !important;
-}
-
-html body .o_action_manager .o_content {
-  background: var(--dac-v6-bg);
+html body .o_action_manager .o_content,
+html body .o_form_view .o_form_sheet_bg {
+  background: var(--dac-v6-bg) !important;
 }
 
 html body .o_form_view .o_form_sheet_bg {
   padding: 18px 24px 36px;
-  background: transparent !important;
 }
 
 html body .o_form_view .o_form_sheet {
   max-width: 1500px;
   border: 1px solid var(--dac-v6-line);
-  border-radius: var(--dac-v6-radius);
-  background: var(--dac-v6-surface);
+  border-radius: 14px;
+  background: #ffffff;
   box-shadow: var(--dac-v6-shadow);
 }
 
@@ -637,25 +611,19 @@ html body .o_notebook .nav-link.active {
   color: #805b00;
 }
 
-html body .o_list_renderer {
-  padding: 18px 24px 32px;
-}
-
 html body .o_list_renderer .o_list_table {
   border: 1px solid var(--dac-v6-line);
-  border-radius: var(--dac-v6-radius);
+  border-radius: 14px;
   background: #ffffff;
   box-shadow: var(--dac-v6-shadow);
 }
 
 html body .o_list_renderer .o_list_table thead th {
   padding: 11px 12px;
-  background: var(--dac-v6-surface-soft);
-  border-bottom: 1px solid var(--dac-v6-line);
+  background: var(--dac-v6-soft);
   color: #848d9d;
   font-size: 11px;
   font-weight: 800;
-  letter-spacing: 0.03em;
 }
 
 html body .o_list_renderer .o_list_table tbody td {
@@ -669,13 +637,11 @@ html body .o_list_renderer .o_list_table tbody tr:hover td {
   background: #fffdf5;
 }
 
-html body .o_kanban_renderer .o_kanban_record > div:not(.o_dropdown_kanban),
-html body .o_kanban_renderer .o_kanban_quick_create,
 html body .modal-content,
 html body .dropdown-menu,
 html body .o-dropdown--menu {
   border-color: var(--dac-v6-line);
-  border-radius: var(--dac-v6-radius);
+  border-radius: 14px;
   box-shadow: var(--dac-v6-shadow-raised);
 }
 
@@ -687,26 +653,11 @@ html body .form-select:focus {
   box-shadow: 0 0 0 3px rgba(255, 194, 14, 0.16);
 }
 
-html body .badge,
-html body .o_tag {
-  border-radius: 999px;
-}
-
 @media (max-width: 767.98px) {
-  html body .o_main_navbar {
-    min-height: 56px;
-    padding: 0 8px;
-  }
-
-  html body .o_control_panel {
-    margin: 10px 10px 0;
-    padding: 10px;
-  }
-
+  html body .o_main_navbar { min-height: 56px; padding: 0 8px; }
+  html body .o_control_panel { margin: 10px 10px 0; padding: 10px; }
   html body .o_form_view .o_form_sheet_bg,
-  html body .o_list_renderer {
-    padding: 10px;
-  }
+  html body .o_list_renderer { padding: 10px; }
 }
 
 /* Keep the sidebar palette above later generic navbar rules. */
