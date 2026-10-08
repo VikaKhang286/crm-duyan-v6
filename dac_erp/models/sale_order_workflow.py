@@ -78,9 +78,12 @@ class SaleOrderWorkflow(models.Model):
                 lambda r: r._quick_proceed_fulfillment('delivery'),
             ('production', 'installation'):
                 lambda r: r._quick_proceed_fulfillment('installation'),
-            ('delivery', 'payment'):
+            # V6 gộp thu tiền vào bước Giao hàng & Thu hộ. Xác nhận giao
+            # hàng sẽ mở luồng ghi nhận tiền cuối (nếu còn phải thu), rồi
+            # chuyển thẳng sang Hoàn thành.
+            ('delivery', 'completed'):
                 lambda r: r.action_confirm_info(),
-            ('installation', 'payment'):
+            ('installation', 'completed'):
                 lambda r: r.action_confirm_info(),
         }
 
@@ -90,12 +93,11 @@ class SaleOrderWorkflow(models.Model):
             return
 
         # Lùi 1 bước (manager/system) -> tái dùng action_back_custom_step (đã gate quyền).
-        _LINEAR = ['quotation', 'deposit', 'production', 'delivery', 'installation', 'payment']
+        _LINEAR = ['quotation', 'deposit', 'production', 'delivery', 'installation']
         if current in _LINEAR and target in _LINEAR:
             prev_collapse = {
                 'delivery': 'production',
                 'installation': 'production',
-                'payment': self.fulfillment_method or 'delivery',
             }
             expected_prev = prev_collapse.get(current)
             if expected_prev is None and _LINEAR.index(current) > 0:
@@ -257,10 +259,17 @@ class SaleOrderWorkflow(models.Model):
         self.delivery_address = address
         self.is_delivery_confirmed = True
         self.check_and_update_completion_status()
-        if self.order_state_custom != 'completed':
-            self.order_state_custom = 'payment'
-            _logger.info(f"[CONFIRM] Order {self.name}: Delivery confirmed -> Payment")
-        return True
+        if self.order_state_custom == 'completed':
+            return True
+
+        # Không còn trạng thái "Thu tiền" riêng trong V6. Tiền còn lại được
+        # ghi nhận ngay trong Giao hàng & Thu hộ; wizard này sẽ tự chuyển đơn
+        # sang Hoàn thành sau khi tạo phiếu thu.
+        _logger.info(
+            "[CONFIRM] Order %s: Delivery confirmed -> collect remaining payment",
+            self.name,
+        )
+        return self.action_create_final_invoice()
 
     def action_confirm_delivery_info(self):
         for order in self:
@@ -325,7 +334,7 @@ class SaleOrderWorkflow(models.Model):
 
     def action_back_custom_step(self):
         """Quay lại tiến trình trước đó - reset cờ confirm khi về production để cho phép chỉnh sửa"""
-        state_order = ['quotation', 'deposit', 'production', 'delivery', 'installation', 'payment']
+        state_order = ['quotation', 'deposit', 'production', 'delivery', 'installation']
         allowed_groups = [self.env.ref('dac_erp.group_dac_erp_manager'),
                           self.env.ref('base.group_system')]
         can_back_any_step = any(g in self.env.user.groups_id for g in allowed_groups)
@@ -349,22 +358,6 @@ class SaleOrderWorkflow(models.Model):
                 #_logger.info(f"[BACK] Order {order.name}: Reset is_delivery_confirmed & is_installation_confirmed")
                 continue
 
-            # --- Từ payment lùi về đúng nhánh đã đi (dựa vào fulfillment_method) và RESET CỜ ---
-            if order.order_state_custom == 'payment':
-                vals = {}
-                # Dựa vào fulfillment_method đã chọn, KHÔNG dựa vào flag started_*
-                if order.fulfillment_method == 'installation':
-                    vals['order_state_custom'] = 'installation'
-                    vals['is_installation_confirmed'] = False
-                    #_logger.info(f"[BACK] Order {order.name}: Payment -> Installation (fulfillment_method=installation)")
-                else:  # delivery hoặc mặc định
-                    vals['order_state_custom'] = 'delivery'
-                    vals['is_delivery_confirmed'] = False
-                    #_logger.info(f"[BACK] Order {order.name}: Payment -> Delivery (fulfillment_method={order.fulfillment_method})")
-
-                order.write(vals)
-                continue
-
             # --- Tuyến tính cho các bước còn lại ---
             if idx > 0:
                 order.order_state_custom = state_order[idx - 1]
@@ -372,8 +365,18 @@ class SaleOrderWorkflow(models.Model):
         return True
 
     def action_next_step(self):
-        state_order = ['quotation', 'deposit', 'production', 'delivery', 'installation', 'payment']
+        state_order = ['quotation', 'deposit', 'production', 'delivery', 'installation']
         for order in self:
+            # Tương thích với các nút/action cũ: không đẩy đơn sang một flow
+            # thanh toán nữa, mà mở trực tiếp thao tác thu tiền của bước hiện tại.
+            if order.order_state_custom in ('delivery', 'installation'):
+                if not (
+                    order.is_delivery_confirmed
+                    if order.order_state_custom == 'delivery'
+                    else order.is_installation_confirmed
+                ):
+                    raise UserError("Vui lòng xác nhận tiến trình hiện tại trước khi hoàn thành đơn hàng!")
+                return order.action_create_final_invoice()
             idx = state_order.index(order.order_state_custom)
             # Kiểm tra xác nhận tiến trình hiện tại
             confirmed_field = {
@@ -382,7 +385,6 @@ class SaleOrderWorkflow(models.Model):
                 'production': 'is_production_confirmed',
                 'delivery': 'is_delivery_confirmed',
                 'installation': 'is_installation_confirmed',
-                'payment': 'is_payment_confirmed',
             }[order.order_state_custom]
             if not getattr(order, confirmed_field):
                 raise UserError("Vui lòng xác nhận tiến trình hiện tại trước khi chuyển sang tiến trình tiếp theo!")
@@ -418,7 +420,7 @@ class SaleOrderWorkflow(models.Model):
         return True
 
     def action_confirm_info(self):
-        state_order = ['quotation', 'deposit', 'production', 'delivery', 'installation', 'payment']
+        state_order = ['quotation', 'deposit', 'production', 'delivery', 'installation']
         for order in self:
             idx = state_order.index(order.order_state_custom)
             if order.order_state_custom == 'delivery':
@@ -456,23 +458,19 @@ class SaleOrderWorkflow(models.Model):
                 order.is_delivery_confirmed = True
                 # Chạy lại kiểm tra hoàn tất: nếu chỉ có hóa đơn cọc và tổng cọc >= tổng đơn
                 order.check_and_update_completion_status()
-                # Nếu chưa completed, nhảy trực tiếp sang payment (KHÔNG qua installation)
+                # Thu tiền đã được gộp trong bước Giao hàng & Thu hộ.
                 if order.order_state_custom != 'completed':
-                    order.order_state_custom = 'payment'
-                    _logger.info(f"[CONFIRM] Order {order.name}: Delivery confirmed -> Payment")
-            elif order.order_state_custom == 'payment':
-                order.is_payment_confirmed = True
-
+                    return order.action_create_final_invoice()
             elif order.order_state_custom == 'installation':
                 # Kiểm tra địa chỉ thi công/lắp đặt riêng
                 if not order.installation_address or not order.installation_address.strip():
                     raise UserError("Vui lòng nhập địa chỉ thi công/lắp đặt trước khi xác nhận!")
                 order.is_installation_confirmed = True
                 order.check_and_update_completion_status()
-                # Nếu chưa completed, nhảy trực tiếp sang payment
+                # Không còn bước Thu tiền riêng; mở ghi nhận thanh toán cuối
+                # trước khi hoàn tất đơn.
                 if order.order_state_custom != 'completed':
-                    order.order_state_custom = 'payment'
-                    _logger.info(f"[CONFIRM] Order {order.name}: Installation confirmed -> Payment")
+                    return order.action_create_final_invoice()
 
             # CHỈ tự động chuyển tiến trình cho quotation và production
             # KHÔNG áp dụng cho delivery/installation (đã xử lý riêng ở trên)

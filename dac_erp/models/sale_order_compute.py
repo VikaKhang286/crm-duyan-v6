@@ -100,6 +100,35 @@ class SaleOrderCompute(models.Model):
             total_paid = sum(paid_deposit_invoices.mapped('amount_total'))
             order.total_deposit_paid = total_paid
 
+    @api.depends('name', 'invoice_ids', 'invoice_ids.payment_state', 'invoice_ids.amount_total', 'invoice_ids.state')
+    def _compute_total_collected_display(self):
+        """Tổng tiền thực thu của đơn, gồm cả cọc và hóa đơn cuối.
+
+        Hóa đơn được tìm theo ``invoice_origin`` vì một số hóa đơn DAC cũ
+        không luôn liên kết ngược qua ``invoice_ids`` của sale.order.
+        """
+        Invoice = self.env['account.move']
+        for order in self:
+            if not order.name or order.name == 'New':
+                order.total_collected_display = 0.0
+                continue
+            paid_invoices = Invoice.search([
+                ('move_type', '=', 'out_invoice'),
+                ('invoice_origin', '=', order.name),
+                ('state', '!=', 'cancel'),
+                ('payment_state', '=', 'paid'),
+            ])
+            order.total_collected_display = sum(paid_invoices.mapped('amount_total'))
+
+    @api.depends('amount_total', 'total_collected_display')
+    def _compute_outstanding_amount_display(self):
+        """Công nợ thực còn lại, kể cả khi đơn đã chuyển Hoàn thành."""
+        for order in self:
+            order.outstanding_amount_display = max(
+                order.amount_total - order.total_collected_display,
+                0.0,
+            )
+
     @api.depends('order_line', 'order_line.price_subtotal', 'order_line.price_unit')
     def _compute_amount_untaxed_original(self):
         """Tính số tiền sản phẩm gốc (Thành tiền - chỉ dòng dương, bỏ qua dòng cọc âm)"""

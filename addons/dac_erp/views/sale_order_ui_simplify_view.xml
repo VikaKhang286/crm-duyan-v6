@@ -118,7 +118,8 @@
                                 <div class="dac-summary-row"><span class="dac-summary-label">Phí vận chuyển</span><span class="dac-summary-value"><field name="shipping_fee" widget="monetary" nolabel="1"/></span></div>
                                 <div class="dac-summary-row"><span class="dac-summary-label">Tổng</span><span class="dac-summary-value dac-summary-value--large"><field name="amount_total" readonly="1" widget="monetary" nolabel="1"/></span></div>
                                 <div class="dac-summary-row" invisible="deposit_paid_display == 0"><span class="dac-summary-label">Cọc / Đã thanh toán</span><span class="dac-summary-value dac-summary-value--deposit"><field name="deposit_paid_display" readonly="1" widget="monetary" nolabel="1"/></span></div>
-                                <div class="dac-summary-row dac-summary-row--remaining" invisible="order_state_custom == 'cancel'"><span class="dac-summary-label dac-summary-label--highlight">Còn thanh toán</span><span class="dac-summary-value--highlight"><field name="remaining_amount_display" readonly="1" widget="monetary" nolabel="1"/></span></div>
+                                <div class="dac-summary-row dac-summary-row--remaining" invisible="order_state_custom in ['cancel', 'completed']"><span class="dac-summary-label dac-summary-label--highlight">Còn thanh toán</span><span class="dac-summary-value--highlight"><field name="remaining_amount_display" readonly="1" widget="monetary" nolabel="1"/></span></div>
+                                <div class="dac-summary-row dac-summary-row--remaining" invisible="order_state_custom != 'completed'"><span class="dac-summary-label dac-summary-label--highlight">Còn thu / COD</span><span class="dac-summary-value--highlight"><field name="outstanding_amount_display" readonly="1" widget="monetary" nolabel="1"/></span></div>
                             </div>
                         </section>
                         <aside class="dac-v6-sticky-rail">
@@ -130,7 +131,7 @@
                                         <strong invisible="order_state_custom != 'production'">Sản xuất</strong>
                                         <strong invisible="order_state_custom != 'delivery'">Giao hàng &amp; Thu hộ</strong>
                                         <strong invisible="order_state_custom != 'installation'">Thi công &amp; Lắp đặt</strong>
-                                        <strong invisible="order_state_custom not in ['payment', 'completed']">Thanh toán</strong>
+                                        <strong invisible="order_state_custom != 'completed'">Kết quả đơn hàng</strong>
                                         <small><field name="name" nolabel="1" readonly="1"/></small>
                                     </div>
                                     <div class="dac-v6-side-details" invisible="order_state_custom != 'quotation'">
@@ -153,6 +154,12 @@
                                         <div><span>Deadline</span><b><field name="production_deadline" nolabel="1" readonly="1"/></b></div>
                                         <div><span>Thiết kế</span><b><field name="design_summary_display" nolabel="1" readonly="1"/></b></div>
                                         <div><span>Task hoàn thành</span><b><field name="production_task_done_count" nolabel="1" readonly="1"/>/<field name="production_task_count" nolabel="1" readonly="1"/></b></div>
+                                    </div>
+                                    <div class="dac-v6-side-details dac-v6-completed-details" invisible="order_state_custom != 'completed'">
+                                        <div><span>Giao nhận</span><b>Đã giao thành công</b></div>
+                                        <div><span>Tổng giá trị</span><b><field name="amount_total" nolabel="1" readonly="1" widget="monetary"/></b></div>
+                                        <div><span>Đã thu</span><b><field name="total_collected_display" nolabel="1" readonly="1" widget="monetary"/></b></div>
+                                        <div><span>Còn thu / COD</span><b><field name="outstanding_amount_display" nolabel="1" readonly="1" widget="monetary"/></b></div>
                                     </div>
                                     <div class="dac-v6-design-actions" invisible="order_state_custom != 'deposit'">
                                         <button name="action_open_design_handover" string="Xem thiết kế" type="object" class="btn btn-outline-secondary"/>
@@ -198,7 +205,7 @@
                                             <button name="action_start_delivery_tracking" string="Bắt đầu giao hàng" type="object" class="btn btn-warning"/>
                                         </div>
                                     </div>
-                                    <div class="dac-v6-side-details" invisible="order_state_custom not in ['installation', 'payment', 'completed']">
+                                    <div class="dac-v6-side-details" invisible="order_state_custom != 'installation'">
                                         <div><span>Hình thức</span><b><field name="fulfillment_method" nolabel="1" readonly="1"/></b></div>
                                         <div><span>Còn thanh toán</span><b><field name="remaining_amount_display" nolabel="1" readonly="1" widget="monetary"/></b></div>
                                     </div>
@@ -229,7 +236,7 @@
 
                 <!-- Bố cục chi tiết đơn theo prototype: gom thông tin vào đúng hai card đầu. -->
                 <xpath expr="//div[hasclass('dac-box-document')]/h5" position="replace">
-                    <h5 class="dac-box-title dac-title-document d-flex justify-content-between align-items-center" invisible="order_state_custom == 'delivery'">
+                    <h5 class="dac-box-title dac-title-document d-flex justify-content-between align-items-center" invisible="order_state_custom in ['delivery', 'completed']">
                         <span>
                             <i class="fa fa-calendar-check-o me-2" title="Báo giá" invisible="order_state_custom != 'quotation'"/>
                             <i class="fa fa-pencil me-2" title="Thiết kế" invisible="order_state_custom != 'deposit'"/>
@@ -239,13 +246,13 @@
                             <span invisible="order_state_custom != 'deposit'">Thiết kế &amp; Đặt cọc</span>
                             <span invisible="order_state_custom != 'production'">Sản xuất</span>
                             <span invisible="order_state_custom != 'delivery'">Giao hàng &amp; thu hộ</span>
-                            <span invisible="order_state_custom not in ['installation', 'payment', 'completed']">Kết quả &amp; công nợ</span>
+                            <span invisible="order_state_custom not in ['installation', 'completed']">Kết quả &amp; công nợ</span>
                         </span>
                         <button name="action_quick_create_task" type="object" string="+ Task" class="btn btn-sm btn-outline-primary py-0 px-2" invisible="order_state_custom not in ['deposit', 'production']" groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager"/>
                     </h5>
                 </xpath>
                 <xpath expr="//div[hasclass('dac-box-document')]/group" position="attributes">
-                    <attribute name="invisible">order_state_custom in ['deposit', 'production', 'delivery']</attribute>
+                    <attribute name="invisible">order_state_custom in ['deposit', 'production', 'delivery', 'completed']</attribute>
                 </xpath>
                 <xpath expr="//div[hasclass('dac-box-document')]//field[@name='order_number']" position="before">
                     <p class="dac-v6-quotation-intro" invisible="order_state_custom != 'quotation'">Chốt nội dung, chất liệu và kích thước trong bảng sản phẩm.</p>
@@ -386,6 +393,23 @@
                         <div class="dac-v6-delivery-stage-footer dac-v6-delivery-stage-footer--success" invisible="not delivery_can_complete">
                             <div><b>Bước tiếp theo: Hoàn thành</b><span><field name="delivery_next_message" nolabel="1" readonly="1"/></span></div>
                             <button name="action_confirm_info" string="Hoàn thành đơn" type="object" class="btn btn-success"/>
+                        </div>
+                    </div>
+                    <div class="dac-v6-completed-stage-card" invisible="order_state_custom != 'completed'">
+                        <div class="dac-v6-delivery-stage-head">
+                            <h3>Kết quả &amp; công nợ</h3>
+                            <span>5 / 5</span>
+                            <b>Chi tiết</b>
+                        </div>
+                        <div class="dac-v6-completed-stage-body">
+                            <p>Đã giao thành công. Công nợ tiếp tục được theo dõi riêng.</p>
+                        </div>
+                        <div class="dac-v6-completed-stage-footer">
+                            <div>
+                                <b>Đơn đã hoàn thành</b>
+                                <span>Đã hoàn tất quy trình đơn hàng.</span>
+                            </div>
+                            <button name="dac_completed_order" string="Đã hoàn thành" type="button" class="btn btn-secondary" disabled="1"/>
                         </div>
                     </div>
                     <div class="dac-v6-quotation-next-step" invisible="order_state_custom != 'quotation'">

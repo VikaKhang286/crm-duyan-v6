@@ -694,15 +694,21 @@ class SaleOrderInvoice(models.Model):
                 messages.append(f"• Lỗi reset hóa đơn {invoice.name}: {str(e)}")
                 _logger.error(f"Error resetting invoice {invoice.name}: {str(e)}")
 
-        # Reset đơn hàng về trạng thái thu tiền
+        # V6 không còn flow Thu tiền riêng. Khi reset thanh toán, đưa đơn về
+        # đúng bước hoàn tất thực tế để người dùng ghi nhận lại tiền tại đó.
         try:
+            resume_state = (
+                'installation'
+                if self.fulfillment_method == 'installation'
+                else 'delivery'
+            )
             self.write({
-                'order_state_custom': 'payment',
+                'order_state_custom': resume_state,
                 'is_payment_confirmed': False,
                 'is_order_completed': False
             })
-            messages.append(f"• Reset đơn hàng {self.name} về trạng thái 'Thu tiền'")
-            _logger.info(f"Reset order {self.name} to payment state")
+            messages.append(f"• Reset đơn hàng {self.name} về bước '{dict(self._fields['order_state_custom'].selection).get(resume_state)}'")
+            _logger.info("Reset order %s to %s state", self.name, resume_state)
         except Exception as e:
             messages.append(f"• Lỗi reset đơn hàng {self.name}: {str(e)}")
             _logger.error(f"Error resetting order {self.name}: {str(e)}")

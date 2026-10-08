@@ -30,14 +30,14 @@
                                 <!-- Nhánh giao hàng: ẩn bước Thi công -->
                                 <field name="order_state_custom"
                                        widget="statusbar"
-                                       statusbar_visible="quotation,deposit,production,delivery,payment,completed"
+                                       statusbar_visible="quotation,deposit,production,delivery,completed"
                                        statusbar_colors='{"cancel":"red"}'
                                        readonly="1"
                                        invisible="fulfillment_method == 'installation'"/>
                                 <!-- Nhánh thi công: ẩn bước Giao hàng -->
                                 <field name="order_state_custom"
                                        widget="statusbar"
-                                       statusbar_visible="quotation,deposit,production,installation,payment,completed"
+                                       statusbar_visible="quotation,deposit,production,installation,completed"
                                        statusbar_colors='{"cancel":"red"}'
                                        readonly="1"
                                        invisible="fulfillment_method != 'installation'"/>
@@ -142,13 +142,13 @@
                                         string="Thu tiền"
                                         type="object"
                                         class="btn btn-primary"
-                                        invisible="order_state_custom != 'delivery' or not is_delivery_confirmed"
+                                        invisible="1"
                                         groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager,base.group_system"/>
                                 <button name="action_create_final_invoice"
                                         string="Thanh toán"
                                         type="object"
                                         class="btn btn-success"
-                                        invisible="order_state_custom != 'payment' or is_payment_confirmed or has_final_invoice"
+                                        invisible="1"
                                         groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager"/>
                                 <button name="dac_new_order" type="button"
                                         class="btn btn-outline-primary dac-new-order-btn"
@@ -209,7 +209,7 @@
                                         <field name="order_number" string="Số đặt hàng" placeholder="VD: 8766" readonly="is_design_user or is_production_user"/>
                                         <field name="date" string="Ngày lập"/>
                                         <field name="order_type" widget="radio" string="Loại đơn hàng" readonly="is_design_user or is_production_user"/>
-                                        <field name="fulfillment_method" widget="radio" string="Hình thức" invisible="order_state_custom == 'quotation' or order_type == 'cart'" readonly="order_state_custom in ['completed', 'cancelled','delivery','installation','payment'] or is_delivery_confirmed or is_installation_confirmed or is_design_user"/>
+                                        <field name="fulfillment_method" widget="radio" string="Hình thức" invisible="order_state_custom == 'quotation' or order_type == 'cart'" readonly="order_state_custom in ['completed', 'cancelled','delivery','installation'] or is_delivery_confirmed or is_installation_confirmed or is_design_user"/>
                                     </group>
                                 </div>
                             </div>
@@ -238,14 +238,14 @@
                                     <field name="is_priority"
                                            string="Ưu tiên"
                                            widget="boolean_toggle"
-                                           readonly="is_design_user or order_state_custom in ['delivery', 'installation', 'payment', 'completed', 'cancel']"/>
+                                           readonly="is_design_user or order_state_custom in ['delivery', 'installation', 'completed', 'cancel']"/>
                                     <span>Ưu tiên</span>
                                 </div>
                                 <div class="dac-toggle-field">
                                     <field name="is_priority_today"
                                            string="Trong ngày"
                                            widget="boolean_toggle"
-                                           readonly="is_design_user or not is_priority or order_state_custom in ['delivery', 'installation', 'payment', 'completed', 'cancel']"/>
+                                           readonly="is_design_user or not is_priority or order_state_custom in ['delivery', 'installation', 'completed', 'cancel']"/>
                                     <span>Trong ngày</span>
                                 </div>
                             </div>
@@ -586,13 +586,13 @@
                                         or is_installation_confirmed"
                                     groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager,base.group_system"/>
 
-                                <!-- Nút Thanh toán ở bước cuối cùng (payment) -->
+                                <!-- V6 gộp thao tác thu tiền vào Giao hàng &amp; Thu hộ. -->
                                 <button name="action_create_final_invoice"
-                                    string="Thanh toán"
-                                    type="object"
-                                    class="btn-success"
-                                    groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager"
-                                    invisible="order_state_custom != 'payment' or is_payment_confirmed or has_final_invoice"/>
+                                        string="Thanh toán"
+                                        type="object"
+                                        class="btn-success"
+                                        groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager"
+                                        invisible="1"/>
 
                                 <!-- Nút Chuyển sang tiến trình tiếp theo: Đặt cọc -->
                                 <button name="action_next_step"
@@ -602,13 +602,12 @@
                                     invisible="order_state_custom != 'quotation' or not is_quotation_confirmed"
                                     groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager,base.group_system"/>
                                     
-                                <!-- Nút Chuyển sang tiến trình tiếp theo: Thu tiền -->
-                                <!-- Bỏ nút Giao hàng vì đã có nút "Tiến hành giao hàng" riêng -->
+                                <!-- Bỏ flow Thu tiền: thao tác thu tiền nằm trong Giao hàng &amp; Thu hộ. -->
                                 <button name="action_next_step"
-                                    string="Thu tiền"
-                                    type="object"
-                                    class="btn-primary"
-                                    invisible="order_state_custom != 'delivery' or not is_delivery_confirmed"
+                                        string="Thu tiền"
+                                        type="object"
+                                        class="btn-primary"
+                                    invisible="1"
                                     groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager,base.group_system"/>
                                 <!-- Nút Chuyển sang tiến trình tiếp theo: Ẩn ở bước cuối cùng -->
                                 <!-- Không cần nút cho bước 'payment' vì không có bước tiếp theo -->
@@ -818,9 +817,9 @@
                     <field name="pricelist_id" column_invisible="1" optional="hide"/>
                     <field name="create_date" string="Ngày tạo đơn (hệ thống)" readonly="1" optional="hide"/>
                     <field name="order_number" string="Số đặt hàng"
-                           readonly="order_state_custom in ['delivery', 'installation', 'payment', 'completed', 'cancel']"/>
+                           readonly="order_state_custom in ['delivery', 'installation', 'completed', 'cancel']"/>
                     <field name="date" string="Ngày đơn hàng"
-                           readonly="order_state_custom in ['delivery', 'installation', 'payment', 'completed', 'cancel']"/>
+                           readonly="order_state_custom in ['delivery', 'installation', 'completed', 'cancel']"/>
                     <field name="partner_id" widget="many2one"
                            readonly="order_state_custom not in ['quotation', 'deposit']"/>
                     <field name="user_id" widget="many2one_avatar_user" string="Sale phụ trách"/>
@@ -830,9 +829,9 @@
                     <field name="order_state_select" string="Trạng thái"/>
                     <field name="list_note" string="Ghi chú" optional="show"/>
                     <field name="is_priority" string="Ưu tiên"
-                           readonly="order_state_custom in ['delivery', 'installation', 'payment', 'completed', 'cancel']"/>
+                           readonly="order_state_custom in ['delivery', 'installation', 'completed', 'cancel']"/>
                     <field name="is_priority_today" string="Trong ngày"
-                           readonly="not is_priority or order_state_custom in ['delivery', 'installation', 'payment', 'completed', 'cancel']"/>
+                           readonly="not is_priority or order_state_custom in ['delivery', 'installation', 'completed', 'cancel']"/>
                     <field name="production_deadline" string="Ngày hoàn tất sản xuất"
                            readonly="order_state_custom not in ['quotation', 'deposit']"/>
                 </list>
@@ -866,9 +865,9 @@
                     <field name="pricelist_id" column_invisible="1" optional="hide"/>
                     <field name="create_date" string="Ngày tạo đơn (hệ thống)" readonly="1" optional="hide"/>
                     <field name="order_number" string="Số đặt hàng"
-                           readonly="order_state_custom in ['delivery', 'installation', 'payment', 'completed', 'cancel']"/>
+                           readonly="order_state_custom in ['delivery', 'installation', 'completed', 'cancel']"/>
                     <field name="date" string="Ngày đơn hàng"
-                           readonly="order_state_custom in ['delivery', 'installation', 'payment', 'completed', 'cancel']"/>
+                           readonly="order_state_custom in ['delivery', 'installation', 'completed', 'cancel']"/>
                     <field name="partner_id" widget="many2one"
                            readonly="order_state_custom not in ['quotation', 'deposit']"/>
                     <field name="user_id" widget="many2one_avatar_user" string="Sale phụ trách"/>
@@ -878,9 +877,9 @@
                     <field name="order_state_select" string="Trạng thái"/>
                     <field name="list_note" string="Ghi chú" optional="show"/>
                     <field name="is_priority" string="Ưu tiên"
-                           readonly="order_state_custom in ['delivery', 'installation', 'payment', 'completed', 'cancel']"/>
+                           readonly="order_state_custom in ['delivery', 'installation', 'completed', 'cancel']"/>
                     <field name="is_priority_today" string="Trong ngày"
-                           readonly="not is_priority or order_state_custom in ['delivery', 'installation', 'payment', 'completed', 'cancel']"/>
+                           readonly="not is_priority or order_state_custom in ['delivery', 'installation', 'completed', 'cancel']"/>
                     <field name="production_deadline" string="Ngày hoàn tất sản xuất"
                            readonly="order_state_custom not in ['quotation', 'deposit']"/>
                 </list>
@@ -927,9 +926,9 @@
                     <field name="order_state_custom" column_invisible="1"/>
                     <field name="name" readonly="1" optional="hide"/>
                     <field name="order_number" string="Số đặt hàng"
-                           readonly="order_state_custom in ['delivery', 'installation', 'payment', 'completed', 'cancel']"/>
+                           readonly="order_state_custom in ['delivery', 'installation', 'completed', 'cancel']"/>
                     <field name="date" string="Ngày đơn hàng"
-                           readonly="order_state_custom in ['delivery', 'installation', 'payment', 'completed', 'cancel']"/>
+                           readonly="order_state_custom in ['delivery', 'installation', 'completed', 'cancel']"/>
                     <field name="customer_address" column_invisible="1"/>
                     <field name="phone" column_invisible="1"/>
                     <field name="currency_id" column_invisible="1"/>
@@ -982,7 +981,6 @@
                     <filter string="Sản xuất" name="production" domain="[('order_state_custom', '=', 'production')]"/>
                     <filter string="Thi công - lắp đặt" name="installation" domain="[('order_state_custom','=','installation')]"/>
                     <filter string="Giao hàng" name="delivery" domain="[('order_state_custom', '=', 'delivery')]"/>
-                    <filter string="Thu tiền" name="payment" domain="[('order_state_custom', '=', 'payment')]"/>
                     <filter string="Hủy" name="cancel" domain="[('order_state_custom', '=', 'cancel')]"/>
                     <separator/>
                     <filter string="Đã hoàn thành" name="completed" domain="[('is_order_completed', '=', True)]"/>
@@ -1047,7 +1045,7 @@
                            optional="show"
                            decoration-info="order_state_select == 'quotation'"
                            decoration-primary="order_state_select == 'deposit'"
-                           decoration-warning="order_state_select in ('production', 'installation', 'delivery', 'payment')"
+                           decoration-warning="order_state_select in ('production', 'installation', 'delivery')"
                            decoration-success="order_state_select == 'completed'"
                            decoration-danger="order_state_select == 'cancel'"/>
                     <field name="list_note" string="Ghi chú" optional="show"/>

@@ -107,7 +107,7 @@
 
   .dac-control-panel-progress .o_statusbar_status {
     display: grid !important;
-    grid-template-columns: repeat(6, minmax(76px, 1fr));
+    grid-template-columns: repeat(5, minmax(76px, 1fr));
     gap: 4px !important;
     overflow: visible !important;
   }
@@ -351,11 +351,10 @@
   color: #755600 !important;
 }
 
-.o_web_client :is(.dac-order-state-deposit, .dac-order-state-production, .dac-order-state-delivery, .dac-order-state-installation, .dac-order-state-payment, .dac-order-state-completed) .dac-sale-order-control-panel-slot .dac-control-panel-progress [data-value="quotation"]::before,
-.o_web_client :is(.dac-order-state-production, .dac-order-state-delivery, .dac-order-state-installation, .dac-order-state-payment, .dac-order-state-completed) .dac-sale-order-control-panel-slot .dac-control-panel-progress [data-value="deposit"]::before,
-.o_web_client :is(.dac-order-state-delivery, .dac-order-state-installation, .dac-order-state-payment, .dac-order-state-completed) .dac-sale-order-control-panel-slot .dac-control-panel-progress [data-value="production"]::before,
-.o_web_client :is(.dac-order-state-payment, .dac-order-state-completed) .dac-sale-order-control-panel-slot .dac-control-panel-progress :is([data-value="delivery"], [data-value="installation"])::before,
-.o_web_client .dac-order-state-completed .dac-sale-order-control-panel-slot .dac-control-panel-progress [data-value="payment"]::before {
+.o_web_client :is(.dac-order-state-deposit, .dac-order-state-production, .dac-order-state-delivery, .dac-order-state-installation, .dac-order-state-completed) .dac-sale-order-control-panel-slot .dac-control-panel-progress [data-value="quotation"]::before,
+.o_web_client :is(.dac-order-state-production, .dac-order-state-delivery, .dac-order-state-installation, .dac-order-state-completed) .dac-sale-order-control-panel-slot .dac-control-panel-progress [data-value="deposit"]::before,
+.o_web_client :is(.dac-order-state-delivery, .dac-order-state-installation, .dac-order-state-completed) .dac-sale-order-control-panel-slot .dac-control-panel-progress [data-value="production"]::before,
+.o_web_client .dac-order-state-completed .dac-sale-order-control-panel-slot .dac-control-panel-progress :is([data-value="delivery"], [data-value="installation"])::before {
   border-color: #ffc20e !important;
   background: #ffc20e !important;
   color: #302500 !important;
@@ -403,10 +402,9 @@
 }
 
 .o_web_client .dac-order-state-quotation { --dac-progress-stop: 0%; }
-.o_web_client .dac-order-state-deposit { --dac-progress-stop: 20%; }
-.o_web_client .dac-order-state-production { --dac-progress-stop: 40%; }
-.o_web_client :is(.dac-order-state-delivery, .dac-order-state-installation) { --dac-progress-stop: 60%; }
-.o_web_client .dac-order-state-payment { --dac-progress-stop: 80%; }
+.o_web_client .dac-order-state-deposit { --dac-progress-stop: 25%; }
+.o_web_client .dac-order-state-production { --dac-progress-stop: 50%; }
+.o_web_client :is(.dac-order-state-delivery, .dac-order-state-installation) { --dac-progress-stop: 75%; }
 .o_web_client .dac-order-state-completed { --dac-progress-stop: 100%; }
 
 .o_web_client .dac-control-panel-progress .o_arrow_button[data-value]::before {
@@ -429,8 +427,7 @@
 .o_web_client .dac-control-panel-progress .o_arrow_button[data-value="production"]::before { content: "3"; }
 .o_web_client .dac-control-panel-progress .o_arrow_button[data-value="delivery"]::before,
 .o_web_client .dac-control-panel-progress .o_arrow_button[data-value="installation"]::before { content: "4"; }
-.o_web_client .dac-control-panel-progress .o_arrow_button[data-value="payment"]::before { content: "5"; }
-.o_web_client .dac-control-panel-progress .o_arrow_button[data-value="completed"]::before { content: "6"; }
+.o_web_client .dac-control-panel-progress .o_arrow_button[data-value="completed"]::before { content: "5"; }
 
 .o_web_client .dac-control-panel-progress .o_arrow_button.o_arrow_button_current {
   color: #755600 !important;
@@ -444,11 +441,10 @@
   box-shadow: 0 0 0 6px #fff3c8;
 }
 
-.o_web_client :is(.dac-order-state-deposit, .dac-order-state-production, .dac-order-state-delivery, .dac-order-state-installation, .dac-order-state-payment, .dac-order-state-completed) .dac-control-panel-progress [data-value="quotation"]::before,
-.o_web_client :is(.dac-order-state-production, .dac-order-state-delivery, .dac-order-state-installation, .dac-order-state-payment, .dac-order-state-completed) .dac-control-panel-progress [data-value="deposit"]::before,
-.o_web_client :is(.dac-order-state-delivery, .dac-order-state-installation, .dac-order-state-payment, .dac-order-state-completed) .dac-control-panel-progress [data-value="production"]::before,
-.o_web_client :is(.dac-order-state-payment, .dac-order-state-completed) .dac-control-panel-progress :is([data-value="delivery"], [data-value="installation"])::before,
-.o_web_client .dac-order-state-completed .dac-control-panel-progress [data-value="payment"]::before {
+.o_web_client :is(.dac-order-state-deposit, .dac-order-state-production, .dac-order-state-delivery, .dac-order-state-installation, .dac-order-state-completed) .dac-control-panel-progress [data-value="quotation"]::before,
+.o_web_client :is(.dac-order-state-production, .dac-order-state-delivery, .dac-order-state-installation, .dac-order-state-completed) .dac-control-panel-progress [data-value="deposit"]::before,
+.o_web_client :is(.dac-order-state-delivery, .dac-order-state-installation, .dac-order-state-completed) .dac-control-panel-progress [data-value="production"]::before,
+.o_web_client .dac-order-state-completed .dac-control-panel-progress :is([data-value="delivery"], [data-value="installation"])::before {
   border-color: #ffc20e;
   background: #ffc20e;
   color: #302500;
@@ -1049,6 +1045,14 @@
 .dac-v6-delivery-stage-footer--success { border-top-color: #28a76b; background: #eefaf4; }
 .dac-v6-delivery-stage-footer--success b, .dac-v6-delivery-stage-footer--success span { color: #157547; }
 .dac-v6-delivery-stage-footer--success .btn { background: #28a76b !important; color: #fff !important; }
+.dac-v6-completed-stage-card { display: flex; min-height: 370px; flex-direction: column; margin-top: 14px; overflow: hidden; border: 1px solid #e3e7ee; border-radius: 11px; background: #fff; }
+.dac-v6-completed-stage-body { flex: 1; padding: 16px 15px; }
+.dac-v6-completed-stage-body p { margin: 0; color: #667489; font-size: 15px; font-weight: 600; line-height: 1.45; }
+.dac-v6-completed-stage-footer { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 14px; padding: 13px 15px; border-top: 1px solid #eddca4; background: #fffdf5; }
+.dac-v6-completed-stage-footer > div { display: flex; min-width: 0; flex-direction: column; gap: 4px; }
+.dac-v6-completed-stage-footer b { color: #29313f; font-size: 12px; font-weight: 850; }
+.dac-v6-completed-stage-footer span { color: #8792a3; font-size: 10px; font-weight: 650; }
+.dac-v6-completed-stage-footer .btn { min-width: 130px; padding: 9px 12px !important; border: 0 !important; border-radius: 9px !important; background: #ffd978 !important; color: #756343 !important; font-size: 11px; font-weight: 850; opacity: 1 !important; }
 .dac-v6-stage-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 10px; border-bottom: 1px solid #e5e8ee; }
 .dac-v6-stage-head strong { color: #293445; font-size: 13px; font-weight: 850; }
 .dac-v6-stage-head .o_field_html { width: auto; }

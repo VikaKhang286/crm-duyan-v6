@@ -35,7 +35,6 @@ class SaleOrder(models.Model):
         ('production', 'Sản xuất'),
         ('installation', 'Thi công - lắp đặt'),
         ('delivery', 'Giao hàng'),
-        ('payment', 'Thu tiền'),
         ('completed', 'Hoàn thành'),
         ('cancel', 'Hủy'),
     ], string='Trạng thái đơn hàng', default='quotation', tracking=True)
@@ -289,6 +288,20 @@ class SaleOrder(models.Model):
         store=False
     )
 
+    total_collected_display = fields.Monetary(
+        string="Đã thu",
+        compute="_compute_total_collected_display",
+        currency_field='currency_id',
+        store=False,
+    )
+
+    outstanding_amount_display = fields.Monetary(
+        string="Còn thanh toán",
+        compute="_compute_outstanding_amount_display",
+        currency_field='currency_id',
+        store=False,
+    )
+
     # Số tiền sản phẩm gốc (chưa trừ cọc)
     amount_untaxed_original = fields.Monetary(
         string="Thành tiền",
@@ -443,7 +456,7 @@ class SaleOrder(models.Model):
         if protected_keys.intersection(vals.keys()):
             for rec in self:
                 if rec.is_delivery_confirmed or rec.is_installation_confirmed \
-                    or rec.order_state_custom in ('delivery', 'installation', 'payment', 'completed'):
+                    or rec.order_state_custom in ('delivery', 'installation', 'completed'):
                         raise UserError(_("Không thể sửa thông tin trễ sau khi đơn đã chuyển sang Giao hàng."))
 
         # 2) Ghi nhận xem có chạm đến ảnh hay không (áp dụng cho nhiều record)
