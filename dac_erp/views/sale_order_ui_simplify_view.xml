@@ -119,7 +119,7 @@
                                 <div class="dac-summary-row"><span class="dac-summary-label">Tổng</span><span class="dac-summary-value dac-summary-value--large"><field name="amount_total" readonly="1" widget="monetary" nolabel="1"/></span></div>
                                 <div class="dac-summary-row" invisible="deposit_paid_display == 0"><span class="dac-summary-label">Cọc / Đã thanh toán</span><span class="dac-summary-value dac-summary-value--deposit"><field name="deposit_paid_display" readonly="1" widget="monetary" nolabel="1"/></span></div>
                                 <div class="dac-summary-row dac-summary-row--remaining" invisible="order_state_custom in ['cancel', 'completed']"><span class="dac-summary-label dac-summary-label--highlight">Còn thanh toán</span><span class="dac-summary-value--highlight"><field name="remaining_amount_display" readonly="1" widget="monetary" nolabel="1"/></span></div>
-                                <div class="dac-summary-row dac-summary-row--remaining" invisible="order_state_custom != 'completed'"><span class="dac-summary-label dac-summary-label--highlight">Còn thu / COD</span><span class="dac-summary-value--highlight"><field name="outstanding_amount_display" readonly="1" widget="monetary" nolabel="1"/></span></div>
+                                <div class="dac-summary-row dac-summary-row--remaining" invisible="order_state_custom != 'completed'"><span class="dac-summary-label dac-summary-label--highlight">Còn thanh toán</span><span class="dac-summary-value--highlight"><field name="outstanding_amount_display" readonly="1" widget="monetary" nolabel="1"/></span></div>
                             </div>
                         </section>
                         <aside class="dac-v6-sticky-rail">

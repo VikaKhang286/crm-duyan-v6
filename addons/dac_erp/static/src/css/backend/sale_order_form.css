@@ -1053,6 +1053,19 @@
 .dac-v6-completed-stage-footer b { color: #29313f; font-size: 12px; font-weight: 850; }
 .dac-v6-completed-stage-footer span { color: #8792a3; font-size: 10px; font-weight: 650; }
 .dac-v6-completed-stage-footer .btn { min-width: 130px; padding: 9px 12px !important; border: 0 !important; border-radius: 9px !important; background: #ffd978 !important; color: #756343 !important; font-size: 11px; font-weight: 850; opacity: 1 !important; }
+
+/* Delivery and completed stages live directly in the existing document card.
+   Removing the inner card chrome prevents the double-frame appearance. */
+.dac-sale-form .dac-box-document:has(> :is(.dac-v6-delivery-stage-card, .dac-v6-completed-stage-card)) {
+  padding: 0 !important;
+  overflow: hidden;
+}
+.dac-sale-form .dac-box-document > :is(.dac-v6-delivery-stage-card, .dac-v6-completed-stage-card) {
+  min-height: 100%;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+}
 .dac-v6-stage-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 10px; border-bottom: 1px solid #e5e8ee; }
 .dac-v6-stage-head strong { color: #293445; font-size: 13px; font-weight: 850; }
 .dac-v6-stage-head .o_field_html { width: auto; }
