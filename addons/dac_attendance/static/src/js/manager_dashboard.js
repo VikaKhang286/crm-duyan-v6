@@ -10,9 +10,19 @@ const MONTHS_VI = [
 ];
 
 const EMPTY_DATA = {
-    today_stats: { present: 0, absent: 0, late: 0, pending_approvals: 0 },
+    today_stats: {
+        present: 0,
+        absent: 0,
+        on_leave: 0,
+        unexplained_absent: 0,
+        late: 0,
+        pending_approvals: 0,
+        pending_leaves: 0,
+        pending_amendments: 0,
+    },
     present_list: [],
     absent_list: [],
+    weekly_attendance: [],
     pending_approvals: { leaves: [], amendments: [] },
 };
 
@@ -27,7 +37,7 @@ export class ManagerDashboard extends Component {
             loading: true,
             error: null,
             data: EMPTY_DATA,
-            activeTab: "present",
+            activeTab: "all",
             approvalTab: "leaves",
             processingId: null,
             refuseTarget: null,   // { type: 'leave'|'amendment', id }
@@ -64,6 +74,61 @@ export class ManagerDashboard extends Component {
 
     get lateList() {
         return (this.state.data.present_list || []).filter(e => e.is_late);
+    }
+
+    get employeeList() {
+        const present = this.state.data.present_list || [];
+        const absent = (this.state.data.absent_list || []).map((employee) => ({
+            ...employee,
+            is_absent: true,
+            is_late: false,
+        }));
+        if (this.state.activeTab === "all") {
+            return [...present, ...absent];
+        }
+        if (this.state.activeTab === "late") {
+            return this.lateList;
+        }
+        return this.state.activeTab === "absent" ? absent : present;
+    }
+
+    get approvalItems() {
+        const approvals = this.state.data.pending_approvals || { leaves: [], amendments: [] };
+        const initials = (name) => (name || "")
+            .trim()
+            .split(/\s+/)
+            .slice(0, 2)
+            .map((part) => part.charAt(0).toUpperCase())
+            .join("");
+        const amendmentLabels = {
+            "Quên check-in": "Check-in",
+            "Quên check-out": "Check-out",
+            "Quên cả hai": "Điều chỉnh giờ",
+            "Sai giờ": "Điều chỉnh giờ",
+        };
+        const leaves = (approvals.leaves || []).map((leave) => ({
+            key: `leave-${leave.id}`,
+            id: leave.id,
+            type: "leave",
+            employee_name: leave.employee_name,
+            initials: initials(leave.employee_name),
+            title: "Nghỉ phép",
+            detail: `${leave.date_from} → ${leave.date_to} · ${leave.days} ngày`,
+        }));
+        const amendments = (approvals.amendments || []).map((amendment) => {
+            const label = amendmentLabels[amendment.amendment_type] || amendment.amendment_type;
+            const time = amendment.actual_check_in || amendment.actual_check_out || "";
+            return {
+                key: `amendment-${amendment.id}`,
+                id: amendment.id,
+                type: "amendment",
+                employee_name: amendment.employee_name,
+                initials: initials(amendment.employee_name),
+                title: "Điều chỉnh",
+                detail: `${amendment.target_date} · ${label}${time ? ` ${time}` : ""}`,
+            };
+        });
+        return [...leaves, ...amendments];
     }
 
     get totalEmployees() {

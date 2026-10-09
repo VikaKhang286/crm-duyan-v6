@@ -32,6 +32,14 @@ class DacAttendanceDashboard(models.AbstractModel):
             return d.strftime('%d/%m/%Y')
         return str(d)
 
+    def _format_duration(self, hours):
+        """Render decimal working hours as the compact label used in the dashboard."""
+        minutes = max(0, round((hours or 0) * 60))
+        hour_part, minute_part = divmod(minutes, 60)
+        if hour_part:
+            return f'{hour_part}h {minute_part:02d}m'
+        return f'{minute_part}m'
+
     # ── Employee Dashboard ────────────────────────────────────────────────────
 
     @api.model
@@ -280,30 +288,72 @@ class DacAttendanceDashboard(models.AbstractModel):
         checked_in_ids = {a.employee_id.id for a in today_atts}
         late_ids = {a.employee_id.id for a in today_atts if a.is_late}
         absent_ids = {e.id for e in all_employees if e.id not in checked_in_ids}
+        approved_leave_employee_ids = set(self.env['dac.attendance.leave'].search([
+            ('state', '=', 'approved'),
+            ('date_from', '<=', today),
+            ('date_to', '>=', today),
+        ]).mapped('employee_id').ids)
+        on_leave_ids = absent_ids & approved_leave_employee_ids
 
-        # Build present list (currently working = no check_out yet)
-        open_atts = {a.employee_id.id: a for a in today_atts if not a.check_out}
+        # Build one operational row per employee.  An employee can check in more
+        # than once in a day, therefore duration is aggregated while the latest
+        # record supplies the displayed check-in/out and verification details.
+        role_departments = {
+            'manager': 'Quản lý',
+            'sale_all': 'Sale',
+            'sale': 'Sale',
+            'design': 'Thiết kế',
+            'production': 'Sản xuất',
+            'design_production': 'Thiết kế & Sản xuất',
+            'full_stack': 'Full-stack',
+        }
+        attendance_by_employee = {}
+        for att in today_atts:
+            attendance_by_employee.setdefault(att.employee_id.id, []).append(att)
 
         present_list = []
-        for att in today_atts:
+        for employee_atts in attendance_by_employee.values():
+            att = max(employee_atts, key=lambda record: record.check_in)
             emp = att.employee_id
+            worked_hours = sum(record.worked_hours or 0 for record in employee_atts)
+            if not att.check_out and att.check_in:
+                worked_hours += max(0, (datetime.utcnow() - att.check_in).total_seconds() / 3600)
+
+            verification = []
+            if att.gps_validated:
+                verification.append('GPS')
+            if att.wifi_validated:
+                verification.append('Wi-Fi')
+            if att.ip_validated:
+                verification.append('IP')
+            if att.photo_validated:
+                verification.append('Ảnh')
+
+            role = getattr(emp.sudo(), 'dac_role', False)
             present_list.append({
                 'employee_id': emp.id,
                 'name': emp.name,
+                'department': role_departments.get(role, 'Chưa phân loại'),
                 'check_in': self._format_time(att.check_in),
                 'check_out': self._format_time(att.check_out) if att.check_out else '',
+                'worked_time': self._format_duration(worked_hours),
+                'verification': ' · '.join(verification) or 'Chưa xác thực',
                 'is_late': att.is_late,
                 'late_minutes': att.late_minutes or 0,
                 'still_working': not att.check_out,
             })
-        # Deduplicate by employee (keep latest)
-        seen = {}
-        for p in present_list:
-            seen[p['employee_id']] = p
-        present_list = sorted(seen.values(), key=lambda x: x['name'])
+        present_list = sorted(present_list, key=lambda x: x['name'])
 
         absent_list = [
-            {'employee_id': e.id, 'name': e.name}
+            {
+                'employee_id': e.id,
+                'name': e.name,
+                'department': role_departments.get(getattr(e.sudo(), 'dac_role', False), 'Chưa phân loại'),
+                'check_in': '',
+                'check_out': '',
+                'worked_time': '—',
+                'verification': '—',
+            }
             for e in all_employees if e.id in absent_ids
         ]
 
@@ -344,15 +394,48 @@ class DacAttendanceDashboard(models.AbstractModel):
 
         total_pending = len(leaves_data) + len(amendments_data)
 
+        # Attendance rate for each working day in the current week.  We use
+        # check_in_date (the local business date stored by the attendance
+        # extension) so the dashboard is stable around the UTC midnight edge.
+        week_start = today - timedelta(days=today.weekday())
+        workday_names = ('Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6')
+        total_employees = len(all_employees)
+        weekly_attendance = []
+        for offset, day_name in enumerate(workday_names):
+            workday = week_start + timedelta(days=offset)
+            is_future = workday > today
+            if is_future:
+                present_count = 0
+                rate = None
+            else:
+                workday_atts = self.env['hr.attendance'].search([
+                    ('check_in_date', '=', workday),
+                ])
+                present_count = len({att.employee_id.id for att in workday_atts})
+                rate = round((present_count / total_employees) * 100) if total_employees else 0
+            weekly_attendance.append({
+                'label': day_name,
+                'date': self._format_date(workday),
+                'present': present_count,
+                'rate': rate,
+                'is_today': workday == today,
+                'is_future': is_future,
+            })
+
         return {
             'today_stats': {
                 'present': len(present_list),
                 'absent': len(absent_list),
+                'on_leave': len(on_leave_ids),
+                'unexplained_absent': len(absent_ids - on_leave_ids),
                 'late': len(late_ids),
                 'pending_approvals': total_pending,
+                'pending_leaves': len(leaves_data),
+                'pending_amendments': len(amendments_data),
             },
             'present_list': present_list,
             'absent_list': absent_list,
+            'weekly_attendance': weekly_attendance,
             'pending_approvals': {
                 'leaves': leaves_data,
                 'amendments': amendments_data,

@@ -123,10 +123,10 @@
 // Tabs
 .o_dac_tab_row {
     display: flex;
-    gap: 4px;
-    margin-bottom: 12px;
-    border-bottom: 2px solid #f1f5f9;
-    padding-bottom: 8px;
+    background: #f1f3f6;
+    padding: 3px;
+    border-radius: 9px;
+    gap: 2px;
 }
 
 .o_dac_tab {
@@ -470,6 +470,62 @@
 
     .o_dac_mgr_main_row { gap: 16px; }
 
+    .o_dac_weekly_card,
+    .o_dac_approval_card { min-height: 278px; }
+
+    .o_dac_weekly_grid {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        padding: 22px 32px 28px;
+    }
+
+    .o_dac_weekday {
+        display: grid;
+        align-items: center;
+        gap: 10px;
+        font-size: 14px;
+        grid-template-columns: minmax(90px, 110px) minmax(0, 1fr) 42px;
+        min-width: 0;
+    }
+
+    .o_dac_weekday--future { opacity: .55; }
+    .o_dac_weekday_label { color: #20242c; font-size: 14px; font-weight: 400; }
+    .o_dac_weekday strong { color: #20242c; font-size: 14px; font-weight: 700; line-height: 1; text-align: right; }
+    .o_dac_weekday_bar { 
+        height: 7px; 
+        border-radius: 999px;
+        background: #eef0f4;
+        overflow: hidden; 
+    }
+    .o_dac_weekday_bar span { display: block; height: 100%; border-radius: inherit; }
+    .o_dac_weekday_bar--green { background: #21b573; }
+    .o_dac_weekday_bar--blue { background: #3478ed; }
+    .o_dac_weekday_bar--yellow { background: #f5bb18; }
+    .o_dac_weekday_bar--red { background: #e65252; }
+    .o_dac_weekday_bar--future { background: #cbd2dc; }
+
+    .o_dac_employee_table_card { margin-top: 16px; }
+    .o_dac_employee_table { padding: 0; overflow-x: auto; }
+    .o_dac_employee_table_head,
+    .o_dac_employee_table_row {
+        display: grid;
+        grid-template-columns: minmax(180px, 1.25fr) minmax(120px, .95fr) repeat(2, minmax(105px, .9fr)) minmax(100px, .8fr) minmax(190px, 1.35fr) minmax(110px, .85fr);
+        min-width: 1020px;
+        align-items: center;
+        gap: 18px;
+        padding: 0 24px;
+    }
+    .o_dac_employee_table_head { min-height: 56px; color: #8b909c; font-size: 11px; font-weight: 750; letter-spacing: .1px; background: #fafbfc; text-transform: none; }
+    .o_dac_employee_table_row { min-height: 72px; border-top: 1px solid #eef0f4; color: #596273; font-size: 13px; }
+    .o_dac_employee_name { color: #282d36; font-weight: 700; }
+    .o_dac_employee_name i { margin-right: 7px; font-size: 13px; }
+    .o_dac_employee_verification { color: #596273; white-space: nowrap; }
+    .o_dac_status_pill { justify-self: start; padding: 5px 10px; border-radius: 99px; background: #e9f7ee; color: #23804a; font-size: 12px; font-weight: 700; }
+    .o_dac_status_pill::before { content: '•'; margin-right: 5px; font-size: 16px; line-height: 0; vertical-align: -1px; }
+    .o_dac_status_pill--late { background: #fff2d3; color: #ae7000; }
+    .o_dac_status_pill--absent { background: #ffebeb; color: #c54545; }
+
     .o_dac_card {
         padding: 0;
         overflow: hidden;
@@ -481,6 +537,7 @@
 
     .o_dac_card_header {
         display: flex;
+        justify-content: space-between;
         min-height: 68px;
         align-items: center;
         padding: 15px 18px 12px;
@@ -501,7 +558,7 @@
     .o_dac_tab_row {
         gap: 5px;
         margin: 0;
-        padding: 12px 18px;
+        padding: 3px;
         border-bottom: 1px solid #eef0f4;
     }
 
@@ -513,25 +570,71 @@
     }
 
     .o_dac_tab--active {
-        margin-bottom: 0;
-        border-bottom: 0;
-        background: #fff3c2;
-        color: #2b2d32;
+        background: white;
+        color: #313b4b;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, .08);
+        font-weight: 750;
+        margin-bottom: 0px;
+        border-bottom: none;
     }
 
-    .o_dac_emp_list,
-    .o_dac_approval_list { padding: 5px 18px 10px; }
+    .o_dac_emp_list { padding: 5px 18px 10px; }
 
-    .o_dac_emp_row,
-    .o_dac_approval_item { padding: 13px 0; border-bottom-color: #eef0f4; }
-
-    .o_dac_btn_approve {
-        background: #ffc20e;
-        color: #252830;
-        &:hover { background: #eeb400; }
+    
+    .o_dac_approval_list--compact { 
+        display: flex;
+        flex-direction: column;
+        gap: 16px; 
+        padding: 22px 32px 28px; 
+        overflow-y: auto;
+        height: 250px;
     }
-
-    .o_dac_pending_badge { background: #fff0b3; color: #8a6500; }
+    .o_dac_approval_item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 0;
+        border-bottom: 1px solid #f0f1f4;
+        cursor: pointer;
+    }
+    .o_dac_approval_initials {
+        width: 28px;
+        height: 28px;
+        border-radius: 8px;
+        background: #fff4cf;
+        color: #805b00;
+        display: grid;
+        place-items: center;
+        font-weight: 800;
+        font-size: 9px;
+    }
+    .o_dac_approval_name { margin-bottom: 5px; color: #20242c; font-size: 14px; font-weight: 700; }
+    .o_dac_approval_detail { margin: 0; color: #657189; font-size: 12px; }
+    .o_dac_approval_list--compact .o_dac_btn_approve {
+        min-width: 60px;
+        min-height: 30px;
+        padding: 0px 8px;
+        border: 1px solid #dfe4ed;
+        border-radius: 12px;
+        background: #fff;
+        color: #58647a;
+        font-size: 14px;
+        font-weight: 700;
+        box-shadow: none;
+        &:hover { border-color: #f0bd12; background: #fff8df; color: #7d5c00; }
+    }
+    .o_dac_pending_badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 13px;
+        border-radius: 999px;
+        background: #fff4da;
+        color: #d88400;
+        font-size: 12px;
+        font-weight: 750;
+    }
+    .o_dac_pending_badge .fa { font-size: 9px; }
 
     @media (max-width: 900px) {
         padding: 22px 18px 40px;
@@ -539,11 +642,19 @@
         .o_dac_mgr_header_actions { justify-content: flex-start; }
         .o_dac_kpi_row { grid-template-columns: repeat(2, 1fr); }
         .o_dac_mgr_main_row { grid-template-columns: 1fr; }
+        .o_dac_employee_table_head,
+        .o_dac_employee_table_row { grid-template-columns: minmax(180px, 2fr) repeat(3, minmax(82px, 1fr)); }
     }
 
     @media (max-width: 520px) {
         padding: 18px 12px 32px;
         .o_dac_kpi_row { grid-template-columns: 1fr; }
         .o_dac_today_label { width: 100%; }
+        .o_dac_weekly_grid { padding: 18px; gap: 14px; }
+        .o_dac_weekday { grid-template-columns: 76px minmax(0, 1fr) 48px; gap: 10px; }
+        .o_dac_weekday_label { font-size: 14px; }
+        .o_dac_weekday strong { font-size: 15px; }
+        .o_dac_employee_table_head,
+        .o_dac_employee_table_row { min-width: 1020px; }
     }
 }
