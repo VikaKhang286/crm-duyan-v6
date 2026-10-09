@@ -10,6 +10,74 @@ _logger = logging.getLogger(__name__)
 class SaleOrderWorkflow(models.Model):
     _inherit = 'sale.order'
 
+    _WORKFLOW_REVIEW_ORDER = {
+        'quotation': 0,
+        'deposit': 1,
+        'production': 2,
+        'delivery': 3,
+        'installation': 3,
+        'completed': 4,
+    }
+
+    def _can_rollback_workflow(self):
+        self.ensure_one()
+        return (
+            self.env.user.has_group('dac_erp.group_dac_erp_manager')
+            or self.env.user.has_group('base.group_system')
+            or (
+                self.env.user.has_group('dac_erp.group_dac_erp_sale')
+                and self.order_state_custom == 'deposit'
+            )
+        )
+
+    def action_return_to_current_workflow_step(self):
+        """Exit review mode without touching the real workflow state."""
+        for order in self:
+            order.workflow_review_state = order.order_state_custom
+        return {'type': 'ir.actions.client', 'tag': 'reload'}
+
+    def action_open_workflow_review_rollback(self):
+        """Ask for confirmation before moving the actual order backwards."""
+        self.ensure_one()
+        target = self.workflow_review_state
+        current = self.order_state_custom
+        if not target or target == current:
+            raise UserError(_("Bạn đang xem bước hiện tại của đơn hàng."))
+        if not self._can_rollback_workflow():
+            raise UserError(_("Bạn không có quyền quay lại trạng thái này."))
+        if self._WORKFLOW_REVIEW_ORDER.get(target, -1) >= self._WORKFLOW_REVIEW_ORDER.get(current, -1):
+            raise UserError(_("Chỉ có thể quay lại một bước trước đó trong quy trình."))
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Quay lại trạng thái trước'),
+            'res_model': 'dac.workflow.review.rollback.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+                'default_order_id': self.id,
+                'default_target_state': target,
+            },
+        }
+
+    def _rollback_to_reviewed_workflow_state(self, target):
+        """Perform a confirmed rollback while preserving entered order data."""
+        self.ensure_one()
+        current = self.order_state_custom
+        if not self._can_rollback_workflow():
+            raise UserError(_("Bạn không có quyền quay lại trạng thái này."))
+        if target not in self._WORKFLOW_REVIEW_ORDER or target == current:
+            raise UserError(_("Bước quay lại không hợp lệ."))
+        if self._WORKFLOW_REVIEW_ORDER[target] >= self._WORKFLOW_REVIEW_ORDER.get(current, -1):
+            raise UserError(_("Chỉ có thể quay lại một bước trước đó trong quy trình."))
+
+        values = {'order_state_custom': target, 'workflow_review_state': target}
+        if target not in ('delivery', 'installation'):
+            values.update({
+                'is_delivery_confirmed': False,
+                'is_installation_confirmed': False,
+            })
+        self.write(values)
+
     # ------------------------------------------------------------------
     # Dropdown trạng thái cho LIST view (chỉnh sửa inline)
     # ------------------------------------------------------------------

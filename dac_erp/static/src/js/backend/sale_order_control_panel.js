@@ -3,11 +3,13 @@
 import { FormController } from "@web/views/form/form_controller";
 import { patch } from "@web/core/utils/patch";
 import { onMounted, onPatched, onWillUnmount } from "@odoo/owl";
+import { useService } from "@web/core/utils/hooks";
 
 const SLOT_CLASS = "dac-sale-order-control-panel-slot";
 const ACTIVE_CLASS = "dac-sale-order-control-panel-active";
 const FLOATING_MENU_CLASS = "dac-title-actions-menu--floating";
 const STATE_CLASS_PREFIX = "dac-order-state-";
+const REVIEW_CLASS = "dac-workflow-review-mode";
 
 function isSaleOrderForm(controller) {
   return controller.props?.resModel === "sale.order";
@@ -33,9 +35,7 @@ function getSourceBar(controller) {
 }
 
 function getCurrentOrderState(controller) {
-  const sourceBar = getSourceBar(controller);
-  const currentStep = sourceBar?.querySelector(".dac-control-panel-progress .o_arrow_button_current[data-value]");
-  return currentStep?.dataset.value || null;
+  return controller.model?.root?.data?.order_state_custom || null;
 }
 
 function syncStateClass(target, state) {
@@ -143,6 +143,7 @@ patch(FormController.prototype, {
       return;
     }
 
+    this.notification = useService("notification");
     this.__dacSaleControlPanelRetries = 0;
 
     onMounted(() => {
@@ -186,7 +187,9 @@ patch(FormController.prototype, {
 
     controlPanel.classList.add(ACTIVE_CLASS);
     this.syncSaleOrderStateClass();
+    this.syncWorkflowReviewMode();
     this.bindNewSaleOrderButton(sourceBar);
+    this.bindWorkflowReviewSteps(sourceBar);
     this.bindSaleOrderActionMenu();
     this.syncInternalNoteBadge();
     this.syncSaleOrderDirtyState();
@@ -238,10 +241,136 @@ patch(FormController.prototype, {
     this.__dacNewOrderCleanup = () => sourceBar.removeEventListener("click", onClick, true);
   },
 
+  bindWorkflowReviewSteps(sourceBar) {
+    const statusbar = sourceBar.querySelector(".dac-control-panel-progress .o_statusbar_status");
+    if (!statusbar) {
+      return;
+    }
+
+    const steps = Array.from(statusbar.querySelectorAll(".o_arrow_button[data-value]"));
+    const currentStep = statusbar.querySelector(".o_arrow_button_current[data-value]");
+    const availableValues = new Set(steps.map((step) => step.dataset.value));
+    // The server action “Về bước hiện tại” updates workflow_review_state and
+    // reloads the form.  Do not keep a previously clicked value in the
+    // controller after that reload, otherwise the progress bar and the form
+    // body can show two different steps.
+    const persistedReviewedState = this.model?.root?.data?.workflow_review_state;
+    const actualState = this.model?.root?.data?.order_state_custom;
+    this.__dacReviewedWorkflowState = availableValues.has(persistedReviewedState)
+      ? persistedReviewedState
+      : currentStep?.dataset.value || null;
+
+    const enableReviewSteps = () => {
+      for (const step of statusbar.querySelectorAll(".o_arrow_button[data-value]")) {
+        if (step.disabled || step.hasAttribute("disabled")) {
+          step.disabled = false;
+          step.removeAttribute("disabled");
+        }
+      }
+    };
+    enableReviewSteps();
+    window.requestAnimationFrame(enableReviewSteps);
+
+    for (const step of steps) {
+      // The order workflow remains read-only.  These buttons only choose the
+      // step being reviewed and must never trigger Odoo's state transition.
+      step.disabled = false;
+      step.removeAttribute("disabled");
+      const isCurrentStep = step.dataset.value === actualState;
+      const isReviewingHistory = this.__dacReviewedWorkflowState !== actualState;
+      // The statusbar field is bound to workflow_review_state, so Odoo would
+      // otherwise move this class to the historical step. Keep it anchored to
+      // the real workflow state for both semantics and styling.
+      step.classList.toggle("o_arrow_button_current", isCurrentStep);
+      if (isCurrentStep) {
+        step.setAttribute("aria-current", "step");
+      } else {
+        step.removeAttribute("aria-current");
+      }
+      step.classList.toggle(
+        "dac-workflow-step-selected",
+        isReviewingHistory && step.dataset.value === this.__dacReviewedWorkflowState
+      );
+      step.setAttribute("aria-pressed", String(isReviewingHistory && step.dataset.value === this.__dacReviewedWorkflowState));
+      step.setAttribute("title", `Xem bước: ${step.textContent.trim()}`);
+    }
+
+    if (this.__dacWorkflowReviewBar === statusbar) {
+      return;
+    }
+    this.__dacWorkflowReviewCleanup?.();
+    const observer = new MutationObserver(enableReviewSteps);
+    observer.observe(statusbar, { attributes: true, attributeFilter: ["disabled"], subtree: true });
+    const onClick = async (event) => {
+      const step = event.target.closest(".o_arrow_button[data-value]");
+      if (!step || !statusbar.contains(step)) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+
+      const currentState = this.model?.root?.data?.order_state_custom;
+      const workflow = availableValues.has("installation")
+        ? ["quotation", "deposit", "production", "installation", "completed"]
+        : ["quotation", "deposit", "production", "delivery", "completed"];
+      const currentIndex = workflow.indexOf(currentState);
+      const targetIndex = workflow.indexOf(step.dataset.value);
+      // Historical steps may be inspected. A later step is not available for
+      // review until the actual workflow has reached it.
+      if (currentIndex >= 0 && targetIndex > currentIndex) {
+        this.notification.add(
+          "Hoàn tất bước hiện tại trước khi mở bước này",
+          { type: "warning" }
+        );
+        // The native statusbar widget may already have updated its local
+        // display. Reload from the server after the toast is visible so it
+        // cannot leave a future step displayed in the form.
+        window.setTimeout(() => this.model?.root?.load(), 1200);
+        return;
+      }
+      // Clicking the actual current step is a quick way to leave review mode.
+      // Do nothing only when the form is already on that step.
+      if (
+        step.dataset.value === currentState &&
+        this.__dacReviewedWorkflowState === currentState
+      ) {
+        return;
+      }
+      this.__dacReviewedWorkflowState = step.dataset.value;
+      const isReviewingHistory = step.dataset.value !== currentState;
+      for (const item of statusbar.querySelectorAll(".o_arrow_button[data-value]")) {
+        const selected = isReviewingHistory && item === step;
+        item.classList.toggle("o_arrow_button_current", item.dataset.value === currentState);
+        item.classList.toggle("dac-workflow-step-selected", selected);
+        item.setAttribute("aria-pressed", String(selected));
+      }
+      if (this.model?.root) {
+        await this.model.root.update({ workflow_review_state: step.dataset.value });
+        if (this.model.root.isDirty) {
+          await this.save();
+        }
+        // Reload only the record data. This re-evaluates the server-side
+        // invisible expressions without reloading the whole browser action.
+        await this.model.root.load();
+      }
+    };
+    statusbar.addEventListener("click", onClick, true);
+    this.__dacWorkflowReviewBar = statusbar;
+    this.__dacWorkflowReviewCleanup = () => {
+      observer.disconnect();
+      statusbar.removeEventListener("click", onClick, true);
+    };
+  },
+
   cleanupSaleOrderControlPanel() {
     this.__dacNewOrderCleanup?.();
     this.__dacNewOrderCleanup = null;
     this.__dacNewOrderBar = null;
+    this.__dacWorkflowReviewCleanup?.();
+    this.__dacWorkflowReviewCleanup = null;
+    this.__dacWorkflowReviewBar = null;
+    this.__dacReviewedWorkflowState = null;
     this.unbindSaleOrderActionMenu();
     this.clearSaleOrderStateClass();
 
@@ -325,6 +454,18 @@ patch(FormController.prototype, {
     syncStateClass(getControlPanel(this), state);
   },
 
+  syncWorkflowReviewMode() {
+    const data = this.model?.root?.data;
+    const reviewedState = data?.workflow_review_state || this.__dacReviewedWorkflowState;
+    const isReviewing = Boolean(
+      reviewedState &&
+      data?.order_state_custom &&
+      reviewedState !== data.order_state_custom
+    );
+    this.el?.classList.toggle(REVIEW_CLASS, isReviewing);
+    document.querySelector(".dac-sale-form")?.classList.toggle(REVIEW_CLASS, isReviewing);
+  },
+
   clearSaleOrderStateClass() {
     syncStateClass(document.body, null);
     syncStateClass(document.querySelector(".o_web_client"), null);
@@ -332,5 +473,7 @@ patch(FormController.prototype, {
     syncStateClass(this.el, null);
     syncStateClass(getActionManager(this), null);
     syncStateClass(getControlPanel(this), null);
+    this.el?.classList.remove(REVIEW_CLASS);
+    document.querySelector(".dac-sale-form")?.classList.remove(REVIEW_CLASS);
   },
 });

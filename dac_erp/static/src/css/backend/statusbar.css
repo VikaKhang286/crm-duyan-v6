@@ -30,8 +30,6 @@
 .o_form_view
   .o_statusbar_status
   > .o_arrow_button:not(.o_arrow_button_current)[disabled] {
-  opacity: var(--dac-status-inactive-opacity) !important;
-  filter: grayscale(35%) saturate(0.75) brightness(0.92);
   transition: opacity 0.15s ease;
 }
 

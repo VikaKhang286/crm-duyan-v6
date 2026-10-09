@@ -64,6 +64,7 @@
         'views/production_deadline_wizard_view.xml',
         'views/delivery_address_wizard_view.xml',
         'views/production_not_done_warning_wizard_view.xml',
+        'views/workflow_review_rollback_wizard_view.xml',
         'views/res_config_settings_views.xml',
         'views/account_move_deposit_view.xml',
         'views/account_move_view.xml',

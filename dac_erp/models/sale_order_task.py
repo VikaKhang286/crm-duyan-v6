@@ -1,4 +1,4 @@
-from odoo import models
+from odoo import fields, models
 import logging
 
 _logger = logging.getLogger(__name__)
@@ -49,6 +49,25 @@ class SaleOrderTask(models.Model):
                 'state': 'draft',
                 'priority': task_priority,
             })
+
+    def _sync_design_tasks_for_priority_today(self):
+        """Đưa hạn mọi task thiết kế về hôm nay khi đơn bật Trong ngày."""
+        Task = self.env['dac.work.task'].sudo()
+        today = fields.Date.context_today(self)
+        deadline_dt = f'{today} 23:59:00'
+        for order in self.filtered(
+            lambda rec: rec.order_state_custom == 'deposit' and rec.is_priority_today
+        ):
+            tasks = Task.search([
+                ('order_id', '=', order.id),
+                ('task_type', '=', 'design'),
+                ('state', '!=', 'cancelled'),
+            ])
+            if tasks:
+                tasks.with_context(dac_skip_order_sync=True).write({
+                    'deadline': deadline_dt,
+                    'priority': 'urgent',
+                })
 
     def _sync_production_task(self):
         """Tạo hoặc cập nhật task sản xuất khi sale phân công / cập nhật deadline."""

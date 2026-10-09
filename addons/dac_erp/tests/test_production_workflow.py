@@ -87,6 +87,28 @@ class TestProductionWorkflow(TransactionCase):
         self.assertEqual(action.get('type'), 'ir.actions.act_window')
         self.assertEqual(action.get('res_model'), 'delivery.address.wizard')
 
+    def test_delivery_defaults_cod_to_remaining_after_deposit(self):
+        self.order.write({
+            'is_deposit_confirmed': True,
+            'deposit_amount': 300.0,
+            'shipping_cod': 0.0,
+        })
+
+        self.order.write({'order_state_custom': 'delivery'})
+
+        self.assertEqual(self.order.shipping_cod, 700.0)
+
+    def test_delivery_keeps_manually_entered_cod(self):
+        self.order.write({
+            'is_deposit_confirmed': True,
+            'deposit_amount': 300.0,
+            'shipping_cod': 450.0,
+        })
+
+        self.order.write({'order_state_custom': 'delivery'})
+
+        self.assertEqual(self.order.shipping_cod, 450.0)
+
     def test_delivery_address_wizard_confirms_delivery_with_address(self):
         self.order.write({
             'order_state_custom': 'delivery',

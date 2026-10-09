@@ -24,6 +24,7 @@ from . import no_deposit_confirm_wizard
 from . import production_deadline_wizard
 from . import delivery_address_wizard
 from . import production_not_done_warning_wizard
+from . import workflow_review_rollback_wizard
 from . import res_config_settings
 from . import mcp_order_log
 from . import mcp_bulk_log

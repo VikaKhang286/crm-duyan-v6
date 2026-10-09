@@ -31,13 +31,21 @@ class SaleOrder(models.Model):
     # Trạng thái đơn hàng tùy chỉnh
     order_state_custom = fields.Selection([
         ('quotation', 'Báo giá'),
-        ('deposit', 'Thiết kế - Đặt cọc'),
+        ('deposit', 'Thiết kế / Cọc'),
         ('production', 'Sản xuất'),
         ('installation', 'Thi công - lắp đặt'),
         ('delivery', 'Giao hàng'),
         ('completed', 'Hoàn thành'),
         ('cancel', 'Hủy'),
     ], string='Trạng thái đơn hàng', default='quotation', tracking=True)
+    workflow_review_state = fields.Selection([
+        ('quotation', 'Báo giá'),
+        ('deposit', 'Thiết kế / Cọc'),
+        ('production', 'Sản xuất'),
+        ('installation', 'Thi công - lắp đặt'),
+        ('delivery', 'Giao hàng'),
+        ('completed', 'Hoàn thành'),
+    ], string='Bước đang xem', default='quotation', copy=False)
 
     date = fields.Datetime(string='Ngày đơn hàng', default=fields.Datetime.now)
     delivery_date = fields.Date(
@@ -220,13 +228,31 @@ class SaleOrder(models.Model):
         ('carrier', 'Đơn vị vận chuyển'),
         ('bus', 'Chành xe'),
     ], string="Phương thức giao", default='carrier', tracking=True)
-    shipping_carrier = fields.Selection([
-        ('choose-option', 'Chọn đơn vị vận chuyển'),
-        ('viettel-post', 'Viettel Post'),
-        ('ghn', 'GHN'),
-        ('j&t-express', 'J&T Express'),
-        ('other', 'Đối tác vận chuyển khác'),
-    ], string="Đơn vị vận chuyển", default='choose-option', tracking=True)
+
+    @api.model
+    def _selection_shipping_carrier(self):
+        selections = [
+            ('choose-option', 'Chọn đơn vị vận chuyển'),
+            ('viettel-post', 'Viettel Post'),
+            ('ghn', 'GHN'),
+            ('j&t-express', 'J&T Express'),
+            ('other', 'Đối tác vận chuyển khác'),
+        ]
+        custom_carriers = self.env['dac.shipping.carrier'].sudo().search(
+            [('active', '=', True)], order='name, id'
+        )
+        selections.extend(
+            [('custom-%s' % carrier.id, carrier.name) for carrier in custom_carriers]
+        )
+        return selections
+
+    shipping_carrier = fields.Selection(
+        selection='_selection_shipping_carrier',
+        string="Đơn vị vận chuyển",
+        default='choose-option',
+        required=True,
+        tracking=True,
+    )
     shipping_tracking_code = fields.Char(string="Mã vận đơn", tracking=True)
     shipping_status = fields.Selection([
         ('waiting', 'Chờ lấy hàng'),
@@ -234,7 +260,7 @@ class SaleOrder(models.Model):
         ('failed', 'Giao chưa thành công'),
         ('delivered', 'Giao thành công'),
         ('returned', 'Trả hàng'),
-    ], string="Trạng thái giao hàng", default='waiting', tracking=True)
+    ], string="Trạng thái giao hàng", default='waiting', required=True, tracking=True)
     shipping_cod = fields.Monetary(string="Số tiền thu hộ (COD)", currency_field='currency_id', tracking=True)
     bus_carrier_name = fields.Char(string="Chành xe / nhà xe", tracking=True)
     bus_shipping_info = fields.Char(string="Thông tin gửi hàng", tracking=True)
@@ -244,7 +270,7 @@ class SaleOrder(models.Model):
         ('failed', 'Gửi chưa thành công'),
         ('delivered', 'Giao thành công'),
         ('returned', 'Trả hàng'),
-    ], string="Trạng thái giao hàng", default='waiting', tracking=True)
+    ], string="Trạng thái giao hàng", default='waiting', required=True,tracking=True)
 
     # Tiến trình thi công - lắp đặt
     installation_address = fields.Text(string="Địa chỉ thi công/lắp đặt", tracking=True)
@@ -440,6 +466,29 @@ class SaleOrder(models.Model):
 
     def write(self, vals):
         """Override write để trigger kiểm tra deposit khi cần"""
+        if 'order_state_custom' in vals and 'workflow_review_state' not in vals:
+            vals['workflow_review_state'] = vals['order_state_custom']
+
+        # workflow_review_state is presentation-only: users may inspect a
+        # completed step, but must never open (and persist) a future one by
+        # clicking the statusbar.  Keep this server-side guard in addition to
+        # the browser notification so RPC calls cannot bypass the rule.
+        requested_review_state = vals.get('workflow_review_state')
+        if requested_review_state:
+            for record in self:
+                fulfillment_method = vals.get('fulfillment_method', record.fulfillment_method)
+                workflow = (
+                    ('quotation', 'deposit', 'production', 'installation', 'completed')
+                    if fulfillment_method == 'installation'
+                    else ('quotation', 'deposit', 'production', 'delivery', 'completed')
+                )
+                actual_state = vals.get('order_state_custom', record.order_state_custom)
+                if (
+                    requested_review_state in workflow
+                    and actual_state in workflow
+                    and workflow.index(requested_review_state) > workflow.index(actual_state)
+                ):
+                    raise UserError(_("Hoàn tất bước hiện tại trước khi mở bước này"))
         # 0) ĐƠN ĐÃ HỦY
         # Cho phép bypass khi context có 'allow_reopen_cancelled' = True
         # (dùng cho MCP reopen action, đã có audit log + guard riêng)
@@ -465,6 +514,19 @@ class SaleOrder(models.Model):
 
         # 3) Gọi super() viết dữ liệu
         result = super().write(vals)
+
+        # Khi bắt đầu flow Giao hàng, mặc định COD bằng số tiền còn phải thu
+        # nếu đơn đã thực nhận cọc. Không ghi đè COD được nhập rõ ràng/thủ công.
+        if vals.get('order_state_custom') == 'delivery' and 'shipping_cod' not in vals:
+            for rec in self:
+                if (
+                    not rec.shipping_cod
+                    and rec.deposit_paid_display > 0
+                    and rec.remaining_amount_display > 0
+                ):
+                    super(SaleOrder, rec).write({
+                        'shipping_cod': rec.remaining_amount_display,
+                    })
 
         # Import không chạy onchange của form. Khi file import có địa chỉ giao
         # hàng, đồng bộ giá trị đó sang địa chỉ của khách hàng trên đơn.
@@ -561,6 +623,8 @@ class SaleOrder(models.Model):
             if _DESIGN_TRIGGER & vals.keys():
                 for rec in self:
                     rec._sync_design_task()
+                    if vals.get('is_priority_today'):
+                        rec._sync_design_tasks_for_priority_today()
             if _PROD_TRIGGER & vals.keys():
                 for rec in self:
                     rec._sync_production_task()
@@ -600,6 +664,7 @@ class SaleOrder(models.Model):
                 vals['production_assigned_date'] = fields.Date.context_today(self)
             if not vals.get('is_priority'):
                 vals['is_priority_today'] = False
+            vals.setdefault('workflow_review_state', vals.get('order_state_custom', 'quotation'))
         records = super().create(vals_list)
         for rec, vals in zip(records, vals_list):
             if (self.env.context.get('import_file')

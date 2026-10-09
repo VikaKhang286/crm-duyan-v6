@@ -7,6 +7,7 @@ Covers:
 - Blocker guards: cannot block terminal tasks; cannot done while blocked
 - MCP endpoints: task-context, ensure-design-task, task status/note/blocker
 """
+from odoo import fields
 from odoo.exceptions import ValidationError
 from odoo.tests import tagged
 from odoo.tests.common import TransactionCase
@@ -110,6 +111,30 @@ class TestSprint1SnapshotFields(TransactionCase):
         design, _ = Task._create_from_order(order, 'design')
         prod, _ = Task._create_from_order(order, 'production')
         self.assertNotEqual(design.id, prod.id, 'Design and production tasks must be separate')
+
+    def test_priority_today_updates_all_design_task_deadlines(self):
+        """Trong ngày updates every non-cancelled design task, not production tasks."""
+        order = self._make_order(order_state_custom='deposit')
+        design_task = self._make_task(order, deadline='2026-12-20 23:59:00')
+        done_design_task = self._make_task(
+            order,
+            state='done',
+            deadline='2026-12-21 23:59:00',
+        )
+        production_task = self._make_task(
+            order,
+            task_type='production',
+            deadline='2026-12-22 23:59:00',
+        )
+
+        order.write({'is_priority': True, 'is_priority_today': True})
+
+        today = fields.Date.context_today(order)
+        self.assertEqual(design_task.deadline.date(), today)
+        self.assertEqual(done_design_task.deadline.date(), today)
+        self.assertEqual(design_task.priority, 'urgent')
+        self.assertEqual(done_design_task.priority, 'urgent')
+        self.assertEqual(str(production_task.deadline.date()), '2026-12-22')
 
     def test_create_from_order_snapshot_populated(self):
         """Task created via factory has snap_order_number set."""

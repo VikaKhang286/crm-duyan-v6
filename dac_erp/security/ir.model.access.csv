@@ -110,6 +110,9 @@ access_dac_erp_mcp_staff_identity_log_manager,access_dac_erp_mcp_staff_identity_
 
 access_dac_sale_material_user,dac.sale.material user,model_dac_sale_material,base.group_user,1,0,0,0
 access_dac_design_handover_wizard_user,dac.design.handover.wizard user,model_dac_design_handover_wizard,base.group_user,1,1,1,1
+access_dac_shipping_carrier_user,dac.shipping.carrier user,model_dac_shipping_carrier,base.group_user,1,0,0,0
+access_dac_shipping_carrier_create_wizard_user,dac.shipping.carrier.create.wizard user,model_dac_shipping_carrier_create_wizard,base.group_user,1,1,1,1
+access_dac_workflow_review_rollback_wizard_user,dac.workflow.review.rollback.wizard user,model_dac_workflow_review_rollback_wizard,base.group_user,1,1,1,1
 access_dac_design_revision_manager,dac.design.revision manager,model_dac_design_revision,group_dac_erp_manager,1,1,1,0
 access_dac_design_revision_sale,dac.design.revision sale,model_dac_design_revision,group_dac_erp_sale,1,1,1,0
 access_dac_design_revision_design,dac.design.revision design,model_dac_design_revision,group_dac_erp_design,1,1,1,0

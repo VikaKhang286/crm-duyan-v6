@@ -28,14 +28,14 @@
                             </div>
                             <div class="dac-control-panel-progress">
                                 <!-- Nhánh giao hàng: ẩn bước Thi công -->
-                                <field name="order_state_custom"
+                                <field name="workflow_review_state"
                                        widget="statusbar"
                                        statusbar_visible="quotation,deposit,production,delivery,completed"
                                        statusbar_colors='{"cancel":"red"}'
                                        readonly="1"
                                        invisible="fulfillment_method == 'installation'"/>
                                 <!-- Nhánh thi công: ẩn bước Giao hàng -->
-                                <field name="order_state_custom"
+                                <field name="workflow_review_state"
                                        widget="statusbar"
                                        statusbar_visible="quotation,deposit,production,installation,completed"
                                        statusbar_colors='{"cancel":"red"}'
@@ -102,7 +102,7 @@
                                         invisible="order_state_custom != 'quotation' or is_quotation_confirmed"
                                         groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager,base.group_system"/>
                                 <button name="action_next_step"
-                                        string="Thiết kế - Đặt cọc"
+                                        string="Thiết kế / Cọc"
                                         type="object"
                                         class="btn btn-primary"
                                         invisible="order_state_custom != 'quotation' or not is_quotation_confirmed"
@@ -215,39 +215,22 @@
                             </div>
                         </div>
 
-                        <!-- KHỐI 2: ACTION BAR (deposit/flags ẩn khi báo giá) -->
-                        <div class="dac-action-bar-top" groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager,base.group_system">
-                            <!-- Deposit & Flags — chỉ hiện khi đã qua báo giá, chỉ Sale/Manager -->
-                            <div class="dac-action-bar-money my-3 mx-3"
-                                 invisible="order_state_custom == 'quotation'"
-                                 groups="dac_erp.group_dac_erp_manager,dac_erp.group_dac_erp_sale">
-                                <field name="has_deposit" invisible="1"/>
-                                <div class="dac-deposit-inline">
-                                    <span class="dac-deposit-label">TIỀN CỌC:</span>
-                                    <field name="deposit_amount"
-                                           widget="integer"
-                                           class="dac-deposit-amount-field"/>
-                                    <span class="dac-deposit-currency">đ</span>
-                                    <button name="action_deposit_invoice" string="LÊN CỌC" type="object" class="btn btn-warning dac-deposit-cta fw-bold px-3" invisible="is_deposit_confirmed or order_state_custom in ['cancel'] or is_order_completed"/>
-                                </div>
-                                <button name="action_view_all_invoices" string="Xem Hóa Đơn" type="object" class="btn btn-info dac-invoice-button fw-bold" invisible="total_invoice_count == 0"/>
-                            </div>
+                        <field name="has_deposit" invisible="1"/>
 
-                            <div class="dac-action-bar-flags" invisible="order_state_custom == 'quotation'">
-                                <div class="dac-toggle-field">
-                                    <field name="is_priority"
-                                           string="Ưu tiên"
-                                           widget="boolean_toggle"
-                                           readonly="is_design_user or order_state_custom in ['delivery', 'installation', 'completed', 'cancel']"/>
-                                    <span>Ưu tiên</span>
-                                </div>
-                                <div class="dac-toggle-field">
-                                    <field name="is_priority_today"
-                                           string="Trong ngày"
-                                           widget="boolean_toggle"
-                                           readonly="is_design_user or not is_priority or order_state_custom in ['delivery', 'installation', 'completed', 'cancel']"/>
-                                    <span>Trong ngày</span>
-                                </div>
+                        <div class="dac-action-bar-flags" invisible="order_state_custom == 'quotation'">
+                            <div class="dac-toggle-field">
+                                <field name="is_priority"
+                                       string="Ưu tiên"
+                                       widget="boolean_toggle"
+                                       readonly="is_design_user or order_state_custom in ['delivery', 'installation', 'completed', 'cancel']"/>
+                                <span>Ưu tiên</span>
+                            </div>
+                            <div class="dac-toggle-field">
+                                <field name="is_priority_today"
+                                       string="Trong ngày"
+                                       widget="boolean_toggle"
+                                       readonly="is_design_user or not is_priority or order_state_custom in ['delivery', 'installation', 'completed', 'cancel']"/>
+                                <span>Trong ngày</span>
                             </div>
                         </div>
 
@@ -596,7 +579,7 @@
 
                                 <!-- Nút Chuyển sang tiến trình tiếp theo: Đặt cọc -->
                                 <button name="action_next_step"
-                                    string="Thiết kế - Đặt cọc"
+                                    string="Thiết kế / Cọc"
                                     type="object"
                                     class="btn-primary"
                                     invisible="order_state_custom != 'quotation' or not is_quotation_confirmed"
@@ -909,6 +892,7 @@
             <field name="priority">3</field>
             <field name="arch" type="xml">
                 <list string="Đơn hàng Xe đẩy"
+                      js_class="dac_cart_orders_list"
                       editable="bottom"
                       default_order="date desc"
                       decoration-warning="partner_vip_class == 'vip'"
@@ -977,7 +961,7 @@
                     <separator/>
                     <filter string="Cơ hội" name="opportunity" domain="[('is_zero_amount', '=', True)]"/>
                     <filter string="Báo giá" name="quotation" domain="[('order_state_custom', '=', 'quotation'), ('is_zero_amount', '=', False)]"/>
-                    <filter string="Thiết kế - Đặt cọc" name="deposit" domain="[('order_state_custom', '=', 'deposit')]"/>
+                    <filter string="Thiết kế / Cọc" name="deposit" domain="[('order_state_custom', '=', 'deposit')]"/>
                     <filter string="Sản xuất" name="production" domain="[('order_state_custom', '=', 'production')]"/>
                     <filter string="Thi công - lắp đặt" name="installation" domain="[('order_state_custom','=','installation')]"/>
                     <filter string="Giao hàng" name="delivery" domain="[('order_state_custom', '=', 'delivery')]"/>

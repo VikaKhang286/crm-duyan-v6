@@ -49,6 +49,12 @@
     border: 0 !important;
     background: #f4f6f9 !important;
   }
+  .dac-toggle-field .o_field_widget.o_field_boolean_toggle, .dac-toggle-field .o_field_widget.o_field_boolean_toggle .form-check {
+    margin-bottom: 0 !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+  }
 
   .o_control_panel.dac-sale-order-control-panel-active .dac-sale-order-control-panel-slot {
     overflow: hidden;
@@ -106,8 +112,10 @@
   .dac-control-panel-progress .o_statusbar_status { width: 100%; }
 
   .dac-control-panel-progress .o_statusbar_status {
+    min-width: 0;
+    align-self: center;
     display: grid !important;
-    grid-template-columns: repeat(5, minmax(76px, 1fr));
+    grid-template-columns: repeat(5, minmax(0px, 1fr));
     gap: 4px !important;
     overflow: visible !important;
   }
@@ -302,6 +310,78 @@
   .dac-sale-form .dac-core-info-row > .d-flex { grid-template-columns: 1fr; }
 }
 
+/* The review banner is deliberately interactive, even though the historical
+   form contents behind it are read-only. Keep this at the end of the file so
+   it wins over all responsive and readonly overrides. */
+.o_form_view.dac-sale-form.dac-workflow-review-mode
+  .dac-workflow-review-banner .dac-workflow-review-actions > button {
+  pointer-events: auto !important;
+  opacity: 1 !important;
+}
+
+/* Confirm rollback dialog. */
+.modal:has(.dac-workflow-rollback-dialog) .modal-dialog { max-width: 1000px; }
+.modal:has(.dac-workflow-rollback-dialog) .modal-content { overflow: hidden; border: 1px solid #dfe5ed; border-radius: 22px; box-shadow: 0 24px 72px rgba(15, 23, 42, .25); }
+.modal:has(.dac-workflow-rollback-dialog) .modal-header { padding: 16px 20px; border-bottom: 1px solid #e2e7ee; }
+.modal:has(.dac-workflow-rollback-dialog) .modal-title { color: #20293b; font-size: 20px; font-weight: 700; }
+.modal:has(.dac-workflow-rollback-dialog) .btn-close { width: 24px; height: 24px; border: 2px solid #e0e6ee; border-radius: 10px; background-size: 14px; opacity: 1; }
+.dac-workflow-rollback-dialog .dac-workflow-rollback-body { padding: 0px 10px; }
+.dac-workflow-rollback-summary .o_field_widget { color: #20293b; font-size: 14px; line-height: 1.3; font-weight: 400; }
+.dac-workflow-rollback-note { margin: 14px 0; color: #293246; font-size: 14px; line-height: 1.3; }
+.dac-workflow-rollback-label { display: block; margin-bottom: 10px; color: #20293b; font-size: 23px; font-weight: 400 !important; }
+.dac-workflow-rollback-dialog textarea { height: 100px !important; min-height: 100px !important; padding: 10px 16px; border: 2px solid #e0e6ee !important; border-radius: 14px !important; font-size: 14px; }
+.dac-workflow-rollback-dialog .o_field_widget.o_field_text > div { height: 100px !important; min-height: 100px !important; }
+.modal:has(.dac-workflow-rollback-dialog) .modal-footer { justify-content: flex-end; gap: 16px; padding: 14px 20px; border-top: 1px solid #e2e7ee; }
+.modal:has(.dac-workflow-rollback-dialog) .modal-footer .btn { min-height: 38px; padding: 0px 13px; border-radius: 15px; font-size: 14px; font-weight: 700; }
+.modal:has(.dac-workflow-rollback-dialog) .modal-footer .btn-secondary { border: 2px solid #e0e6ee; background: #fff; color: #5c6a80; }
+.modal:has(.dac-workflow-rollback-dialog) .modal-footer .btn-warning { border-color: #ffc20e; background: #ffc20e; color: #302500; }
+
+/* Final cascade override: Odoo's current-step rule has a deliberately long
+   selector and otherwise paints transparent over the review selection. */
+.o_web_client .o_control_panel.dac-sale-order-control-panel-active
+  .dac-sale-order-control-panel-slot .dac-control-panel-bar
+  .dac-control-panel-progress .o_statusbar_status
+  .o_arrow_button.o_arrow_button_current.dac-workflow-step-selected[data-value],
+.o_web_client .o_control_panel.dac-sale-order-control-panel-active
+  .dac-sale-order-control-panel-slot .dac-control-panel-bar
+  .dac-control-panel-progress .o_statusbar_status
+  .o_arrow_button.dac-workflow-step-selected[data-value] {
+  border: 1px solid #e5c856 !important;
+  background: #fff5d1 !important;
+  background-color: #fff5d1 !important;
+  background-image: none !important;
+  color: #4f3b00 !important;
+  box-shadow: 0 0 0 2px rgba(255, 194, 14, .2), 0 3px 9px rgba(117, 86, 0, .14) !important;
+}
+
+.dac-sale-form .dac-workflow-review-banner {
+  display: flex;
+  min-height: 82px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin: 0 0 24px;
+  padding: 16px 22px;
+  border: 1px solid #f0ce58;
+  border-radius: 12px;
+  background: linear-gradient(100deg, #fff8dc, #fffdf3);
+  box-shadow: 0 3px 12px rgba(117, 86, 0, .06);
+}
+
+.dac-workflow-review-copy { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
+.dac-workflow-review-copy strong { color: #253047; font-size: 20px; font-weight: 800; }
+.dac-workflow-review-copy span { color: #728097; font-size: 15px; }
+.dac-workflow-review-copy .o_field_widget { display: inline; font: inherit; color: inherit; }
+.dac-workflow-review-actions { display: flex; flex: 0 0 auto; flex-wrap: wrap; justify-content: flex-end; gap: 12px; }
+.dac-workflow-review-actions .btn { min-height: 44px; padding: 8px 18px; border-color: #dbe2ea; border-radius: 10px; background: #fff; color: #5d6a80; font-weight: 750; }
+.dac-workflow-review-actions .btn:hover { border-color: #dca800; background: #fff4c4; color: #5f4700; }
+
+@media (max-width: 767px) {
+  .dac-sale-form .dac-workflow-review-banner { align-items: stretch; flex-direction: column; margin: 12px 0 18px; padding: 14px; }
+  .dac-workflow-review-actions { justify-content: stretch; }
+  .dac-workflow-review-actions .btn { flex: 1 1 180px; }
+}
+
 /* Final reset: neutralise Odoo's arrow geometry after all backend overrides. */
 .o_web_client .dac-sale-order-control-panel-slot .dac-control-panel-progress .o_arrow_button[data-value] {
   border: 0 !important;
@@ -366,7 +446,7 @@
   position: relative;
   align-items: flex-start;
   isolation: isolate;
-  gap: 0 !important;
+  gap: 4px !important;
 }
 
 .o_web_client .dac-control-panel-progress .o_statusbar_status::before {
@@ -646,8 +726,6 @@
 .dac-sale-form .dac-v6-sticky-rail {
   position: sticky;
   top: 12px;
-  max-height: calc(100vh - 28px);
-  overflow: auto;
 }
 
 .dac-sale-form .dac-v6-side-notebook { margin: 0 !important; }
@@ -667,6 +745,9 @@
 .dac-sale-form .dac-v6-design-actions .btn { min-height: 40px; padding: 8px 9px !important; border-color: #dfe4eb !important; border-radius: 9px !important; background: #fff !important; color: #596579 !important; font-size: 11px; font-weight: 800; white-space: nowrap; }
 .dac-sale-form .dac-v6-design-actions .btn:hover { border-color: #ffc20e !important; color: #40351b !important; }
 .dac-sale-form .dac-v6-delivery-panel > label { display: block; margin: 13px 0 6px; color: #8994a4; font-size: 11px; font-weight: 700; }
+.dac-sale-form .dac-v6-delivery-field-label { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 13px 0 6px; }
+.dac-sale-form .dac-v6-delivery-field-label label { margin: 0; color: #8994a4; font-size: 11px; font-weight: 700; }
+.dac-sale-form .dac-v6-delivery-field-label .btn-link { min-height: 0; padding: 0 !important; border: 0 !important; color: #d99800 !important; font-size: 11px; font-weight: 800; text-decoration: none; }
 .dac-sale-form .dac-v6-delivery-panel > .o_field_widget:not(.o_field_radio) { width: 100%; min-height: 40px; margin: 0 !important; padding: 8px 10px !important; border: 1px solid #dfe4eb !important; border-radius: 9px !important; background: #fff; font-size: 11px; }
 .dac-sale-form .dac-v6-delivery-panel .o_field_radio { margin-bottom: 12px; }
 .dac-sale-form .dac-v6-delivery-panel .o_field_radio .o_horizontal { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -1534,27 +1615,106 @@
 }
 
 .dac-control-panel-progress .o_field_statusbar {
-  justify-content: flex-end;
+  min-width: 0;
+  width: 100%;
 }
 
 .dac-control-panel-progress .o_statusbar_status {
-  flex-wrap: nowrap;
-  justify-content: flex-end;
-  gap: 6px;
-  overflow-x: auto;
-  scrollbar-width: thin;
+  display: grid !important;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  width: 100%;
+  min-width: 0;
+  gap: 4px !important;
+  overflow: visible;
 }
 
 .dac-control-panel-progress .o_arrow_button {
-  flex: 0 0 auto;
+  box-sizing: border-box;
+  min-width: 0 !important;
+  width: 100%;
+  max-width: 100%;
   margin-bottom: 0;
-  padding: 6px 12px;
-  white-space: nowrap;
+  padding: 6px !important;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .dac-control-panel-progress .dropdown-toggle.o_arrow_button.d-none,
 .dac-control-panel-progress .o_statusbar_status > .btn.d-none {
   display: none !important;
+}
+
+/* Read-only workflow review: clicking a milestone selects it for inspection
+   without changing the real order state. */
+.o_web_client .dac-sale-order-control-panel-slot .dac-control-panel-progress
+  .o_statusbar_status > .o_arrow_button[data-value] {
+  padding: 5px 10px !important;
+  border: 1px solid transparent !important;
+  border-radius: 10px !important;
+  cursor: pointer !important;
+  transition: background-color .16s ease, border-color .16s ease, box-shadow .16s ease, color .16s ease !important;
+}
+
+.o_web_client .dac-sale-order-control-panel-slot .dac-control-panel-progress
+  .o_statusbar_status > .o_arrow_button[data-value]:hover {
+  border-color: transparent !important;
+  background: #fff9df !important;
+  background-color: #fff9df !important;
+  color: #755600 !important;
+}
+
+.o_web_client .dac-sale-order-control-panel-slot .dac-control-panel-progress
+  .o_statusbar_status > .o_arrow_button[data-value].dac-workflow-step-selected {
+  border-color: #e1a900 !important;
+  background: #fff9df !important;
+  background-color: #fff9df !important;
+  color: #4f3b00 !important;
+  font-weight: 850 !important;
+  box-shadow: none !important;
+}
+
+.o_web_client .dac-sale-order-control-panel-slot .dac-control-panel-progress
+  .o_statusbar_status > .o_arrow_button[data-value].dac-workflow-step-selected::before {
+  border-color: #ffc20e !important;
+  background: #ffc20e !important;
+  color: #4f3b00 !important;
+}
+
+/* Current stage: only the milestone circle is yellow. The outer grid cell
+   remains neutral until the user explicitly reviews a historical step. */
+.o_web_client .dac-sale-order-control-panel-slot .dac-control-panel-progress
+  .o_statusbar_status > .o_arrow_button.o_arrow_button_current[data-value]:not(.dac-workflow-step-selected) {
+  border-color: transparent !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.o_web_client .dac-sale-order-control-panel-slot .dac-control-panel-progress
+  .o_statusbar_status > .o_arrow_button.o_arrow_button_current[data-value]::before {
+  border-color: #ffc20e;
+  background: #fff;
+  color: #ffc20e;
+  box-shadow: 0 0 0 5px #fff5d1;
+}
+
+/* Historical workflow steps are presentation-only.  Keep their data visible
+   while preventing accidental edits or business transitions. */
+.dac-sale-form.dac-workflow-review-mode .o_form_sheet :is(
+  button:not(.nav-link), input, textarea, select,
+  .o_field_many2one_selection, .o_field_x2many_list_row_add,
+  .o_list_record_remove, .dac-task-state-menu
+) {
+  pointer-events: none !important;
+}
+
+.dac-sale-form.dac-workflow-review-mode .o_form_sheet button:not(.nav-link) {
+  opacity: .58;
+}
+
+.dac-sale-form.dac-workflow-review-mode .dac-workflow-review-banner button {
+  pointer-events: auto !important;
+  opacity: 1 !important;
 }
 
 .dac-sale-form > header {
@@ -2378,6 +2538,53 @@
     white-space: normal !important;
   }
   .o_web_client .dac-control-panel-main { grid-area: title; min-height: 78px; padding: 17px 18px; }
+  .o_web_client .dac-control-panel-main {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 10px;
+  }
+  .o_web_client .dac-control-panel-title::after { display: none; }
+  .o_web_client .dac-v6-order-status-badges {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+  .o_web_client .dac-v6-order-status-badge {
+    display: inline-flex;
+    min-height: 28px;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 11px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1;
+    white-space: nowrap;
+  }
+  .o_web_client .dac-v6-order-status-badge .fa { font-size: 7px; }
+  .o_web_client .dac-v6-order-status-badge--order {
+    background: #eaf3ff;
+    color: #2f7df4;
+  }
+  .o_web_client .dac-v6-order-status-badge--normal {
+    background: #f0f2f5;
+    color: #687386;
+  }
+  .o_web_client .dac-v6-order-status-badge--priority {
+    background: #fff4dc;
+    color: #d88700;
+  }
+  .o_web_client .dac-v6-order-status-badge--priority-high {
+    background: #fff0d5;
+    color: #d97b00;
+  }
+  .o_web_client .dac-v6-order-status-badge--cancel {
+    background: #ffeaed;
+    color: #c9344d;
+  }
   .o_web_client .dac-control-panel-progress {
     grid-area: progress; min-height: 78px; padding: 11px 16px;
     border-left: 1px solid #eef0f4; display: flex; align-items: center;
@@ -2410,6 +2617,21 @@
     grid-area: tools; width: 100%; min-height: 58px; margin: 0 !important;
     padding: 10px 18px; border-top: 1px solid #e9ecf1;
     background: #fafbfc; justify-content: flex-start;
+  }
+  .o_web_client .dac-control-panel-tools .dac-action-bar-flags {
+    margin-left: auto;
+    padding: 0;
+    border: 0 !important;
+    background: transparent !important;
+  }
+  .o_web_client .dac-control-panel-tools .dac-toggle-field {
+    min-height: 34px;
+    padding: 5px 10px;
+    border-color: #e3e7ed;
+    border-radius: 8px;
+    background: #fff;
+    color: #5e6878;
+    font-size: 11px;
   }
   .o_web_client .dac-sale-form .dac-core-info-row > .d-flex {
     display: grid !important;

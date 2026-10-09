@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_dac_workflow_review_rollback_wizard_form" model="ir.ui.view">
+        <field name="name">dac.workflow.review.rollback.wizard.form</field>
+        <field name="model">dac.workflow.review.rollback.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Quay lại trạng thái trước" class="dac-workflow-rollback-dialog">
+                <field name="order_id" invisible="1"/>
+                <field name="target_state" invisible="1"/>
+                <div class="dac-workflow-rollback-body">
+                    <div class="dac-workflow-rollback-summary"><field name="rollback_summary" nolabel="1" readonly="1"/></div>
+                    <p class="dac-workflow-rollback-note">Giữ nguyên thanh toán, thiết kế và các task đã ghi nhận.</p>
+                    <label for="reason" class="dac-workflow-rollback-label">Lý do quay lại</label>
+                    <field name="reason" nolabel="1" placeholder="Nhập lý do quay lại trạng thái"/>
+                </div>
+                <footer>
+                    <button string="Hủy" special="cancel" class="btn-secondary"/>
+                    <button name="action_confirm_rollback" string="Xác nhận quay lại" type="object" class="btn-warning"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>
