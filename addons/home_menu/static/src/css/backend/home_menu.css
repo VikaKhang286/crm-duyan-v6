@@ -30,6 +30,7 @@
 .dac-home-panels { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
 .dac-home-panel { min-height:380px; overflow:hidden; border:1px solid var(--home-line); border-radius:12px; background:#fff; }
 .dac-home-panel > header { display:block; padding:20px 22px 16px; border-bottom:1px solid var(--home-line); }
+.dac-home-panel .o_form_statusbar { padding:0 22px; border-bottom:1px solid #e4e8ef; }
 .dac-home-dashboard .o_statusbar_buttons > p { flex:0 0 100%; width:100%; }
 .dac-home-panel h2 { display:block; margin:0; color:var(--home-text); font-size:19px; font-weight:850; }
 .dac-home-panel header p { display:block; margin:4px 0 0; color:#708097; font-size:14px; }
