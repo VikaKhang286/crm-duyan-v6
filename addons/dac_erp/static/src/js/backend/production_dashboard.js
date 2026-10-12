@@ -144,6 +144,55 @@ class ProductionDashboard extends Component {
   get productionTasks() {
     return this.state.data?.production_tasks || [];
   }
+  get productionStats() {
+    return this.state.data?.production_stats || {};
+  }
+  get productionOrders() {
+    return this.state.data?.production_orders || [];
+  }
+  get workshopLoads() {
+    const orders = this.productionOrders;
+    const groups = new Map();
+    for (const order of orders) {
+      const name = order.team || "Chưa phân tổ";
+      const current = groups.get(name) || { name, total: 0, progress: 0 };
+      current.total += 1;
+      current.progress += order.progress || 0;
+      groups.set(name, current);
+    }
+    return [...groups.values()].slice(0, 4).map((group) => ({
+      name: group.name,
+      progress: Math.round(group.progress / group.total),
+    }));
+  }
+  formatMoney(value) {
+    const amount = Number(value || 0);
+    if (amount >= 1_000_000_000) return `${(amount / 1_000_000_000).toFixed(1).replace('.0', '')} tỷ`;
+    if (amount >= 1_000_000) return `${Math.round(amount / 1_000_000)}tr`;
+    return new Intl.NumberFormat("vi-VN").format(amount);
+  }
+
+  async openOrder(order) {
+    if (!order?.id) return;
+    await this.action.doAction({
+      type: "ir.actions.act_window",
+      res_model: "sale.order",
+      res_id: order.id,
+      target: "current",
+      views: [[false, "form"]],
+    });
+  }
+
+  async openProductionOrders() {
+    await this.action.doAction({
+      type: "ir.actions.act_window",
+      name: "Đơn đang sản xuất",
+      res_model: "sale.order",
+      target: "current",
+      views: [[false, "list"], [false, "form"]],
+      domain: [["order_state_custom", "=", "production"]],
+    });
+  }
   get overdueDesignCount() {
     return this.designTasks.filter((t) => t.is_overdue).length;
   }

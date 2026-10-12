@@ -3,7 +3,7 @@
     <t t-name="dac_erp.CartCustomerField">
         <div class="dac-cart-customer" style="min-width: 220px;">
             <t t-call="web.Many2OneField"/>
-            <div>
+            <div class="dac-cart-customer-address">
             <t t-if="!props.readonly">
                 <textarea t-ref="customerAddress" class="o_input mt-1" rows="1"
                           placeholder="Địa chỉ" aria-label="Địa chỉ"
@@ -16,7 +16,7 @@
                 </div>
             </t>
             </div>
-            <div>
+            <div class="dac-cart-customer-phone">
             <t t-if="!props.readonly">
             <input t-ref="customerPhone" type="tel" class="o_input mt-1"
                        placeholder="Số điện thoại" aria-label="Số điện thoại"/>

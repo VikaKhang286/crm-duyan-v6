@@ -24,7 +24,7 @@
                         <p>Tình trạng nhân sự hôm nay và các yêu cầu đang chờ duyệt.</p>
                     </div>
                     <div class="o_dac_mgr_header_actions">
-                        <span class="o_dac_today_label" t-esc="todayLabel"/>
+                        
                         <button class="o_dac_btn_reports" t-on-click="openReports">
                             <i class="fa fa-bar-chart me-2"/>Báo cáo tháng
                         </button>

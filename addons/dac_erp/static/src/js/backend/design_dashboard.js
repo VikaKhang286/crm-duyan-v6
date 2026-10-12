@@ -130,6 +130,19 @@ class DesignDashboard extends Component {
   get designTasks() {
     return this.state.data?.design_tasks || [];
   }
+  get designDistribution() {
+    return this.state.data?.design_distribution || {};
+  }
+  get distributionStyle() {
+    const data = this.designDistribution;
+    const total = (data.designing || 0) + (data.waiting || 0) +
+      (data.revision || 0) + (data.ready || 0);
+    if (!total) return "conic-gradient(#eef1f5 0 100%)";
+    const a = (data.designing || 0) * 100 / total;
+    const b = a + (data.waiting || 0) * 100 / total;
+    const c = b + (data.revision || 0) * 100 / total;
+    return `conic-gradient(#f4c440 0 ${a}%, #4f83e5 ${a}% ${b}%, #efa53a ${b}% ${c}%, #51aa72 ${c}% 100%)`;
+  }
   get overdueCount() {
     return this.designTasks.filter((t) => t.is_overdue).length;
   }
@@ -186,6 +199,21 @@ class DesignDashboard extends Component {
         { type: "danger" }
       );
     }
+  }
+
+  openDesignCalendar() {
+    return this.action.doAction("dac_erp.action_dac_task_calendar_design");
+  }
+
+  openCreateDesignTask() {
+    return this.action.doAction({
+      type: "ir.actions.act_window",
+      name: "Task thiết kế",
+      res_model: "dac.work.task",
+      target: "new",
+      views: [[false, "form"]],
+      context: { default_task_type: "design" },
+    });
   }
 
   // ==== viewport helpers ====

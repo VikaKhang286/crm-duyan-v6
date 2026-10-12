@@ -101,10 +101,10 @@ export class ManagerDashboard extends Component {
             .map((part) => part.charAt(0).toUpperCase())
             .join("");
         const amendmentLabels = {
-            "Quên check-in": "Check-in",
-            "Quên check-out": "Check-out",
-            "Quên cả hai": "Điều chỉnh giờ",
-            "Sai giờ": "Điều chỉnh giờ",
+            "Quên check-in": "Check-in ",
+            "Quên check-out": "Check-out ",
+            "Quên cả hai": "Điều chỉnh giờ ",
+            "Sai giờ": "Điều chỉnh giờ ",
         };
         const leaves = (approvals.leaves || []).map((leave) => ({
             key: `leave-${leave.id}`,

@@ -321,6 +321,33 @@ class SaleOrder(models.Model):
         store=False,
     )
 
+    cart_product_summary = fields.Char(
+        string="Sản phẩm",
+        compute="_compute_cart_product_summary",
+        store=False,
+    )
+
+    cart_order_code = fields.Char(
+        string="Mã đơn",
+        compute="_compute_cart_order_code",
+        store=False,
+    )
+
+    @api.depends('order_number', 'name')
+    def _compute_cart_order_code(self):
+        for order in self:
+            order.cart_order_code = order.order_number or order.name or '—'
+
+    @api.depends('order_line.product_id', 'order_line.name', 'order_line.display_type')
+    def _compute_cart_product_summary(self):
+        for order in self:
+            names = []
+            for line in order.order_line.filtered(lambda item: not item.display_type):
+                name = line.product_id.display_name or line.name or ''
+                if name and name not in names:
+                    names.append(name)
+            order.cart_product_summary = ', '.join(names[:2]) or '—'
+
     outstanding_amount_display = fields.Monetary(
         string="Còn thanh toán",
         compute="_compute_outstanding_amount_display",

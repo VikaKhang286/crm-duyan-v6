@@ -355,9 +355,11 @@
     background: #f7f8fb;
 
     .o_dac_mgr_header {
+        position: relative;
         align-items: flex-end;
         margin-bottom: 24px;
         gap: 20px;
+        padding-right: 300px;
     }
 
     .o_dac_mgr_crumb {
@@ -384,6 +386,10 @@
     }
 
     .o_dac_mgr_header_actions {
+        position: absolute;
+        top: 0;
+        right: 0;
+        z-index: 1;
         display: flex;
         align-items: center;
         justify-content: flex-end;
@@ -638,8 +644,8 @@
 
     @media (max-width: 900px) {
         padding: 22px 18px 40px;
-        .o_dac_mgr_header { align-items: flex-start; }
-        .o_dac_mgr_header_actions { justify-content: flex-start; }
+        .o_dac_mgr_header { align-items: flex-start; padding-right: 0; }
+        .o_dac_mgr_header_actions { position: static; justify-content: flex-start; }
         .o_dac_kpi_row { grid-template-columns: repeat(2, 1fr); }
         .o_dac_mgr_main_row { grid-template-columns: 1fr; }
         .o_dac_employee_table_head,

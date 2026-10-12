@@ -208,6 +208,10 @@ class SaleOrderDashboardService(models.Model):
         manager = self.env.user.has_group('dac_erp.group_dac_erp_manager')
         user_name = self.env.user.name
         uid = self.env.uid
+        if isinstance(date_from, str):
+            date_from = fields.Date.from_string(date_from)
+        if isinstance(date_to, str):
+            date_to = fields.Date.from_string(date_to)
         if not date_from:
             date_from = today.replace(day=1)
         if not date_to:
@@ -272,7 +276,15 @@ class SaleOrderDashboardService(models.Model):
 
         # ---- KPI tiến độ ----
         year, month = date_from.year, date_from.month
-        goal = self._dashboard_month_goal(year, month, company)
+        goal = 0.0
+        goal_cursor = date_from
+        while goal_cursor <= date_to:
+            month_days = calendar.monthrange(goal_cursor.year, goal_cursor.month)[1]
+            month_end = goal_cursor.replace(day=month_days)
+            overlap_end = min(month_end, date_to)
+            overlap_days = (overlap_end - goal_cursor).days + 1
+            goal += self._dashboard_month_goal(goal_cursor.year, goal_cursor.month, company) * overlap_days / month_days
+            goal_cursor = month_end + timedelta(days=1)
         progress_ratio = (total_revenue / goal) if goal else 0.0
         days_in_month = calendar.monthrange(year, month)[1]
         expected_ratio = min(date_to.day, days_in_month) / days_in_month
@@ -529,6 +541,142 @@ class SaleOrderDashboardService(models.Model):
             "completed_total_str": fmt(completed_total_val),
         }
 
+        # ---- SALE DASHBOARD V6 ----
+        # Dữ liệu cô đọng phục vụ giao diện tổng quan mới.
+        month_orders = self.search(s_dom, order='date_order asc')
+        daily_amounts = {}
+        for order in month_orders:
+            order_day = (order.date_order or fields.Datetime.now()).date()
+            daily_amounts[order_day] = daily_amounts.get(order_day, 0.0) + (order.amount_total or 0.0)
+        running = 0.0
+        revenue_series = []
+        range_days = max((date_to - date_from).days + 1, 1)
+        for offset in range(range_days):
+            series_day = date_from + timedelta(days=offset)
+            running += daily_amounts.get(series_day, 0.0)
+            revenue_series.append({
+                'day': series_day.isoformat(),
+                'revenue': running,
+                'target': goal * (offset + 1) / range_days if goal else 0.0,
+            })
+
+        pipeline_owner_domain = [('company_id', '=', company.id)]
+        if not manager:
+            pipeline_owner_domain.append(('user_id', '=', uid))
+        funnel_defs = [
+            ('messages', _('Tin nhắn'), None),
+            ('potential', _('Tiềm năng'), ['quotation', 'deposit', 'production', 'delivery', 'installation', 'payment', 'completed']),
+            ('quoted', _('Đã báo giá'), ['quotation', 'deposit', 'production', 'delivery', 'installation', 'payment', 'completed']),
+            ('deposit', _('Đặt cọc'), ['deposit', 'production', 'delivery', 'installation', 'payment', 'completed']),
+            ('closed', _('Đã chốt'), ['completed']),
+        ]
+        pipeline = []
+        previous_count = 0
+        for stage_key, label, states in funnel_defs:
+            if stage_key == 'messages':
+                count = len(consulting_list)
+                amount = 0.0
+            else:
+                stage_orders = self.search(pipeline_owner_domain + [('order_state_custom', 'in', states)])
+                count = len(stage_orders)
+                amount = sum(stage_orders.mapped('amount_total'))
+            conversion = 100.0 if not pipeline else min(100.0, (count / previous_count * 100.0) if previous_count else 0.0)
+            pipeline.append({
+                'key': stage_key,
+                'label': label,
+                'count': count,
+                'amount': amount,
+                'conversion': round(conversion, 1),
+            })
+            previous_count = count
+
+        recent_domain = [('company_id', '=', company.id)]
+        if not manager:
+            recent_domain.append(('user_id', '=', uid))
+        recent_orders = self.search(recent_domain, limit=8, order='create_date desc, id desc')
+        state_labels = dict(self._fields['order_state_custom'].selection)
+        recent_orders_v6 = []
+        for order in recent_orders:
+            deadline = order.production_deadline or order.design_deadline
+            paid = getattr(order, 'total_deposit_paid', 0.0) or 0.0
+            partner_name = order.partner_id.display_name or ''
+            initials = ''.join(word[0] for word in partner_name.split()[-2:] if word)[:2].upper()
+            recent_orders_v6.append({
+                'id': order.id,
+                'number': order.order_number or order.name or '',
+                'partner': partner_name,
+                'partner_initials': initials or 'KH',
+                'sale': order.user_id.name or '',
+                'state': order.order_state_custom or 'quotation',
+                'state_label': state_labels.get(order.order_state_custom, order.order_state_custom or ''),
+                'deadline': deadline.strftime('%d/%m/%Y') if deadline else '—',
+                'is_overdue': bool(deadline and deadline < today),
+                'amount': order.amount_total or 0.0,
+                'debt': max((order.amount_total or 0.0) - paid, 0.0),
+            })
+
+        overdue_design = self.search_count([
+            ('company_id', '=', company.id), ('order_state_custom', '=', 'deposit'),
+            ('design_deadline', '!=', False), ('design_deadline', '<', today),
+        ])
+        overdue_production = self.search_count([
+            ('company_id', '=', company.id), ('order_state_custom', '=', 'production'),
+            ('production_deadline', '!=', False), ('production_deadline', '<', today),
+        ])
+        channel_counts = {
+            'Facebook/Pancake': len(consulting_list),
+            'Website': 0,
+            'Khách cũ': 0,
+            'Giới thiệu': 0,
+            'Khác': 0,
+        }
+        lead_orders = self.search(recent_domain + [
+            ('create_date', '>=', fields.Datetime.to_datetime(date_from)),
+            ('create_date', '<', fields.Datetime.to_datetime(date_to) + timedelta(days=1)),
+        ], order='create_date asc, id asc')
+        for order in lead_orders:
+            source_name = (order.source_id.name if 'source_id' in self._fields and order.source_id else '').lower()
+            is_pancake = bool('pancake_order_id' in self._fields and order.pancake_order_id)
+            if is_pancake or 'facebook' in source_name or 'pancake' in source_name:
+                channel_counts['Facebook/Pancake'] += 1
+            elif 'web' in source_name:
+                channel_counts['Website'] += 1
+            elif any(term in source_name for term in ('giới thiệu', 'gioi thieu', 'referral')):
+                channel_counts['Giới thiệu'] += 1
+            elif order.partner_id and self.search_count([
+                ('partner_id', '=', order.partner_id.id),
+                ('company_id', '=', company.id),
+                ('create_date', '<', order.create_date),
+            ]):
+                channel_counts['Khách cũ'] += 1
+            else:
+                channel_counts['Khác'] += 1
+        sale_v6 = {
+            'kpi': {
+                'revenue': total_revenue,
+                'target': goal,
+                'closed': closed_count,
+                'expected': expected,
+                'progress_percent': round(progress_ratio * 100, 1),
+            },
+            'revenue_series': revenue_series,
+            'pipeline': pipeline,
+            'pipeline_total': next((stage['amount'] for stage in pipeline if stage['key'] == 'quoted'), 0.0),
+            'alerts': {
+                'overdue_orders': overdue_design + overdue_production,
+                'overdue_design': overdue_design,
+                'overdue_production': overdue_production,
+                'conversations': len(consulting_list),
+                'receivables': len(receivables_list),
+                'quotations': len(quotation_list),
+                'receivables_amount': receivables_total_val,
+                'quotation_amount': sum(item['amount_raw'] for item in quotation_data),
+            },
+            'period_label': '%s - %s' % (date_from.strftime('%d/%m/%Y'), date_to.strftime('%d/%m/%Y')),
+            'lead_sources': [{'label': label, 'count': count} for label, count in channel_counts.items()],
+            'recent_orders': recent_orders_v6,
+        }
+
         return {
             "header": {
                 "month_target": fmt(goal),
@@ -553,6 +701,7 @@ class SaleOrderDashboardService(models.Model):
             },
             "sums": sums,
             "task_overview": task_overview,
+            "sale_v6": sale_v6,
             "user_name": user_name,
         }
 

@@ -16,7 +16,7 @@ class DacSaleDashboard extends Component {
     this.orm = useService("orm");
     this.action = useService("action");
     this.notification = useService("notification");
-    this.state = useState({ loading: true, data: null, error: null });
+    this.state = useState({ loading: true, data: null, error: null, period: 'month' });
 
     onWillStart(async () => {
       await this._load();
@@ -57,7 +57,8 @@ class DacSaleDashboard extends Component {
   async _load() {
     this.state.loading = true;
     try {
-      const data = await this.orm.call("sale.order", "dac_get_dashboard", []);
+      const [dateFrom, dateTo] = this._periodRange(this.state.period);
+      const data = await this.orm.call("sale.order", "dac_get_dashboard", [dateFrom, dateTo]);
       this.state.data = data || {};
     } catch (e) {
       this.state.error = (e && e.message) || String(e);
@@ -69,6 +70,127 @@ class DacSaleDashboard extends Component {
 
   async refresh() {
     await this._load();
+  }
+
+  _periodRange(period) {
+    const end = new Date();
+    const start = new Date(end);
+    if (period === '7d') start.setDate(end.getDate() - 6);
+    else if (period === '30d') start.setDate(end.getDate() - 29);
+    else if (period === 'quarter') start.setMonth(Math.floor(end.getMonth() / 3) * 3, 1);
+    else start.setDate(1);
+    const iso = (value) => `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
+    return [iso(start), iso(end)];
+  }
+
+  async setPeriod(period) {
+    if (this.state.period === period) return;
+    this.state.period = period;
+    await this._load();
+  }
+
+  periodClass(period) {
+    return this.state.period === period ? 'active' : '';
+  }
+
+  get periodTitle() {
+    return { '7d': '7 ngày gần nhất', '30d': '30 ngày gần nhất', month: 'tháng này', quarter: 'quý này' }[this.state.period];
+  }
+
+  get saleV6() {
+    return this.state.data?.sale_v6 || { kpi: {}, revenue_series: [], pipeline: [], alerts: {}, lead_sources: [], recent_orders: [] };
+  }
+
+  formatCompact(value) {
+    const amount = Number(value || 0);
+    if (amount >= 1_000_000_000) return `${(amount / 1_000_000_000).toFixed(1).replace('.0', '')} tỷ`;
+    if (amount >= 1_000_000) return `${(amount / 1_000_000).toFixed(1).replace('.0', '')}tr`;
+    return new Intl.NumberFormat('vi-VN').format(amount);
+  }
+
+  formatMoney(value) {
+    return `${new Intl.NumberFormat('vi-VN').format(Number(value || 0))} ₫`;
+  }
+
+  chartPoints(key) {
+    const rows = this.saleV6.revenue_series || [];
+    if (!rows.length) return '';
+    const max = Math.max(...rows.flatMap((row) => [row.revenue || 0, row.target || 0]), 1);
+    return rows.map((row, index) => {
+      const x = rows.length === 1 ? 0 : index * 100 / (rows.length - 1);
+      const y = 92 - ((row[key] || 0) / max) * 82;
+      return `${x},${y}`;
+    }).join(' ');
+  }
+
+  chartPath(key, area = false) {
+    const rows = this.saleV6.revenue_series || [];
+    if (!rows.length) return '';
+    const max = this.revenueChartMax;
+    const points = rows.map((row, index) => ({
+      x: rows.length === 1 ? 0 : index * 100 / (rows.length - 1),
+      y: 92 - ((row[key] || 0) / max) * 82,
+    }));
+    let path = `M ${points[0].x} ${points[0].y}`;
+    for (let i = 1; i < points.length; i++) {
+      const previous = points[i - 1];
+      const current = points[i];
+      const middle = (previous.x + current.x) / 2;
+      path += ` C ${middle} ${previous.y}, ${middle} ${current.y}, ${current.x} ${current.y}`;
+    }
+    if (area) path += ` L 100 100 L 0 100 Z`;
+    return path;
+  }
+
+  get revenueChartMax() {
+    const rows = this.saleV6.revenue_series || [];
+    const rawMax = Math.max(...rows.flatMap((row) => [row.revenue || 0, row.target || 0]), 1);
+    const step = rawMax >= 1_000_000_000 ? 250_000_000 : rawMax >= 10_000_000 ? 10_000_000 : 1_000_000;
+    return Math.ceil(rawMax / step) * step;
+  }
+
+  get revenueAxisLabels() {
+    const max = this.revenueChartMax;
+    return [max, max * .75, max * .5, max * .25, 0];
+  }
+
+  get revenueDateLabels() {
+    const rows = this.saleV6.revenue_series || [];
+    if (!rows.length) return [];
+    return [0, .25, .5, .75, 1].map((ratio) => {
+      const value = rows[Math.round((rows.length - 1) * ratio)]?.day || '';
+      const parts = value.split('-');
+      return parts.length === 3 ? `${parts[2]}/${parts[1]}` : value;
+    });
+  }
+
+  get leadSourceTotal() {
+    return (this.saleV6.lead_sources || []).reduce((sum, item) => sum + (item.count || 0), 0);
+  }
+
+  get leadSourceStyle() {
+    const rows = this.saleV6.lead_sources || [];
+    const total = this.leadSourceTotal || 1;
+    const colors = ['#ffbf16', '#3282ee', '#25af6d', '#ff980b', '#e6eaf0'];
+    let cursor = 0;
+    const parts = rows.map((row, index) => {
+      const start = cursor;
+      cursor += (row.count || 0) * 100 / total;
+      return `${colors[index] || colors[4]} ${start}% ${cursor}%`;
+    });
+    return `conic-gradient(${parts.join(', ')})`;
+  }
+
+  leadSourcePercent(count) {
+    return this.leadSourceTotal ? Math.round((count || 0) * 100 / this.leadSourceTotal) : 0;
+  }
+
+  openOrders() {
+    return this.action.doAction(this.state.data?.header?.is_manager ? 'dac_erp.dac_sale_order_manager_action' : 'dac_erp.dac_sale_order_custom_action');
+  }
+
+  createOrder() {
+    return this.action.doAction({ type: 'ir.actions.act_window', res_model: 'sale.order', target: 'current', views: [[false, 'form']] });
   }
 
   //--------------------------------------------------------------------
