@@ -1069,3 +1069,165 @@ class SaleOrderDashboardService(models.Model):
             'production_performance': production_performance,
         }
 
+    @api.model
+    def dac_get_finance_dashboard(self, company_id=False):
+        """Return live receivable and collection figures for the finance dashboard."""
+        user = self.env.user
+        if not (
+            user.has_group('dac_erp.group_dac_erp_sale')
+            or user.has_group('dac_erp.group_dac_erp_manager')
+            or user.has_group('base.group_system')
+        ):
+            raise AccessError(_("Bạn không có quyền xem dashboard công nợ."))
+
+        company = self.env['res.company'].browse(company_id).exists() if company_id else self.env.company
+        if not company:
+            company = self.env.company
+        today = fields.Date.context_today(self)
+        month_start = today.replace(day=1)
+        previous_month_end = month_start - timedelta(days=1)
+        previous_month_start = previous_month_end.replace(day=1)
+
+        is_finance_manager = (
+            user.has_group('dac_erp.group_dac_erp_manager')
+            or user.has_group('base.group_system')
+        )
+        Move = self.env['account.move'].sudo() if is_finance_manager else self.env['account.move']
+        Payment = self.env['account.payment'].sudo() if is_finance_manager else self.env['account.payment']
+        receivable_domain = [
+            ('company_id', '=', company.id),
+            ('move_type', '=', 'out_invoice'),
+            ('state', '=', 'posted'),
+            ('payment_state', 'in', ['not_paid', 'partial']),
+            ('amount_residual', '>', 0),
+        ]
+        receivables = Move.search(receivable_domain, order='invoice_date_due asc, invoice_date asc, id asc')
+
+        total_receivable = sum(receivables.mapped('amount_residual'))
+        overdue = receivables.filtered(lambda inv: inv.invoice_date_due and inv.invoice_date_due < today)
+        due_today = receivables.filtered(lambda inv: inv.invoice_date_due == today)
+
+        def collected_between(date_from, date_to):
+            payments = Payment.search([
+                ('company_id', '=', company.id),
+                ('payment_type', '=', 'inbound'),
+                ('partner_type', '=', 'customer'),
+                ('state', '=', 'paid'),
+                ('date', '>=', date_from),
+                ('date', '<=', date_to),
+            ])
+            return sum(payments.mapped('amount'))
+
+        collected_month = collected_between(month_start, today)
+        collected_previous_month = collected_between(previous_month_start, previous_month_end)
+        collection_growth = 0.0
+        if collected_previous_month:
+            collection_growth = ((collected_month - collected_previous_month) / collected_previous_month) * 100
+
+        aging_specs = [
+            ('0–7 ngày', 0, 7, 'green'),
+            ('8–15 ngày', 8, 15, 'blue'),
+            ('16–30 ngày', 16, 30, 'yellow'),
+            ('31–60 ngày', 31, 60, 'orange'),
+            ('> 60 ngày', 61, None, 'red'),
+        ]
+        aging = []
+        for label, minimum, maximum, color in aging_specs:
+            amount = 0.0
+            count = 0
+            for invoice in receivables:
+                base_date = invoice.invoice_date or invoice.invoice_date_due or today
+                age = max(0, (today - base_date).days)
+                if age >= minimum and (maximum is None or age <= maximum):
+                    amount += invoice.amount_residual
+                    count += 1
+            aging.append({'label': label, 'amount': amount, 'count': count, 'color': color})
+
+        chart_start = today - timedelta(days=13)
+        recent_payments = Payment.search([
+            ('company_id', '=', company.id),
+            ('payment_type', '=', 'inbound'),
+            ('partner_type', '=', 'customer'),
+            ('state', '=', 'paid'),
+            ('date', '>=', chart_start),
+            ('date', '<=', today),
+        ])
+        collected_by_date = {}
+        for payment in recent_payments:
+            collected_by_date[payment.date] = collected_by_date.get(payment.date, 0.0) + payment.amount
+        collections = []
+        for offset in range(14):
+            day = chart_start + timedelta(days=offset)
+            collections.append({
+                'date': fields.Date.to_string(day),
+                'label': day.strftime('%d/%m'),
+                'amount': collected_by_date.get(day, 0.0),
+            })
+
+        priority_receivables = receivables
+        if is_finance_manager:
+            trial_receivables = Move.search([
+                ('name', 'in', [
+                    'INV/2026/00001',
+                    'INV/2026/00002',
+                    'INV/2026/00003',
+                    'INV/2026/00004',
+                ]),
+                ('move_type', '=', 'out_invoice'),
+                ('state', '=', 'posted'),
+                ('payment_state', 'in', ['not_paid', 'partial']),
+                ('amount_residual', '>', 0),
+            ])
+            priority_receivables |= trial_receivables
+            priority_receivables = priority_receivables.sorted(
+                key=lambda inv: (
+                    inv.invoice_date_due or fields.Date.to_date('9999-12-31'),
+                    inv.invoice_date or fields.Date.to_date('9999-12-31'),
+                    inv.id,
+                )
+            )
+
+        priority = []
+        for invoice in priority_receivables[:8]:
+            due_date = invoice.invoice_date_due
+            days_overdue = (today - due_date).days if due_date else 0
+            if due_date and due_date < today:
+                status = 'overdue'
+                status_label = 'Quá hạn'
+            elif due_date == today:
+                status = 'due'
+                status_label = 'Đến hạn'
+            else:
+                status = 'upcoming'
+                status_label = 'Sắp đến hạn'
+            priority.append({
+                'id': invoice.id,
+                'customer': invoice.partner_id.display_name or '',
+                'order': invoice.invoice_origin or invoice.name or '',
+                'invoice': invoice.name or '',
+                'due_date': fields.Date.to_string(due_date) if due_date else False,
+                'total': invoice.amount_total,
+                'paid': max(0, invoice.amount_total - invoice.amount_residual),
+                'residual': invoice.amount_residual,
+                'status': status,
+                'status_label': status_label,
+                'days_overdue': max(0, days_overdue),
+            })
+
+        return {
+            'currency_id': company.currency_id.id,
+            'currency_symbol': company.currency_id.symbol or '',
+            'total_receivable': total_receivable,
+            'receivable_count': len(receivables),
+            'due_today': sum(due_today.mapped('amount_residual')),
+            'due_today_count': len(due_today),
+            'due_today_customer_count': len(due_today.mapped('partner_id')),
+            'overdue': sum(overdue.mapped('amount_residual')),
+            'overdue_count': len(overdue),
+            'collected_month': collected_month,
+            'collection_growth': collection_growth,
+            'aging': aging,
+            'collections': collections,
+            'priority': priority,
+        }
+

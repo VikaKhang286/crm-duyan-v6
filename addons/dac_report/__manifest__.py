@@ -49,6 +49,10 @@
     ## + t
     'assets': {  
         'web.assets_backend': [
+            'dac_report/static/src/js/backend/finance_dashboard.js',
+            'dac_report/static/src/xml/backend/finance_dashboard.xml',
+            'dac_report/static/src/css/backend/finance_dashboard.css',
+            'dac_report/static/src/css/backend/finance_dashboard_buttons_fix.css',
             'dac_report/static/src/js/**/*',
             'dac_report/static/src/xml/**/*',
             'dac_report/static/src/css/**/*',

@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+  <t t-name="dac_report.FinanceDashboard">
+    <div class="dac-finance-dashboard">
+      <div t-if="state.loading" class="dac-finance-loading">
+        <i class="fa fa-spinner fa-spin fa-3x" />
+        <p>Đang tổng hợp công nợ...</p>
+      </div>
+      <main t-else="" class="o_dac_manager_dashboard">
+        <header class="dac-finance-header">
+          <div>
+            <div class="dac-finance-breadcrumb">
+              DAC Tài chính &amp; Công nợ <span>/</span> Tổng quan
+            </div>
+            <h1>Công nợ &amp; Dòng tiền</h1>
+            <p>Theo dõi phải thu, tuổi nợ và thanh toán theo đơn hàng.</p>
+          </div>
+          <div class="dac-finance-actions">
+            <button class="secondary" t-on-click="createReceipt">
+              <i class="fa fa-file-text-o" /> Tạo phiếu thu</button>
+              <button class="primary" t-on-click="recordPayment">
+              <i class="fa fa-check-circle" /> Ghi nhận thanh toán
+            </button>
+          </div>
+        </header>
+        <section class="dac-finance-kpis">
+          <article>
+            <span class="icon debt"><i class="fa fa-money" /></span><small>Tổng phải thu</small><strong><t t-esc="formatCompact(state.data.total_receivable)"/></strong>
+            <p><t t-esc="state.data.receivable_count" /> hóa đơn còn nợ</p>
+          </article>
+          <article>
+            <span class="icon due"><i class="fa fa-clock-o" /></span><small>Đến hạn hôm nay</small><strong><t t-esc="formatCompact(state.data.due_today)" /></strong>
+            <p><t t-esc="state.data.due_today_customer_count" /> khách hàng</p>
+          </article>
+          <article>
+            <span class="icon overdue"><i class="fa fa-exclamation" /></span><small>Quá hạn</small><strong><t t-esc="formatCompact(state.data.overdue)" /></strong>
+            <p class="danger">
+              <t t-esc="state.data.overdue_count" /> khoản cần xử lý
+            </p>
+          </article>
+          <article>
+            <span class="icon collected"><i class="fa fa-bar-chart" /></span><small>Đã thu tháng này</small><strong><t t-esc="formatCompact(state.data.collected_month)"/></strong>
+            <p t-att-class="state.data.collection_growth &gt;= 0 ? 'success' : 'danger'">
+              <i t-att-class="state.data.collection_growth &gt;= 0 ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"/>
+              <t t-esc="Math.abs(Math.round(state.data.collection_growth))" />%
+              <em>so tháng trước</em>
+            </p>
+          </article>
+        </section>
+        <section class="dac-finance-charts">
+          <article class="panel aging">
+            <header>
+              <h2>Công nợ theo tuổi</h2>
+              <p>Phân nhóm theo số ngày chưa thanh toán</p>
+            </header>
+            <div class="aging-list">
+              <t t-foreach="state.data.aging" t-as="bucket" t-key="bucket.label"><button t-on-click="openReceivables">
+                  <span><t t-esc="bucket.label" /></span><i><b
+                      t-att-class="bucket.color"
+                      t-att-style="'width:'+agingWidth(bucket.amount)" /></i><strong><t t-esc="formatCompact(bucket.amount)"/></strong></button>
+                  </t>
+            </div>
+          </article>
+          <article class="panel collections">
+            <header>
+              <h2>Thu tiền 14 ngày gần nhất</h2>
+              <p>Dòng tiền thực thu</p>
+            </header>
+            <div class="collection-chart">
+              <t
+                t-foreach="state.data.collections"
+                t-as="item"
+                t-key="item.date">
+                <div
+                  class="bar-column"
+                  t-att-title="item.label+': '+formatCurrency(item.amount)">
+                  <i><b t-att-style="'height:'+collectionHeight(item.amount)" /></i><small><t t-esc="item.label" /></small>
+                  </div>
+                  </t>
+            </div>
+          </article>
+        </section>
+        <section class="panel priority">
+          <header>
+            <div>
+              <h2>Khoản phải thu ưu tiên</h2>
+              <p>Các khoản đến hạn và quá hạn cần theo dõi</p>
+            </div>
+            <button t-on-click="openReceivables">
+              Xem toàn bộ công nợ
+            </button>
+          </header>
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>Khách hàng</th>
+                  <th>Đơn hàng</th>
+                  <th>Hạn thanh toán</th>
+                  <th>Tổng tiền</th>
+                  <th>Đã thu</th>
+                  <th>Còn nợ</th>
+                  <th>Trạng thái</th>
+                </tr>
+              </thead>
+              <tbody>
+                <t t-if="state.data.priority.length">
+                  <t
+                    t-foreach="state.data.priority"
+                    t-as="item"
+                    t-key="item.id">
+                    <tr t-on-click="()=&gt;this.openInvoice(item.id)">
+                      <td>
+                        <t t-esc="item.customer" />
+                      </td>
+                      <td class="order"><t t-esc="item.order" /></td>
+                      <td t-att-class="item.status === 'overdue' ? 'date overdue' : 'date'">
+                        <t t-esc="formatDate(item.due_date)" />
+                      </td>
+                      <td><t t-esc="formatCurrency(item.total)" /></td>
+                      <td><t t-esc="formatCurrency(item.paid)" /></td>
+                      <td class="residual">
+                        <t t-esc="formatCurrency(item.residual)" />
+                      </td>
+                      <td>
+                        <span t-att-class="'status '+item.status"><i/> <t t-esc="item.status_label"/></span>
+                      </td>
+                      </tr>
+                      </t>
+                      </t>
+                <tr t-else="">
+                  <td colspan="7" class="empty">
+                    <i class="fa fa-check-circle" /> Không có khoản phải thu cần theo dõi
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+  </t>
+</templates>

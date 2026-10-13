@@ -269,9 +269,6 @@
                         box-shadow: none !important;
                         border: 0 !important;
                     }
-                    .o_home_menu_form .o_form_sheet {
-                        max-width: 1220px !important;
-                    }
                     .dac-home-shell {
                         display: grid !important;
                         gap: 22px;

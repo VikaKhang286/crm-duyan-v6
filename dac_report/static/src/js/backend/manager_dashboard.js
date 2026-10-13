@@ -558,6 +558,38 @@ export class ManagerDashboard extends Component {
     }
   }
 
+  averageProgress(items) {
+    if (!items || !items.length) return 0;
+    return Math.round(items.reduce((sum, item) => sum + Number(item.progress || 0), 0) / items.length);
+  }
+
+  get installationProgress() {
+    return this.averageProgress(this.state.data.production_performance);
+  }
+
+  async setDashboardPeriod(period) {
+    const now = new Date();
+    if (period === "week") {
+      await this.selectThisWeek();
+      return;
+    }
+    if (period === "month") {
+      this.state.filterMode = "month";
+      this.state.selectedYear = now.getFullYear();
+      this.state.selectedMonth = now.getMonth() + 1;
+      await this.loadDashboardData();
+      return;
+    }
+    const quarterStartMonth = Math.floor(now.getMonth() / 3) * 3;
+    const start = new Date(now.getFullYear(), quarterStartMonth, 1);
+    const end = new Date(now.getFullYear(), quarterStartMonth + 3, 0);
+    const format = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    this.state.filterMode = "custom";
+    this.state.customDateFrom = format(start);
+    this.state.customDateTo = format(end);
+    await this.loadDashboardData();
+  }
+
   /**
    * Chuyển tab trong Action Center
    */
@@ -960,6 +992,6 @@ export class ManagerDashboard extends Component {
   }
 }
 
-ManagerDashboard.template = "dac_report.ManagerDashboard";
+ManagerDashboard.template = "dac_report.ManagerDashboardV6";
 
 registry.category("actions").add("dac_manager_dashboard", ManagerDashboard);

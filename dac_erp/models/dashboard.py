@@ -106,6 +106,16 @@ class SaleOrder(models.Model):
         Task = self.env['dac.work.task'].sudo()
         now = fields.Datetime.now()
         month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        # KPI "Tổng việc": tất cả task chưa hoàn thành được giao cho người xem,
+        # thống nhất với Dashboard Thiết kế v5.
+        total_active_tasks = Task.search_count([
+            ('assigned_user_id', '=', uid),
+            ('state', 'not in', ['done', 'cancelled']),
+        ])
+        total_in_progress_tasks = Task.search_count([
+            ('assigned_user_id', '=', uid),
+            ('state', '=', 'in_progress'),
+        ])
         active_domain = [
             ('task_type', '=', 'design'),
             ('state', 'not in', ['done', 'cancelled']),
@@ -189,8 +199,8 @@ class SaleOrder(models.Model):
         ))
         return {
             'task_stats': {
-                'total': len(active) + len(completed_month),
-                'in_progress': len(active.filtered(lambda t: t.state == 'in_progress')),
+                'total': total_active_tasks,
+                'in_progress': total_in_progress_tasks,
                 'overdue': len(overdue),
                 'due_soon': len(due_soon),
                 'done_month': len(completed_month),

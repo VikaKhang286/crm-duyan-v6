@@ -2,7 +2,7 @@
 <templates xml:space="preserve">
   <t t-name="dac_erp.ProductionDashboard" owl="1">
     <div class="dac-viewport">
-      <main class="o_dac_dashboard dac-theme-production dac-production-v6">
+      <main class="o_dac_manager_dashboard dac-theme-production dac-production-v6">
         <header class="prod-v6-header">
           <div><div class="prod-v6-breadcrumb">DAC Sản xuất &amp; Vận hành / Sản xuất</div><h1>Dashboard Sản xuất</h1><p>Góc nhìn vai trò Sản xuất: đơn trong xưởng, tiến độ, deadline và việc bị chặn.</p></div>
           <div class="prod-v6-actions"><button class="btn prod-v6-btn prod-v6-btn-light" t-on-click="openProductionOrders"><i class="fa fa-calendar-o"/> Lịch sản xuất</button><button class="btn prod-v6-btn prod-v6-btn-primary" t-on-click="_load"><i class="fa fa-refresh"/> Cập nhật tiến độ</button></div>

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates xml:space="preserve">
   <t t-name="dac_erp.DesignDashboard" owl="1">
-    <div class="dac-viewport"><main class="o_dac_dashboard dac-theme-design dac-design-v6">
+    <div class="dac-viewport"><main class="o_dac_manager_dashboard dac-theme-design dac-design-v6">
       <header class="design-v6-header"><div><div class="design-v6-breadcrumb">DAC Sản xuất &amp; Vận hành / Thiết kế</div><h1>Dashboard Thiết kế</h1><p>Góc nhìn vai trò Thiết kế: deadline, ưu tiên, file và task cần hoàn thành.</p></div><div class="design-v6-actions"><button class="btn design-v6-btn design-v6-btn-light" t-on-click="openDesignCalendar"><i class="fa fa-calendar-o"/> Lịch thiết kế</button><button class="btn design-v6-btn design-v6-btn-primary" t-on-click="openCreateDesignTask"><i class="fa fa-plus"/> Task thiết kế</button></div></header>
       <t t-if="state.loading"><div class="design-v6-loading"><i class="fa fa-spinner fa-pulse"/> Đang tải dữ liệu thiết kế…</div></t>
       <t t-elif="state.error"><div class="alert alert-danger"><t t-esc="state.error"/></div></t>

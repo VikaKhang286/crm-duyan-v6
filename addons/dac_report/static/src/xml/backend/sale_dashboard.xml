@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates xml:space="preserve">
   <t t-name="dac_sale_dashboard.Dashboard">
-    <div class="dac-viewport o_dac_dashboard dac-sale-v6">
+    <div class="dac-viewport o_dac_manager_dashboard dac-sale-v6">
       <div t-if="state.loading" class="dac-sale-state"><i class="fa fa-spinner fa-spin"/> Đang tải dữ liệu...</div>
       <div t-elif="state.error" class="dac-sale-state dac-sale-error"><i class="fa fa-exclamation-circle"/> <t t-esc="state.error"/></div>
       <main t-else="" class="dac-sale-shell">

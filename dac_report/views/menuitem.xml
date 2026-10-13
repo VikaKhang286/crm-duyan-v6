@@ -111,6 +111,14 @@
          ======================================================== -->
 
     <!-- Công nợ đơn hàng (Sale) -->
+    <menuitem id="dac_finance_dashboard_menu"
+              name="Dashboard Công nợ"
+              parent="dac_erp.dac_finance_root"
+              action="dac_finance_dashboard_action"
+              sequence="1"
+              groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager,base.group_system"/>
+
+    <!-- Công nợ đơn hàng (Sale) -->
     <menuitem id="dac_account_move_sale_menu"
               name="Công nợ đơn hàng"
               parent="dac_erp.dac_finance_root"

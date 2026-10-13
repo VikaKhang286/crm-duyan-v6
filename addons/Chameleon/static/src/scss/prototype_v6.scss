@@ -584,11 +584,11 @@ html body .o_form_view .o_form_sheet_bg {
 }
 
 html body .o_form_view .o_form_sheet {
-  max-width: 1500px;
   border: 1px solid var(--dac-v6-line);
   border-radius: 14px;
   background: #ffffff;
   box-shadow: var(--dac-v6-shadow);
+  padding: 0 !important;
 }
 
 html body .o_notebook .nav-tabs {

@@ -1,0 +1,337 @@
+.dac-finance-dashboard {
+  height: 100%;
+  overflow: auto;
+  background: #f5f7fb;
+  color: #172033;
+  font-family:
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+}
+.dac-finance-shell {
+  min-height: 100%;
+  padding: 28px 32px 40px;
+}
+.dac-finance-loading {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+}
+.dac-finance-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 18px;
+}
+.dac-finance-breadcrumb {
+  color: #9aa3b2;
+  font-size: 12px;
+  font-weight: 400;
+  margin-bottom: 8px;
+}
+.dac-finance-header h1 {
+  font-size: 24px;
+  margin: 0 0 6px;
+  font-weight: 700;
+}
+.dac-finance-header p,
+.dac-finance-dashboard .panel header p {
+  margin: 0;
+  color: #657187;
+  font-size: 12px;
+}
+.dac-finance-actions {
+  display: flex;
+  gap: 12px;
+}
+.dac-finance-actions button {
+  border: 1px solid #e1e6ef;
+  border-radius: 10px;
+  padding: 12px 18px;
+  background: #fff;
+  color: #58657a;
+  font-weight: 700;
+}
+.dac-finance-actions .primary {
+  background: #f6b900;
+  border-color: #f6b900;
+  color: #302600;
+}
+.dac-finance-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.dac-finance-kpis article,
+.dac-finance-dashboard .panel {
+  position: relative;
+  background: #fff;
+  border: 1px solid #e3e8f0;
+  border-radius: 14px;
+}
+.dac-finance-kpis article {
+  padding: 16px;
+}
+.dac-finance-kpis small {
+  display: block;
+  color: #7a869b;
+  font-weight: 700;
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+.dac-finance-kpis strong {
+  display: block;
+  font-size: 28px;
+  line-height: 1;
+  font-weight: 800;
+}
+.dac-finance-kpis p {
+  color: #8b96aa;
+  margin: 5px 0 0;
+  font-size: 12px;
+  font-weight: 400;
+}
+.dac-finance-kpis p.success {
+  color: #16a765;
+}
+.dac-finance-kpis p.danger {
+  color: #ee4266;
+}
+.dac-finance-kpis p em {
+  color: #8b96aa;
+  font-style: normal;
+}
+.dac-finance-kpis .icon {
+  position: absolute;
+  right: 20px;
+  top: 20px;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+}
+.icon.debt,
+.icon.due {
+  background: #fff2c9;
+  color: #a87900;
+}
+.icon.overdue {
+  background: #fff0f4;
+  color: #ee4266;
+}
+.icon.collected {
+  background: #e9f8f2;
+  color: #1ab77a;
+}
+.dac-finance-charts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.dac-finance-dashboard .panel > header {
+  padding: 14px 16px;
+  border-bottom: 1px solid #e8edf4;
+}
+.dac-finance-dashboard .panel h2 {
+  margin: 0 0 4px;
+  font-size: 16px;
+  font-weight: 700;
+}
+.aging-list {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+.aging-list button {
+  display: grid;
+  grid-template-columns: minmax(90px, 110px) minmax(0, 1fr) 42px;
+  align-items: center;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: #273348;
+  text-align: left;
+}
+.aging-list button > i {
+  height: 8px;
+  background: #edf0f5;
+  border-radius: 10px;
+  overflow: hidden;
+}
+.aging-list button b {
+  display: block;
+  height: 100%;
+  border-radius: 10px;
+}
+.aging-list .green {
+  background: #20b976;
+}
+.aging-list .blue {
+  background: #387df2;
+}
+.aging-list .yellow {
+  background: #ffc629;
+}
+.aging-list .orange {
+  background: #f2990a;
+}
+.aging-list .red {
+  background: #ef426f;
+}
+.aging-list button > strong {
+  text-align: right;
+}
+.collection-chart {
+  height: 210px;
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  padding: 30px 21px 16px;
+}
+.bar-column {
+  height: 100%;
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.bar-column i {
+  height: calc(100% - 22px);
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  border-bottom: 1px solid #e4e9f0;
+}
+.bar-column b {
+  width: 76%;
+  max-width: 46px;
+  background: linear-gradient(#ffd55a, #f4b800);
+  border-radius: 7px 7px 2px 2px;
+}
+.bar-column small {
+  font-size: 10px;
+  color: #8490a3;
+  padding-top: 7px;
+}
+.priority > header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.priority > header button {
+  border: 0;
+  background: transparent;
+  color: #896300;
+  font-weight: 800;
+}
+.priority table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.priority th,
+.priority td {
+  text-align: left;
+  padding: 12px;
+  border-bottom: 1px solid #e7ebf2;
+  white-space: nowrap;
+}
+.priority th {
+  background: #fbfcfe;
+  color: #8994a7;
+  font-size: 12px;
+}
+.priority td {
+  color: #526078;
+}
+.priority tbody tr {
+  cursor: pointer;
+}
+.priority tbody tr:hover {
+  background: #fffaf0;
+}
+.priority td strong,
+.priority td small {
+  display: block;
+}
+.priority td small {
+  color: #9aa4b4;
+  font-size: 11px;
+}
+.priority .order {
+  color: #866000;
+  font-weight: 800;
+}
+.priority .residual {
+  font-weight: 400;
+}
+.priority .date.overdue {
+  color: #f03f66;
+  font-weight: 800;
+}
+.priority .status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 20px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 800;
+}
+.priority .status i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.status.overdue {
+  background: #fff0f4;
+  color: #ed4168;
+}
+.status.due {
+  background: #fff5db;
+  color: #d88900;
+}
+.status.upcoming {
+  background: #edf5ff;
+  color: #3478df;
+}
+.priority .empty {
+  text-align: center;
+  padding: 32px;
+}
+@media (max-width: 1100px) {
+  .dac-finance-kpis {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .dac-finance-charts {
+    grid-template-columns: 1fr;
+  }
+  .dac-finance-header {
+    flex-direction: column;
+  }
+}
+@media (max-width: 700px) {
+  .dac-finance-shell {
+    padding: 18px 14px;
+  }
+  .dac-finance-kpis {
+    grid-template-columns: 1fr;
+  }
+  .dac-finance-actions {
+    flex-direction: column;
+  }
+  .aging-list button {
+    grid-template-columns: 95px 1fr 62px;
+  }
+}
