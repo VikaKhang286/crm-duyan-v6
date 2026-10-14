@@ -6,6 +6,15 @@ function fieldInput(block, name) {
     return block.querySelector(`[name="${name}"] input, [name="${name}"] textarea, .o_field_widget[name="${name}"] input, .o_field_widget[name="${name}"] textarea`);
 }
 
+function isDescriptionReadOnly(block, titleInput, summaryInput) {
+    const roleMarker = block.querySelector(".dac-v6-description-readonly-role");
+    const roleIsReadOnly = roleMarker && !roleMarker.classList.contains("d-none") && !roleMarker.classList.contains("o_invisible_modifier");
+    const fieldIsReadOnly = [titleInput, summaryInput].some((input) =>
+        input?.readOnly || input?.disabled || input?.closest(".o_readonly_modifier")
+    );
+    return Boolean(roleIsReadOnly || fieldIsReadOnly);
+}
+
 function setOdooValue(input, value) {
     if (!input) return;
     const descriptor = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(input), "value");
@@ -75,10 +84,11 @@ function addImage(files, gallery, editor) {
     });
 }
 
-function openDescriptionModal(block) {
+function openDescriptionModal(block, forceReadOnly = false) {
     document.getElementById(MODAL_ID)?.remove();
     const titleInput = fieldInput(block, "order_title");
     const summaryInput = fieldInput(block, "order_summary");
+    const readOnly = forceReadOnly || isDescriptionReadOnly(block, titleInput, summaryInput);
     const orderName = document.querySelector(".dac-control-panel-title h1, .dac-control-panel-title")?.textContent?.trim() || "Đơn mới";
     const customer = document.querySelector('.o_field_widget[name="partner_id"] input')?.value || "Chưa chọn khách hàng";
 
@@ -109,31 +119,48 @@ function openDescriptionModal(block) {
     title.value = titleInput?.value || "";
     editor.textContent = summaryInput?.value || "";
 
+    if (readOnly) {
+        title.readOnly = true;
+        editor.contentEditable = "false";
+        modal.querySelector(".dac-v6-description-tools").remove();
+        modal.querySelector(".dac-v6-modal-save").remove();
+        modal.querySelector(".dac-v6-save-state").textContent = "Chỉ xem";
+    }
+
     const close = () => modal.remove();
     modal.querySelector(".dac-v6-modal-close").addEventListener("click", close);
     modal.querySelector(".dac-v6-modal-cancel").addEventListener("click", close);
     modal.addEventListener("click", (event) => { if (event.target === modal) close(); });
-    modal.querySelector(".dac-v6-bold").addEventListener("click", () => { editor.focus(); document.execCommand("bold"); });
-    modal.querySelector('input[type="file"]').addEventListener("change", (event) => addImage(event.target.files, gallery, editor));
-    editor.addEventListener("paste", (event) => {
-        const images = [...event.clipboardData.files].filter((file) => file.type.startsWith("image/"));
-        if (images.length) addImage(images, gallery, editor);
-    });
-    modal.querySelector(".dac-v6-modal-save").addEventListener("click", () => {
-        const nextTitle = title.value.trim();
-        const nextSummary = editor.innerText.trim();
-        const imageCount = gallery.querySelectorAll(".dac-v6-description-image").length;
-        setOdooValue(titleInput, nextTitle);
-        setOdooValue(summaryInput, nextSummary);
-        renderDescriptionPreview(block, nextTitle, nextSummary, imageCount);
-        close();
-        showSavedToast();
-    });
+    if (!readOnly) {
+        modal.querySelector(".dac-v6-bold").addEventListener("click", () => { editor.focus(); document.execCommand("bold"); });
+        modal.querySelector('input[type="file"]').addEventListener("change", (event) => addImage(event.target.files, gallery, editor));
+        editor.addEventListener("paste", (event) => {
+            const images = [...event.clipboardData.files].filter((file) => file.type.startsWith("image/"));
+            if (images.length) addImage(images, gallery, editor);
+        });
+        modal.querySelector(".dac-v6-modal-save").addEventListener("click", () => {
+            const nextTitle = title.value.trim();
+            const nextSummary = editor.innerText.trim();
+            const imageCount = gallery.querySelectorAll(".dac-v6-description-image").length;
+            setOdooValue(titleInput, nextTitle);
+            setOdooValue(summaryInput, nextSummary);
+            renderDescriptionPreview(block, nextTitle, nextSummary, imageCount);
+            close();
+            showSavedToast();
+        });
+    }
     document.body.appendChild(modal);
     requestAnimationFrame(() => editor.focus());
 }
 
 document.addEventListener("click", (event) => {
+    if (event.target.closest(".dac-v6-task-description-btn")) {
+        event.preventDefault();
+        event.stopPropagation();
+        const descriptionBlock = document.querySelector(".dac-v6-order-description");
+        if (descriptionBlock) openDescriptionModal(descriptionBlock, true);
+        return;
+    }
     const block = event.target.closest(".dac-v6-order-description");
     if (!block || event.target.closest("button, input, textarea, a, .o_field_widget")) return;
     openDescriptionModal(block);

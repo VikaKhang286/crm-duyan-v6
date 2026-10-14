@@ -18,7 +18,7 @@
           </section>
           <section class="prod-v6-board">
             <article class="prod-v6-panel prod-v6-orders">
-              <div class="prod-v6-panel-head"><div><h2>Đơn đang sản xuất</h2><p>Xếp theo deadline gần nhất.</p></div><button class="prod-v6-link" t-on-click="openProductionOrders">Xem tất cả</button></div>
+              <div class="prod-v6-panel-head"><div><h2>Đơn đang sản xuất</h2><p>Xếp theo deadline gần nhất.</p></div></div>
               <div class="prod-v6-order-list">
                 <t t-if="productionOrders.length"><t t-foreach="productionOrders" t-as="order" t-key="order.id"><button class="prod-v6-order" t-on-click="() => this.openOrder(order)"><span t-attf-class="prod-v6-progress #{order.is_overdue ? 'is-overdue' : ''}"><t t-if="order.is_overdue">!</t><t t-else=""><t t-esc="order.progress"/></t></span><span class="prod-v6-order-copy"><strong><t t-esc="order.number"/> · <t t-esc="order.title"/></strong><small t-if="order.is_overdue">Quá hạn · còn <t t-esc="order.remaining_tasks"/> task</small><small t-else=""><t t-esc="order.progress"/>% · Deadline <t t-esc="order.deadline || 'Chưa đặt'"/> · <t t-esc="order.team"/></small></span><i class="fa fa-angle-right"/></button></t></t>
                 <div t-else="" class="prod-v6-empty"><span><i class="fa fa-industry"/></span><strong>Chưa có đơn trong xưởng</strong><p>Đơn chuyển sang trạng thái Sản xuất sẽ xuất hiện tại đây.</p></div>

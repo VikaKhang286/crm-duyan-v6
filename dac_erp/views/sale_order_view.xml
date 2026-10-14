@@ -202,7 +202,9 @@
                                 </div>
                                 <div class="col-md-6 col-12 dac-box-card dac-box-document">
                                     <h5 class="dac-box-title dac-title-document d-flex justify-content-between align-items-center">
-                                        <span><i class="fa fa-calendar-check-o me-2" invisible="order_state_custom in ['deposit', 'production']"/><i class="fa fa-pencil me-2" invisible="order_state_custom != 'deposit'"/><i class="fa fa-industry me-2" invisible="order_state_custom != 'production'"/><span invisible="order_state_custom in ['deposit', 'production']">Báo giá &amp; lịch hẹn</span><span invisible="order_state_custom != 'deposit'">Thiết kế &amp; Đặt cọc</span><span invisible="order_state_custom != 'production'">Sản xuất</span></span>
+                                        <span invisible="is_design_user and order_state_custom == 'deposit'"><i class="fa fa-calendar-check-o me-2" invisible="order_state_custom in ['deposit', 'production']"/><i class="fa fa-pencil me-2" invisible="order_state_custom != 'deposit'"/><i class="fa fa-industry me-2" invisible="order_state_custom != 'production'"/><span invisible="order_state_custom in ['deposit', 'production']">Báo giá &amp; lịch hẹn</span><span invisible="order_state_custom != 'deposit'">Thiết kế &amp; Đặt cọc</span><span invisible="order_state_custom != 'production'">Sản xuất</span></span>
+                                        <span invisible="not is_design_user or order_state_custom != 'deposit'">Task của tôi</span>
+                                        <small class="dac-design-role-label" invisible="not is_design_user or order_state_custom != 'deposit'">Thiết kế</small>
                                         <button name="action_quick_create_task" type="object" string="+ Task" class="btn btn-sm btn-outline-primary py-0 px-2" invisible="order_state_custom not in ['deposit', 'production']" groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager"/>
                                     </h5>
                                     <group>
@@ -222,14 +224,14 @@
                                 <field name="is_priority"
                                        string="Ưu tiên"
                                        widget="boolean_toggle"
-                                       readonly="is_design_user or order_state_custom in ['delivery', 'installation', 'completed', 'cancel']"/>
+                                       readonly="is_design_user or is_production_user or order_state_custom in ['delivery', 'installation', 'completed', 'cancel']"/>
                                 <span>Ưu tiên</span>
                             </div>
                             <div class="dac-toggle-field">
                                 <field name="is_priority_today"
                                        string="Trong ngày"
                                        widget="boolean_toggle"
-                                       readonly="is_design_user or not is_priority or order_state_custom in ['delivery', 'installation', 'completed', 'cancel']"/>
+                                       readonly="is_design_user or is_production_user or not is_priority or order_state_custom in ['delivery', 'installation', 'completed', 'cancel']"/>
                                 <span>Trong ngày</span>
                             </div>
                         </div>
@@ -627,7 +629,7 @@
                                                     <i class="fa fa-pencil"/><span class="visually-hidden">Người thiết kế</span>
                                                 </span>
                                                 <span class="dac-v6-metric-value">
-                                                    <field name="user_id_design" widget="many2one_avatar_user" nolabel="1" readonly="is_design_user"/>
+                                                    <field name="user_id_design" widget="many2one_avatar_user" nolabel="1" readonly="is_design_user or is_production_user"/>
                                                 </span>
                                             </div>
                                             <div class="dac-v6-metric-row">
@@ -635,8 +637,8 @@
                                                     <i class="fa fa-cogs"/><span class="visually-hidden">Xưởng sản xuất</span>
                                                 </span>
                                                 <span class="dac-v6-metric-value">
-                                                    <field name="user_id_production" widget="many2one_avatar_user" nolabel="1" readonly="is_design_user"/>
-                                                    <field name="production_group_ids" widget="many2many_tags" nolabel="1" readonly="is_design_user" invisible="order_state_custom == 'quotation'"/>
+                                                    <field name="user_id_production" widget="many2one_avatar_user" nolabel="1" readonly="is_design_user or is_production_user"/>
+                                                    <field name="production_group_ids" widget="many2many_tags" nolabel="1" readonly="is_design_user or is_production_user" invisible="order_state_custom == 'quotation'"/>
                                                 </span>
                                             </div>
                                             <div class="dac-v6-metric-row">
@@ -644,7 +646,7 @@
                                                     <i class="fa fa-clock-o"/><span class="visually-hidden">Deadline</span>
                                                 </span>
                                                 <span class="dac-v6-metric-value">
-                                                    <field name="delivery_date" nolabel="1" placeholder="Chọn ngày giao hàng"/>
+                                                    <field name="delivery_date" nolabel="1" placeholder="Chọn ngày giao hàng" readonly="is_design_user or is_production_user"/>
                                                 </span>
                                             </div>
                                         </div>

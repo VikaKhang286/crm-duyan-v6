@@ -29,6 +29,10 @@ class SaleOrder(models.Model):
         )
         state_labels = dict(order._fields['order_state_custom'].selection)
         task_state_labels = dict(self.env['dac.work.task']._fields['state'].selection)
+        restrict_quick_actions = (
+            self.env.user.has_group('dac_erp.group_dac_erp_design')
+            or self.env.user.has_group('dac_erp.group_dac_erp_production')
+        )
 
         def _task_payload(task):
             return {
@@ -61,6 +65,7 @@ class SaleOrder(models.Model):
             'conversation_id': order.conversation_id.id if order.conversation_id else False,
             'tasks': [_task_payload(task) for task in tasks[:5]],
             'task_count': len(tasks),
+            'restrict_quick_actions': restrict_quick_actions,
         }
 
     def _get_partner_vip_class(self, partner):

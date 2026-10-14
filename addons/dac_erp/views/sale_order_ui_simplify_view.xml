@@ -165,12 +165,12 @@
                                     </list>
                                 </field>
                             </div>
-                            <div class="dac-summary-container" groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager" invisible="is_design_user or is_production_user">
+                            <div class="dac-summary-container" groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager,dac_erp.group_dac_erp_design,dac_erp.group_dac_erp_production" invisible="(is_design_user and workflow_review_state != 'deposit') or (is_production_user and workflow_review_state != 'production')">
                                 <field name="currency_id" invisible="1"/>
                                 <div class="dac-summary-row"><span class="dac-summary-label">Tạm tính</span><span class="dac-summary-value"><field name="amount_untaxed_original" readonly="1" widget="monetary" nolabel="1"/></span></div>
                                 <div class="dac-summary-row" invisible="order_type == 'cart'"><span class="dac-summary-label">Thuế</span><span class="dac-summary-value"><field name="amount_tax" readonly="1" widget="monetary" nolabel="1"/></span></div>
-                                <div class="dac-summary-row"><span class="dac-summary-label">Khuyến mãi/Giảm giá</span><span class="dac-summary-value"><field name="promotion_amount" widget="monetary" nolabel="1"/></span></div>
-                                <div class="dac-summary-row"><span class="dac-summary-label">Phí vận chuyển</span><span class="dac-summary-value"><field name="shipping_fee" widget="monetary" nolabel="1"/></span></div>
+                                <div class="dac-summary-row"><span class="dac-summary-label">Khuyến mãi/Giảm giá</span><span class="dac-summary-value"><field name="promotion_amount" widget="monetary" nolabel="1" readonly="is_design_user or is_production_user"/></span></div>
+                                <div class="dac-summary-row"><span class="dac-summary-label">Phí vận chuyển</span><span class="dac-summary-value"><field name="shipping_fee" widget="monetary" nolabel="1" readonly="is_design_user or is_production_user"/></span></div>
                                 <div class="dac-summary-row"><span class="dac-summary-label">Tổng</span><span class="dac-summary-value dac-summary-value--large"><field name="amount_total" readonly="1" widget="monetary" nolabel="1"/></span></div>
                                 <div class="dac-summary-row" invisible="deposit_paid_display == 0"><span class="dac-summary-label">Cọc / Đã thanh toán</span><span class="dac-summary-value dac-summary-value--deposit"><field name="deposit_paid_display" readonly="1" widget="monetary" nolabel="1"/></span></div>
                                 <div class="dac-summary-row dac-summary-row--remaining" invisible="order_state_custom in ['cancel', 'completed']"><span class="dac-summary-label dac-summary-label--highlight">Còn thanh toán</span><span class="dac-summary-value--highlight"><field name="remaining_amount_display" readonly="1" widget="monetary" nolabel="1"/></span></div>
@@ -223,6 +223,9 @@
                                     <p class="dac-v6-side-help" invisible="workflow_review_state != 'deposit'">Duyệt thiết kế và xác nhận cọc trước khi sản xuất.</p>
                                     <div class="dac-v6-side-link" invisible="workflow_review_state != 'production' or not design_link">
                                         <field name="design_link" widget="url" nolabel="1" readonly="1" text="Xem bản vẽ"/>
+                                    </div>
+                                    <div class="dac-v6-design-actions" invisible="workflow_review_state != 'production'">
+                                        <button name="action_open_design_handover" string="Xem thiết kế" type="object" class="btn btn-outline-secondary"/>
                                     </div>
                                     <p class="dac-v6-side-help" invisible="workflow_review_state != 'production'">Sản xuất theo nội dung, chất liệu và kích thước trong bảng sản phẩm.</p>
                                     <div class="dac-v6-delivery-panel" invisible="workflow_review_state != 'delivery'">
@@ -299,7 +302,7 @@
                 <!-- Bố cục chi tiết đơn theo prototype: gom thông tin vào đúng hai card đầu. -->
                 <xpath expr="//div[hasclass('dac-box-document')]/h5" position="replace">
                     <h5 class="dac-box-title dac-title-document d-flex justify-content-between align-items-center" invisible="workflow_review_state in ['delivery', 'completed']">
-                        <span>
+                        <span invisible="is_design_user and workflow_review_state == 'deposit'">
                             <i class="fa fa-calendar-check-o me-2" title="Báo giá" invisible="workflow_review_state != 'quotation'"/>
                             <i class="fa fa-pencil me-2" title="Thiết kế" invisible="workflow_review_state != 'deposit'"/>
                             <i class="fa fa-industry me-2" title="Sản xuất" invisible="workflow_review_state != 'production'"/>
@@ -310,6 +313,8 @@
                             <span invisible="workflow_review_state != 'delivery'">Giao hàng &amp; thu hộ</span>
                             <span invisible="workflow_review_state not in ['installation', 'completed']">Kết quả &amp; công nợ</span>
                         </span>
+                        <span invisible="not is_design_user or workflow_review_state != 'deposit'">Task của tôi</span>
+                        <small class="dac-design-role-label" invisible="not is_design_user or workflow_review_state != 'deposit'">Thiết kế</small>
                         <button name="action_quick_create_task" type="object" string="+ Task" class="btn btn-sm btn-outline-primary py-0 px-2" invisible="workflow_review_state not in ['deposit', 'production'] or workflow_review_state != order_state_custom" groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager"/>
                     </h5>
                 </xpath>
@@ -335,7 +340,39 @@
                     <attribute name="invisible">workflow_review_state not in ['deposit', 'production']</attribute>
                 </xpath>
                 <xpath expr="//div[hasclass('dac-box-tasks')]/field[@name='task_ids']" position="replace">
-                    <field name="design_task_display_ids" nolabel="1" invisible="workflow_review_state != 'deposit'">
+                    <field name="design_task_display_ids" nolabel="1"
+                           domain="[('assigned_user_id', '=', uid)]"
+                           invisible="workflow_review_state != 'deposit'"
+                           groups="dac_erp.group_dac_erp_design">
+                        <kanban create="false" delete="false" quick_create="false" limit="100" class="dac-design-my-tasks">
+                            <field name="name"/>
+                            <field name="priority"/>
+                            <field name="state"/>
+                            <field name="quick_state"/>
+                            <field name="assigned_user_id"/>
+                            <field name="sale_user_id"/>
+                            <field name="deadline_date_display"/>
+                            <field name="design_revision_display"/>
+                            <templates>
+                                <t t-name="card">
+                                    <div t-attf-class="dac-task-card-inner dac-design-task-card dac-task-state-#{record.state.raw_value} dac-task-priority-#{record.priority.raw_value}">
+                                        <div class="dac-task-card-header">
+                                            <span class="dac-task-name"><i t-if="record.state.raw_value === 'done'" class="fa fa-check me-2"/><t t-esc="record.name.value"/></span>
+                                            <field name="quick_state" widget="selection" class="dac-task-state-select" nolabel="1"/>
+                                        </div>
+                                        <div class="dac-design-task-meta">
+                                            <span><small>Người nhận</small><b t-esc="record.assigned_user_id.value || 'Chưa giao'"/></span>
+                                            <span><small>Sale giao</small><b t-esc="record.sale_user_id.value || '—'"/></span>
+                                            <span><small>Deadline</small><b t-esc="record.deadline_date_display.value"/></span>
+                                            <span><small>Bản vẽ</small><b t-esc="record.design_revision_display.value || 'V1'"/></span>
+                                        </div>
+                                        <a href="#" role="button" class="btn btn-outline-secondary dac-v6-task-description-btn">Xem mô tả &amp; ảnh</a>
+                                    </div>
+                                </t>
+                            </templates>
+                        </kanban>
+                    </field>
+                    <field name="design_task_display_ids" nolabel="1" invisible="workflow_review_state != 'deposit'" groups="!dac_erp.group_dac_erp_design">
                         <kanban create="false" delete="false" quick_create="false" limit="100">
                             <field name="name"/>
                             <field name="priority"/>
@@ -427,6 +464,7 @@
                 <xpath expr="//div[hasclass('dac-box-client')]/group" position="after">
                     <xpath expr="//div[hasclass('dac-box-internal')]" position="move"/>
                     <div class="dac-v6-order-description">
+                        <span class="dac-v6-description-readonly-role" invisible="not is_design_user and not is_production_user"/>
                         <h5 class="dac-v6-subtitle">
                             <i class="fa fa-file-text-o me-2"/>Mô tả đơn hàng
                         </h5>
@@ -495,19 +533,19 @@
                         <field name="design_task_done_count" nolabel="1" readonly="1"/>/<field name="design_task_count" nolabel="1" readonly="1"/> task hoàn thành
                     </div>
                     <xpath expr="//div[hasclass('dac-box-tasks')]" position="move"/>
-                    <div class="dac-v6-design-next-step dac-v6-design-next-step--blocked" invisible="workflow_review_state != 'deposit' or design_tasks_complete">
+                    <div class="dac-v6-design-next-step dac-v6-design-next-step--blocked" invisible="is_design_user or workflow_review_state != 'deposit' or design_tasks_complete">
                         <div><b>Bước tiếp theo: Sản xuất</b><span>Chưa thể chuyển: Thiết kế chưa hoàn tất (<field name="design_task_progress_percent" nolabel="1" readonly="1"/>%). Hoàn tất công việc thiết kế rồi bấm tiếp tục lại.</span></div>
                         <button name="dac_disabled_design_transition" string="Bắt đầu sản xuất" type="button" class="btn btn-danger" disabled="1"/>
                     </div>
-                    <div class="dac-v6-design-next-step dac-v6-design-next-step--blocked" invisible="workflow_review_state != 'deposit' or not design_tasks_complete or (design_done and is_deposit_confirmed)">
+                    <div class="dac-v6-design-next-step dac-v6-design-next-step--blocked" invisible="is_design_user or workflow_review_state != 'deposit' or not design_tasks_complete or (design_done and is_deposit_confirmed)">
                         <div><b>Bước tiếp theo: Sản xuất</b><span>Chưa thể chuyển: Cần duyệt thiết kế và ghi nhận cọc trước khi sản xuất.</span></div>
                         <button name="dac_disabled_design_approval_deposit" string="Bắt đầu sản xuất" type="button" class="btn btn-danger" disabled="1"/>
                     </div>
-                    <div class="dac-v6-design-next-step" invisible="workflow_review_state != 'deposit' or not design_tasks_complete or not design_done or not is_deposit_confirmed">
+                    <div class="dac-v6-design-next-step" invisible="is_design_user or workflow_review_state != 'deposit' or not design_tasks_complete or not design_done or not is_deposit_confirmed">
                         <div><b>Bước tiếp theo: Sản xuất</b><span>Bấm tiếp tục để chuyển đơn sang bước kế tiếp.</span></div>
                         <button name="action_proceed_to_production" string="Bắt đầu sản xuất" type="object" class="btn btn-warning" context="{'from_ui_button': True}" groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager,base.group_system"/>
                     </div>
-                    <div class="dac-v6-production-next-step dac-v6-production-next-step--blocked" invisible="workflow_review_state != 'production' or production_tasks_complete">
+                    <div class="dac-v6-production-next-step dac-v6-production-next-step--blocked" invisible="is_production_user or workflow_review_state != 'production' or production_tasks_complete">
                         <div>
                             <b invisible="fulfillment_method != 'delivery'">Bước tiếp theo: Giao hàng</b>
                             <b invisible="fulfillment_method != 'installation'">Bước tiếp theo: Thi công</b>
@@ -516,7 +554,7 @@
                         <button name="dac_disabled_production_delivery" string="Bắt đầu giao hàng" type="button" class="btn btn-danger" disabled="1" invisible="fulfillment_method != 'delivery'"/>
                         <button name="dac_disabled_production_installation" string="Bắt đầu thi công" type="button" class="btn btn-danger" disabled="1" invisible="fulfillment_method != 'installation'"/>
                     </div>
-                    <div class="dac-v6-production-next-step" invisible="workflow_review_state != 'production' or not production_tasks_complete">
+                    <div class="dac-v6-production-next-step" invisible="is_production_user or workflow_review_state != 'production' or not production_tasks_complete">
                         <div>
                             <b invisible="fulfillment_method != 'delivery'">Bước tiếp theo: Giao hàng</b>
                             <b invisible="fulfillment_method != 'installation'">Bước tiếp theo: Thi công</b>

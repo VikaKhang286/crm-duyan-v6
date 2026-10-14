@@ -52,7 +52,13 @@ class SaleOrderCompute(models.Model):
             for message in messages.filtered(lambda item: item not in internal_messages)[:30]:
                 body = re.sub(r'<[^>]+>', '', unescape(message.body or '')).strip()
                 changes = []
-                for tracking_value in message.tracking_value_ids:
+                # ``tracking_value_ids`` is a technical mail field restricted to
+                # administrators in Odoo 18.  The order history is nevertheless
+                # visible to users who are allowed to read the order (notably the
+                # assigned designer/production user), so read only this technical
+                # relation with sudo instead of granting those users broad mail
+                # administration rights.
+                for tracking_value in message.sudo().tracking_value_ids:
                     field_label = tracking_value.field_id.field_description or tracking_value.field_id.name
                     old_value = tracking_value.old_value_char or ''
                     new_value = tracking_value.new_value_char or ''

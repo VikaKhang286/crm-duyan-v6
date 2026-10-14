@@ -68,6 +68,9 @@ class DacWorkTask(models.Model):
         'res.users', string='Người thực hiện', tracking=True,
     )
     sale_user_id = fields.Many2one('res.users', related='order_id.user_id', string='Sale giao', readonly=True)
+    design_revision_display = fields.Char(
+        related='order_id.design_revision_display', string='Bản vẽ', readonly=True,
+    )
     deadline_date_display = fields.Char(string='Hạn hiển thị', compute='_compute_deadline_date_display')
     quick_state = fields.Selection([
         ('draft', 'Chưa làm'),

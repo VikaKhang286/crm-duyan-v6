@@ -161,8 +161,8 @@ class SaleOrderDesignPanel(models.Model):
 
     def action_open_design_handover(self):
         self.ensure_one()
-        if self.order_state_custom != 'deposit':
-            raise UserError(_('Chỉ mở bàn giao thiết kế ở bước Thiết kế & Đặt cọc.'))
+        if self.order_state_custom not in ('deposit', 'production'):
+            raise UserError(_('Chỉ xem thiết kế ở bước Thiết kế & Đặt cọc hoặc Sản xuất.'))
         return {
             'type': 'ir.actions.act_window',
             'name': _('Thiết kế & bàn giao'),
@@ -259,6 +259,8 @@ class DesignHandoverWizard(models.TransientModel):
     order_label = fields.Char(string='Đơn hàng', readonly=True)
     design_version = fields.Char(string='Phiên bản bản vẽ', required=True)
     designer_id = fields.Many2one('res.users', string='Người thiết kế', readonly=True)
+    design_review_message = fields.Char(string='Trạng thái duyệt', readonly=True)
+    show_design_review_status = fields.Boolean(string='Hiện trạng thái cho Thiết kế', readonly=True)
 
     @api.model
     def default_get(self, fields_list):
@@ -275,11 +277,28 @@ class DesignHandoverWizard(models.TransientModel):
             'order_label': order.name,
             'design_version': latest.name if latest else 'V1',
             'designer_id': order.user_id_design.id,
+            'show_design_review_status': (
+                self.env.user.has_group('dac_erp.group_dac_erp_design')
+                and not self.env.user.has_group('base.group_system')
+                and not self.env.user.has_group('dac_erp.group_dac_erp_manager')
+                and not self.env.user.has_group('dac_erp.group_dac_erp_sale')
+            ),
+            'design_review_message': (
+                _('Bản vẽ đã duyệt') if order.design_done
+                else _('Bản vẽ đang chờ duyệt')
+            ),
         })
         return values
 
     def action_confirm_handover(self):
         self.ensure_one()
+        can_approve = (
+            self.env.user.has_group('base.group_system')
+            or self.env.user.has_group('dac_erp.group_dac_erp_manager')
+            or self.env.user.has_group('dac_erp.group_dac_erp_sale')
+        )
+        if not can_approve:
+            raise UserError(_('Người thiết kế không thể tự duyệt và bàn giao thiết kế.'))
         order = self.env['sale.order'].browse(self.env.context.get('active_id')).exists()
         if not order:
             raise UserError(_('Không tìm thấy đơn hàng.'))

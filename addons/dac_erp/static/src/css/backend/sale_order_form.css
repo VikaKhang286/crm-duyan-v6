@@ -1250,6 +1250,8 @@
   border-left: 0 !important;
   overflow: visible !important;
   position: relative;
+  padding: 0 !important;
+  background: transparent !important;
 }
 .dac-sale-form .dac-box-document > .dac-box-tasks .o_kanban_record:has(.dac-task-state-menu .dropdown-menu.show) {
   z-index: 1060;
@@ -1271,7 +1273,7 @@
   background: #fffdf4 !important;
 }
 .dac-sale-form .dac-box-document .dac-task-card-inner.dac-task-state-done {
-  border-left-color: #28a76b;
+  border-left-color: #28a76b !important;
   background: #fafbfc !important;
 }
 .dac-sale-form .dac-box-document .dac-task-card-header { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
@@ -1283,6 +1285,80 @@
 .dac-sale-form .dac-box-document .dac-task-state-menu .dropdown-item { border-radius: 6px; font-size: 11px; font-weight: 700; }
 .dac-sale-form .dac-box-document .dac-task-production-meta { display: flex; flex-wrap: wrap; gap: 5px 18px; margin-top: 12px; color: #758195; font-size: 10px; }
 .dac-sale-form .dac-box-document .dac-task-production-meta b { color: #647085; font-weight: 750; }
+
+.dac-sale-form .dac-design-role-label {
+  margin-left: auto;
+  color: #667085;
+  font-size: 13px;
+  font-weight: 500;
+}
+.dac-sale-form .dac-box-document .dac-design-my-tasks .o_kanban_renderer.o_kanban_ungrouped {
+  max-height: none;
+  gap: 16px;
+}
+.dac-sale-form .dac-box-document .dac-design-my-tasks .o_kanban_record.o_kanban_ghost {
+  display: none !important;
+}
+.dac-sale-form .dac-box-document .dac-design-task-card {
+  padding: 16px !important;
+  border: 1px solid #dfe5ed !important;
+  border-left: 4px solid #e1b51a !important;
+  border-radius: 12px !important;
+  background: #f8fafc !important;
+}
+.dac-sale-form .dac-box-document .dac-design-task-card .dac-task-name {
+  font-size: 15px;
+}
+.dac-sale-form .dac-box-document .dac-design-task-card .o_field_selection select {
+  min-width: 120px;
+  min-height: 29px;
+  padding: 4px 6px;
+  border: 1px solid #dbe2eb;
+  border-radius: 5px;
+  background: #fff;
+  font-size: 12px;
+}
+.dac-sale-form .dac-design-task-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+  color: #8c96a3;
+}
+.dac-sale-form .dac-design-task-meta > span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+.dac-sale-form .dac-design-task-meta small {
+  color: #929dad;
+  font-size: 13px;
+}
+.dac-sale-form .dac-design-task-meta b {
+  overflow: hidden;
+  color: #374151;
+  font-size: 14px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dac-sale-form .dac-v6-task-description-btn {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0px 14px !important;
+  border-color: #dbe2eb !important;
+  border-radius: 9px !important;
+  background: #fff !important;
+  color: #596579 !important;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+@media (max-width: 700px) {
+  .dac-sale-form .dac-design-task-meta { grid-template-columns: 1fr; }
+}
 
 .dac-sale-form .o-chatter-group > .container-fluid:empty,
 .dac-sale-form .o-chatter-group > .container-fluid > .col-12:empty {

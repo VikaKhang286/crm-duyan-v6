@@ -116,4 +116,5 @@ access_dac_workflow_review_rollback_wizard_user,dac.workflow.review.rollback.wiz
 access_dac_design_revision_manager,dac.design.revision manager,model_dac_design_revision,group_dac_erp_manager,1,1,1,0
 access_dac_design_revision_sale,dac.design.revision sale,model_dac_design_revision,group_dac_erp_sale,1,1,1,0
 access_dac_design_revision_design,dac.design.revision design,model_dac_design_revision,group_dac_erp_design,1,1,1,0
+access_dac_design_revision_production,dac.design.revision production,model_dac_design_revision,group_dac_erp_production,1,0,0,0
 access_dac_design_revision_system,dac.design.revision system,model_dac_design_revision,base.group_system,1,1,1,1

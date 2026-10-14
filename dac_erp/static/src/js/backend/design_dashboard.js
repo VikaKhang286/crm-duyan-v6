@@ -17,6 +17,7 @@ class DesignDashboard extends Component {
   setup() {
     this.orm = useService("orm");
     this.action = useService("action");
+    this.menu = useService("menu");
     this.quickSale = useService("dac_quick_sale");
     this.notification = useService("notification");
     this.state = useState({ loading: true, data: null, error: null, filter: null });
@@ -31,6 +32,12 @@ class DesignDashboard extends Component {
     this._restoreViewportTweaks = this._restoreViewportTweaks.bind(this);
 
     onMounted(() => {
+      if (!this.menu.getCurrentApp()) {
+        const designMenu = this.menu
+          .getAll()
+          .find((menu) => menu.xmlid === "dac_report.menu_dashboards_manage_design");
+        if (designMenu) this.menu.setCurrentMenu(designMenu);
+      }
       document.body.classList.add("dac-dashboard-open", "dac-compact");
       const act =
         this.el?.closest?.(".o_action") || document.querySelector(".o_action");
