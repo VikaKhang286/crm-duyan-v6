@@ -16,6 +16,7 @@ class DacSaleDashboard extends Component {
     this.orm = useService("orm");
     this.action = useService("action");
     this.notification = useService("notification");
+    this.quickSale = useService("dac_quick_sale");
     this.state = useState({ loading: true, data: null, error: null, period: 'month' });
 
     onWillStart(async () => {
@@ -303,6 +304,7 @@ class DacSaleDashboard extends Component {
   // Mở record bất kỳ (method generic)
   async openRecord(model, resId, ev) {
     if (ev) ev.stopPropagation();
+    if (model === "sale.order") return this.quickSale.open(resId);
     return this.action.doAction({
       type: "ir.actions.act_window",
       res_model: model,
@@ -356,6 +358,7 @@ class DacSaleDashboard extends Component {
   }
 
   openForm(model, id) {
+    if (model === "sale.order") return this.quickSale.open(id);
     return this.action.doAction({
       type: "ir.actions.act_window",
       res_model: model,

@@ -15,6 +15,54 @@ def _first_line(html_or_text):
 class SaleOrder(models.Model):
     _inherit = "sale.order"
 
+    @api.model
+    def dac_get_quick_sale(self, order_id):
+        """Small, permission-aware payload for the global order quick view."""
+        order = self.browse(int(order_id)).exists()
+        if not order:
+            return False
+        order.check_access('read')
+        today = fields.Date.context_today(self)
+        deadline = order.production_deadline or order.design_deadline
+        tasks = order.task_ids.filtered(lambda task: task.state != 'cancelled').sorted(
+            key=lambda task: (task.state == 'done', task.deadline or fields.Datetime.to_datetime('9999-12-31 00:00:00'))
+        )
+        state_labels = dict(order._fields['order_state_custom'].selection)
+        task_state_labels = dict(self.env['dac.work.task']._fields['state'].selection)
+
+        def _task_payload(task):
+            return {
+                'id': task.id,
+                'name': task.name or '',
+                'state': task.state,
+                'state_label': task_state_labels.get(task.state, task.state or ''),
+                'assignee': task.assigned_user_id.name or '',
+                'deadline': fields.Datetime.context_timestamp(self, task.deadline).strftime('%d/%m/%Y') if task.deadline else False,
+                'is_overdue': bool(task.deadline and task.deadline < fields.Datetime.now() and task.state != 'done'),
+            }
+
+        return {
+            'id': order.id,
+            'number': order.order_number or order.name or '',
+            'title': order.order_title or '',
+            'partner_name': order.partner_id.name or '',
+            'phone': order.phone or order.partner_id.phone or '',
+            'amount_total': order.amount_total,
+            'paid_amount': order.deposit_paid_display,
+            'remaining_amount': order.remaining_amount_display,
+            'currency_symbol': order.currency_id.symbol or '₫',
+            'state': order.order_state_custom or 'quotation',
+            'state_label': state_labels.get(order.order_state_custom, ''),
+            'sale_name': order.user_id.name or '',
+            'design_name': order.user_id_design.name or '',
+            'production_name': order.user_id_production.name or '',
+            'deadline': deadline.strftime('%d/%m/%Y') if deadline else False,
+            'is_overdue': bool(deadline and deadline < today),
+            'conversation_id': order.conversation_id.id if order.conversation_id else False,
+            'tasks': [_task_payload(task) for task in tasks[:5]],
+            'task_count': len(tasks),
+        }
+
     def _get_partner_vip_class(self, partner):
         if not partner or not partner.pancake_tag_ids:
             return ''

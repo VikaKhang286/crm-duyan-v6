@@ -15,6 +15,7 @@ export class ManagerDashboard extends Component {
   setup() {
     this.orm = useService("orm");
     this.action = useService("action");
+    this.quickSale = useService("dac_quick_sale");
 
     this.state = useState({
       // Dữ liệu dashboard
@@ -608,13 +609,7 @@ export class ManagerDashboard extends Component {
    * Mở form đơn hàng
    */
   async openOrder(orderId) {
-    this.action.doAction({
-      type: "ir.actions.act_window",
-      res_model: "sale.order",
-      res_id: orderId,
-      views: [[false, "form"]],
-      target: "current",
-    });
+    return this.quickSale.open(orderId);
   }
 
   /**

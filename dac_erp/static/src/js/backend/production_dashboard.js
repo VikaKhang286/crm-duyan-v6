@@ -19,6 +19,7 @@ class ProductionDashboard extends Component {
   setup() {
     this.orm = useService("orm");
     this.action = useService("action");
+    this.quickSale = useService("dac_quick_sale");
     this.notification = useService("notification");
     this.state = useState({ loading: true, data: null, error: null, filter: null });
     this.designScrollRef = useRef("designScroll");
@@ -174,13 +175,7 @@ class ProductionDashboard extends Component {
 
   async openOrder(order) {
     if (!order?.id) return;
-    await this.action.doAction({
-      type: "ir.actions.act_window",
-      res_model: "sale.order",
-      res_id: order.id,
-      target: "current",
-      views: [[false, "form"]],
-    });
+    await this.quickSale.open(order.id);
   }
 
   async openProductionOrders() {
@@ -227,13 +222,7 @@ class ProductionDashboard extends Component {
   async openTaskOrOrder(task) {
     if (!task || !task.id) return;
     if (task.order_id) {
-      await this.action.doAction({
-        type: "ir.actions.act_window",
-        res_model: "sale.order",
-        res_id: task.order_id,
-        target: "current",
-        views: [[false, "form"]],
-      });
+      await this.quickSale.open(task.order_id);
     } else {
       await this.action.doAction({
         type: "ir.actions.act_window",

@@ -45,6 +45,7 @@ export class CartOrdersListController extends ListController {
         super.setup();
         this.orm = useService("orm");
         this.action = useService("action");
+        this.quickSale = useService("dac_quick_sale");
         this.cartStats = null;
         this.cartToolbarFilterGroupIds = { search: null, stage: null, sale: null };
         this.cartSearchTimer = null;
@@ -52,10 +53,34 @@ export class CartOrdersListController extends ListController {
         this.cartKanbanRequest = 0;
         onMounted(async () => {
             this.mountCartOrdersHero();
+            this.bindQuickSaleRows();
             await this.loadCartStats();
         });
-        onPatched(() => this.mountCartOrdersHero());
+        onPatched(() => {
+            this.mountCartOrdersHero();
+            this.bindQuickSaleRows();
+        });
         onWillUnmount(() => this.removeCartOrdersHero());
+    }
+
+    openRecord(record) {
+        return this.quickSale.open(record.resId);
+    }
+
+    bindQuickSaleRows() {
+        const rows = this.rootRef?.el?.querySelectorAll(".o_list_table tbody tr.o_data_row") || [];
+        const records = this.model?.root?.records || [];
+        rows.forEach((row, index) => {
+            if (row.dataset.quickSaleBound || !records[index]?.resId) return;
+            row.dataset.quickSaleBound = "true";
+            row.classList.add("dac-quick-sale-row");
+            row.addEventListener("click", (event) => {
+                if (event.target.closest("a,button,input,select,textarea,.o-checkbox,.o_field_x2many")) return;
+                event.preventDefault();
+                event.stopPropagation();
+                this.quickSale.open(records[index].resId);
+            }, true);
+        });
     }
 
     getCartStats() {
@@ -291,13 +316,7 @@ export class CartOrdersListController extends ListController {
                     line.textContent = text;
                     card.append(line);
                 }
-                card.addEventListener("click", () => this.action.doAction({
-                    type: "ir.actions.act_window",
-                    res_model: "sale.order",
-                    res_id: record.id,
-                    views: [[false, "form"]],
-                    target: "current",
-                }));
+                card.addEventListener("click", () => this.quickSale.open(record.id));
                 column.append(card);
             }
             board.append(column);

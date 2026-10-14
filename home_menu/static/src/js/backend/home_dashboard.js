@@ -23,6 +23,10 @@ function many2oneName(value) {
     return value?.display_name || value?.name || value?.[1] || "—";
 }
 
+function many2oneId(value) {
+    return value?.id || value?.[0] || false;
+}
+
 function initials(name) {
     return name.split(/\s+/).filter(Boolean).slice(-2).map((part) => part[0]).join("").toUpperCase() || "DA";
 }
@@ -32,6 +36,7 @@ patch(FormController.prototype, {
         super.setup(...arguments);
         this.dacHomeOrm = useService("orm");
         this.dacHomeAction = useService("action");
+        this.dacQuickSale = useService("dac_quick_sale");
         this.dacHomeLoaded = false;
         onMounted(() => this.mountDacHomeDashboard());
         onPatched(() => this.mountDacHomeDashboard());
@@ -93,12 +98,14 @@ patch(FormController.prototype, {
                     title: `${many2oneName(item.assigned_user_id)} cập nhật task`,
                     detail: `${item.name}${item.order_id ? ` · ${many2oneName(item.order_id)}` : ""}`,
                     person: many2oneName(item.assigned_user_id),
+                    orderId: many2oneId(item.order_id),
                 })),
                 ...recentOrders.map((item) => ({
                     date: item.write_date,
                     title: `${many2oneName(item.user_id)} cập nhật đơn ${item.order_number || item.name}`,
                     detail: `${many2oneName(item.partner_id)} · ${new Intl.NumberFormat("vi-VN").format(item.amount_total || 0)}đ`,
                     person: many2oneName(item.user_id),
+                    orderId: item.id,
                 })),
             ].sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 3);
             this.renderDacActivities(dashboard, activities, now);
@@ -142,6 +149,15 @@ patch(FormController.prototype, {
         for (const activity of activities) {
             const row = document.createElement("div");
             row.className = "dac-home-activity-row";
+            if (activity.orderId) {
+                row.classList.add("is-clickable");
+                row.setAttribute("role", "button");
+                row.tabIndex = 0;
+                row.addEventListener("click", () => this.dacQuickSale.open(activity.orderId));
+                row.addEventListener("keydown", (event) => {
+                    if (event.key === "Enter" || event.key === " ") this.dacQuickSale.open(activity.orderId);
+                });
+            }
             const avatar = document.createElement("span");
             avatar.textContent = initials(activity.person);
             const copy = document.createElement("div");
