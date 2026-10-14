@@ -33,7 +33,7 @@
               <div class="dac-y-axis"><span t-foreach="revenueAxisLabels" t-as="label" t-key="label"><t t-esc="formatCompact(label)"/></span></div>
               <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-label="Biểu đồ doanh thu">
                 <defs><linearGradient id="dacRevenueArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#ffbd12" stop-opacity=".2"/><stop offset="100%" stop-color="#ffbd12" stop-opacity="0"/></linearGradient></defs>
-                <path class="revenue-area" t-att-d="chartPath('revenue', true)"/>
+                <path class="revenue-area" style="fill: url(#dacRevenueArea); stroke: none" t-att-d="chartPath('revenue', true)"/>
                 <path class="target-line" t-att-d="chartPath('target')"/>
                 <path class="actual-line" t-att-d="chartPath('revenue')"/>
               </svg>
