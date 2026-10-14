@@ -58,6 +58,7 @@
         'views/pancake_status_visual_views.xml',
         'views/pancake_message_sync_job_views.xml',
         'views/pancake_staff_mapping_views.xml',
+        'views/pancake_monitoring_dashboard_views.xml',
         'views/menuitem.xml',
     ],
 
@@ -77,6 +78,9 @@
             'CRM_DAC/static/src/xml/backend/pancake_many2one_field.xml',
             'CRM_DAC/static/src/js/backend/create_order_list_view.js',
             'CRM_DAC/static/src/xml/backend/create_order_list_view.xml',
+            'CRM_DAC/static/src/js/backend/pancake_monitoring_dashboard.js',
+            'CRM_DAC/static/src/xml/backend/pancake_monitoring_dashboard.xml',
+            'CRM_DAC/static/src/scss/backend/pancake_monitoring_dashboard.scss',
         ],
     },
     'license': 'LGPL-3',

@@ -27,6 +27,13 @@ function formatCurrency(value) {
     }).format(amount)} ₫`;
 }
 
+function formatDate(value) {
+    if (!value) return "—";
+    if (value.toFormat) return value.toFormat("dd/MM/yyyy");
+    const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    return match ? `${match[3]}/${match[2]}/${match[1]}` : String(value);
+}
+
 /**
  * A light presentation layer around the native Odoo list.  The standard
  * control panel and table remain in charge of searching, sorting, filtering
@@ -37,10 +44,12 @@ export class CartOrdersListController extends ListController {
     setup() {
         super.setup();
         this.orm = useService("orm");
+        this.action = useService("action");
         this.cartStats = null;
         this.cartToolbarFilterGroupIds = { search: null, stage: null, sale: null };
         this.cartSearchTimer = null;
         this.cartViewMode = "list";
+        this.cartKanbanRequest = 0;
         onMounted(async () => {
             this.mountCartOrdersHero();
             await this.loadCartStats();
@@ -116,10 +125,10 @@ export class CartOrdersListController extends ListController {
                     </div>
                 </div>
                 <div class="dac-cart-orders-stats">
-                    <article><span class="dac-cart-stat-icon dac-cart-stat-icon--blue"><i class="fa fa-list-ul"></i></span><div><small>Tất cả đơn</small><strong data-stat="total">0</strong></div></article>
-                    <article><span class="dac-cart-stat-icon dac-cart-stat-icon--yellow"><i class="fa fa-clock-o"></i></span><div><small>Đang hoạt động</small><strong data-stat="active">0</strong></div></article>
-                    <article><span class="dac-cart-stat-icon dac-cart-stat-icon--red"><i class="fa fa-exclamation-triangle"></i></span><div><small>Quá hạn</small><strong data-stat="overdue">0</strong></div></article>
-                    <article><span class="dac-cart-stat-icon dac-cart-stat-icon--purple"><i class="fa fa-money"></i></span><div><small>Tổng công nợ</small><strong data-stat="outstanding">0 ₫</strong></div></article>
+                    <article><div><small>Tất cả đơn</small><strong data-stat="total">0</strong></div></article>
+                    <article><div><small>Đang hoạt động</small><strong data-stat="active">0</strong></div></article>
+                    <article><div><small>Quá hạn</small><strong data-stat="overdue" class="overdue">0</strong></div></article>
+                    <article><div><small>Tổng công nợ</small><strong data-stat="outstanding">0 ₫</strong></div></article>
                 </div>`;
             const controlPanel = root.querySelector(".o_control_panel");
             if (controlPanel) {
@@ -164,7 +173,7 @@ export class CartOrdersListController extends ListController {
                         <option value="completed">Hoàn thành</option>
                     </select>
                     <select class="dac-cart-sale-select" aria-label="Sale"><option value="">Tất cả Sale</option></select>
-                    <button type="button" class="dac-cart-toolbar-filter"><i class="fa fa-sliders"></i> Bộ lọc</button>
+                    <button type="button" class="dac-cart-toolbar-filter">Bộ lọc</button>
                 </div>
                 <div class="dac-cart-view-toggle" aria-label="Kiểu hiển thị">
                     <button type="button" class="active">Danh sách</button>
@@ -211,7 +220,7 @@ export class CartOrdersListController extends ListController {
         this.renderCartKanban(this.rootRef?.el);
     }
 
-    renderCartKanban(root) {
+    async renderCartKanban(root) {
         if (!root) return;
         const renderer = root.querySelector(".o_list_renderer");
         const toolbar = root.querySelector(`.${TOOLBAR_CLASS}`);
@@ -228,10 +237,28 @@ export class CartOrdersListController extends ListController {
         board?.remove();
         board = document.createElement("div");
         board.className = KANBAN_CLASS;
-        const records = this.model?.root?.records || [];
+        // `root.records` only contains the current pager page.  Fetch against
+        // the list's effective domain so Kanban counts/cards stay identical to
+        // the list view and to the stage/sale filters.
+        const request = ++this.cartKanbanRequest;
+        let records;
+        try {
+            records = await this.orm.searchRead(
+                "sale.order",
+                this.model?.root?.domain || [["order_type", "=", "cart"]],
+                ["cart_order_code", "name", "partner_id", "user_id", "production_deadline", "amount_total", "order_state_custom"],
+                { limit: 2000 }
+            );
+        } catch (error) {
+            console.warn("Unable to load cart Kanban records", error);
+            records = (this.model?.root?.records || []).map((record) => ({ id: record.resId, ...record.data }));
+        }
+        if (request !== this.cartKanbanRequest || this.cartViewMode !== "kanban") {
+            return;
+        }
         for (const [stage, label] of KANBAN_STAGES) {
             const stageRecords = records.filter((record) => {
-                const value = record.data.order_state_custom;
+                const value = record.order_state_custom;
                 return value === stage || (stage === "delivery" && value === "installation");
             });
             const column = document.createElement("section");
@@ -247,16 +274,16 @@ export class CartOrdersListController extends ListController {
                 const card = document.createElement("button");
                 card.type = "button";
                 card.className = "dac-cart-kanban-card";
-                const partner = record.data.partner_id;
-                const sale = record.data.user_id;
-                const deadline = record.data.production_deadline;
+                const partner = record.partner_id;
+                const sale = record.user_id;
+                const deadline = record.production_deadline;
                 const partnerName = partner?.display_name || partner?.name || partner?.[1] || "—";
                 const saleName = sale?.display_name || sale?.name || sale?.[1] || "—";
-                const dateText = deadline?.toFormat ? deadline.toFormat("dd/MM/yyyy") : (deadline ? String(deadline) : "—");
+                const dateText = formatDate(deadline);
                 for (const [className, text] of [
-                    ["dac-cart-kanban-code", record.data.cart_order_code || record.data.name || "—"],
+                    ["dac-cart-kanban-code", record.cart_order_code || record.name || "—"],
                     ["dac-cart-kanban-customer", partnerName],
-                    ["dac-cart-kanban-total", formatCurrency(record.data.amount_total)],
+                    ["dac-cart-kanban-total", formatCurrency(record.amount_total)],
                     ["dac-cart-kanban-meta", `${dateText} · ${saleName}`],
                 ]) {
                     const line = document.createElement("span");
@@ -264,7 +291,13 @@ export class CartOrdersListController extends ListController {
                     line.textContent = text;
                     card.append(line);
                 }
-                card.addEventListener("click", () => this.openRecord(record));
+                card.addEventListener("click", () => this.action.doAction({
+                    type: "ir.actions.act_window",
+                    res_model: "sale.order",
+                    res_id: record.id,
+                    views: [[false, "form"]],
+                    target: "current",
+                }));
                 column.append(card);
             }
             board.append(column);

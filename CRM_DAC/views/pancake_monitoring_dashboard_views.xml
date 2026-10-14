@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data>
+    <record id="action_pancake_monitoring_dashboard" model="ir.actions.client">
+      <field name="name">Monitoring &amp; Đồng bộ Pancake</field>
+      <field name="tag">pancake_monitoring_dashboard</field>
+      <field name="target">current</field>
+    </record>
+  </data>
+</odoo>

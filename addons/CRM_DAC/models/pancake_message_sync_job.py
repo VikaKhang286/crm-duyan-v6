@@ -757,6 +757,141 @@ class PancakeMessageSyncJob(models.Model):
                 _logger.exception("Pancake API queue job failed: %s", exc)
                 job._mark_failed(f'Job lỗi: {exc}')
 
+    @api.model
+    def get_monitoring_dashboard_data(self):
+        """Return operational metrics for the Pancake monitoring dashboard."""
+        if not (
+            self.env.user.has_group('dac_erp.group_dac_erp_manager')
+            or self.env.user.has_group('base.group_system')
+        ):
+            raise UserError(_('Bạn không có quyền xem monitoring Pancake.'))
+
+        now = fields.Datetime.now()
+        day_start = fields.Datetime.start_of(now, 'day')
+        since_24h = now - timedelta(hours=24)
+        Page = self.env['page.fm.page'].sudo()
+        Conversation = self.env['page.fm.conversation'].sudo()
+        Log = self.env['pancake.message.sync.log'].sudo()
+        Task = self.env['pancake.message.sync.task'].sudo()
+
+        page_count = Page.search_count([])
+        active_page_count = Page.search_count([('active', '=', True)])
+        conversation_count = Conversation.search_count([])
+        conversations_today = Conversation.search_count([('create_date', '>=', day_start)])
+
+        logs_today = Log.search([('logged_at', '>=', day_start)])
+        success_today = len(logs_today.filtered(lambda log: log.level == 'success'))
+        error_today = len(logs_today.filtered(lambda log: log.level == 'error'))
+        processed_today = len(logs_today)
+        success_rate = round((processed_today - error_today) / processed_today * 100, 2) if processed_today else 100.0
+
+        latest_job = self.sudo().search([], order='id desc', limit=1)
+        latest_success = Log.search(
+            [('level', '=', 'success'), ('logged_at', '>=', since_24h)],
+            order='logged_at desc',
+            limit=1,
+        )
+        pending_count = Task.search_count([('state', 'in', ['pending', 'retry'])])
+        completed_tasks_24h = Task.search([
+            ('state', '=', 'done'),
+            ('finished_at', '>=', since_24h),
+            ('duration_ms', '>', 0),
+        ])
+        average_processing_ms = round(
+            sum(completed_tasks_24h.mapped('duration_ms')) / len(completed_tasks_24h)
+        ) if completed_tasks_24h else 0
+        recent_logs = Log.search([], order='logged_at desc, id desc', limit=8)
+
+        unassigned_count = Conversation.search_count([('owner_id', '=', False)])
+        unsynced_count = Conversation.search_count([('last_message_sync_fm', '=', False)])
+        self.env.cr.execute("""
+            SELECT COALESCE(SUM(duplicate_count), 0)
+              FROM (
+                    SELECT COUNT(*) AS duplicate_count
+                      FROM res_partner
+                     WHERE active = TRUE
+                       AND phone_normalized IS NOT NULL
+                       AND phone_normalized != ''
+                  GROUP BY phone_normalized
+                    HAVING COUNT(*) > 1
+                   ) AS duplicate_phones
+        """)
+        duplicate_customer_count = self.env.cr.fetchone()[0] or 0
+        stale_cutoff = now - timedelta(hours=1)
+        active_pages = Page.search([('active', '=', True)])
+        stale_pages = active_pages.filtered(
+            lambda page: not page.last_message_sync_at or page.last_message_sync_at < stale_cutoff
+        )
+        stale_page_count = len(stale_pages)
+        stale_page = min(
+            stale_pages,
+            key=lambda page: page.last_message_sync_at or fields.Datetime.from_string('1970-01-01 00:00:00'),
+            default=Page.browse(),
+        )
+        stale_page_minutes = round(
+            (now - stale_page.last_message_sync_at).total_seconds() / 60
+        ) if stale_page and stale_page.last_message_sync_at else 0
+        quality_issue_count = sum(bool(count) for count in (
+            duplicate_customer_count,
+            unassigned_count,
+            stale_page_count,
+        ))
+
+        job_data = {
+            'id': latest_job.id or False,
+            'name': latest_job.name or _('Chưa có job đồng bộ'),
+            'state': latest_job.state or 'idle',
+            'state_label': latest_job._selection_label('state', latest_job.state) if latest_job else _('Chưa chạy'),
+            'progress': latest_job.progress_percent if latest_job else 0,
+            'completed': latest_job.completed_task_count if latest_job else 0,
+            'total': (
+                latest_job.completed_task_count
+                + latest_job.pending_task_count
+                + latest_job.running_task_count
+                + latest_job.failed_task_count
+            ) if latest_job else 0,
+            'failed': latest_job.failed_task_count if latest_job else 0,
+            'pending': latest_job.pending_task_count if latest_job else 0,
+            'phase': latest_job._selection_label('phase', latest_job.phase) if latest_job else _('Chưa chạy'),
+        }
+
+        return {
+            'pages': page_count,
+            'active_pages': active_page_count,
+            'conversations': conversation_count,
+            'conversations_today': conversations_today,
+            'processed_today': processed_today,
+            'success_today': success_today,
+            'success_rate': success_rate,
+            'errors': error_today,
+            'critical_errors': Log.search_count([
+                ('logged_at', '>=', day_start),
+                ('level', '=', 'error'),
+                ('event_code', 'in', ['job_failed', 'token_invalid']),
+            ]),
+            'job': job_data,
+            'last_successful_sync': fields.Datetime.to_string(latest_success.logged_at) if latest_success else False,
+            'queue_depth': pending_count,
+            'average_processing_ms': average_processing_ms,
+            'duplicate_customer_count': duplicate_customer_count,
+            'unassigned_conversation_count': unassigned_count,
+            'stale_page_name': stale_page.name if stale_page else _('Chưa có page'),
+            'stale_page_minutes': stale_page_minutes,
+            'quality_issue_count': quality_issue_count,
+            'circuit_healthy': not bool(latest_job and latest_job.state == 'failed'),
+            'recent_logs': [{
+                'id': log.id,
+                'time': fields.Datetime.to_string(log.logged_at),
+                'level': log.level,
+                'message': log.message or '',
+            } for log in recent_logs],
+            'quality': [
+                {'level': 'critical', 'title': _('Hội thoại chưa đồng bộ'), 'detail': _('%s hội thoại chưa có mốc đồng bộ') % unsynced_count, 'count': unsynced_count},
+                {'level': 'high', 'title': _('Thiếu người phụ trách'), 'detail': _('%s hội thoại chưa có người phụ trách') % unassigned_count, 'count': unassigned_count},
+                {'level': 'high', 'title': _('Page đồng bộ trễ'), 'detail': _('%s page chưa đồng bộ trong 1 giờ') % stale_page_count, 'count': stale_page_count},
+            ],
+        }
+
 
 class PancakeMessageSyncLog(models.Model):
     _name = 'pancake.message.sync.log'

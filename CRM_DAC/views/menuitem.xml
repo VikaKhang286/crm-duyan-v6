@@ -25,6 +25,13 @@
                   sequence="10"
                   groups="dac_erp.group_dac_erp_manager,base.group_system"/>
 
+        <menuitem id="menu_pancake_monitoring_dashboard"
+                  name="Monitoring Pancake"
+                  parent="menu_page_fm_sync_root"
+                  action="action_pancake_monitoring_dashboard"
+                  sequence="1"
+                  groups="dac_erp.group_dac_erp_manager,base.group_system"/>
+
         <!-- Đồng bộ liên tục (Rút gọn từ 2 menu trùng lặp thành 1 menu duy nhất) -->
         <menuitem id="menu_pancake_sync_dashboard"
                   name="Đồng bộ liên tục"

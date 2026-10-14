@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+  <t t-name="CRM_DAC.PancakeMonitoringDashboard">
+    <div class="pancake-monitoring-dashboard">
+      <div t-if="state.loading" class="pancake-monitoring-loading">
+        <i class="fa fa-spinner fa-spin fa-3x"/>
+        <p>Đang tải trạng thái Pancake...</p>
+      </div>
+      <main t-else="" class="o_dac_manager_dashboard">
+        <header class="pancake-monitoring-header">
+          <div>
+            <div class="pancake-monitoring-breadcrumb">DAC Cấu hình Hệ thống / Pancake</div>
+            <h1>Monitoring &amp; Đồng bộ Pancake</h1>
+            <p>Theo dõi page, hội thoại, job đồng bộ, lỗi và trạng thái vận hành.</p>
+          </div>
+          <div class="pancake-monitoring-actions">
+            <button t-on-click="openLogs">Mở log</button>
+            <button t-on-click="scanToday">Quét hôm nay</button>
+            <button class="primary" t-on-click="syncAll">Đồng bộ tất cả</button>
+          </div>
+        </header>
+
+        <section class="pancake-monitoring-kpis">
+          <article><span class="icon blue"><i class="fa fa-window-maximize"/></span><small>Page kết nối</small><strong><t t-esc="formatNumber(state.data.pages)"/></strong><p class="success"><t t-esc="state.data.active_pages"/>/<t t-esc="state.data.pages"/> hoạt động</p></article>
+          <article><span class="icon yellow"><i class="fa fa-comments-o"/></span><small>Hội thoại</small><strong><t t-esc="formatNumber(state.data.conversations)"/></strong><p>+<t t-esc="formatNumber(state.data.conversations_today)"/> hôm nay</p></article>
+          <article><span class="icon green"><i class="fa fa-refresh"/></span><small>Sync hôm nay</small><strong><t t-esc="formatNumber(state.data.processed_today)"/></strong><p class="success"><t t-esc="state.data.success_rate"/>% thành công</p></article>
+          <article><span class="icon red"><i class="fa fa-exclamation"/></span><small>Lỗi cần xử lý</small><strong><t t-esc="state.data.errors"/></strong><p class="danger"><t t-esc="state.data.critical_errors"/> critical</p></article>
+        </section>
+
+        <section class="pancake-monitoring-middle">
+          <article class="panel bulk-job">
+            <header><div><h2>Bulk Sync Job</h2><p><t t-esc="state.data.job.name"/> · <t t-esc="state.data.job.state_label"/></p></div><span class="progress-badge">● <t t-esc="Math.round(state.data.job.progress)"/>%</span></header>
+            <div class="panel-body"><div class="job-stats"><div><small>Hoàn tất</small><strong><t t-esc="formatNumber(state.data.job.completed)"/></strong></div><div><small>Tổng task</small><strong><t t-esc="formatNumber(state.data.job.total)"/></strong></div><div><small>Lỗi</small><strong class="danger"><t t-esc="state.data.job.failed"/></strong></div><div><small>Đang chờ</small><strong><t t-esc="state.data.job.pending"/></strong></div></div>
+            <div class="panel-group"><label>Tổng tiến độ</label>
+            <div class="progress">
+            <i t-att-style="'width:' + state.data.job.progress + '%'"/>
+            </div></div>
+            <div class="panel-group"><label>Phase hiện tại: <t t-esc="state.data.job.phase"/></label><div class="progress blue"><i t-att-style="'width:' + state.data.job.progress + '%'"/></div></div></div>
+          </article>
+          <article class="panel sync-health">
+            <header><div><h2>Sync Health</h2><p>Trạng thái 24 giờ gần nhất</p></div></header>
+            <div class="health-list">
+              <p>
+                <span>Last successful sync</span>
+                <strong><t t-esc="formatTime(state.data.last_successful_sync)"/></strong>
+              </p>
+              <p>
+                <span>Webhook success rate</span>
+                <strong><t t-esc="state.data.success_rate"/>%</strong>
+              </p>
+              <p>
+                <span>Circuit breaker</span>
+                <strong t-att-class="state.data.circuit_healthy ? 'healthy' : 'danger'">
+                  <t t-esc="state.data.circuit_healthy ? '● Healthy' : '● Attention'"/>
+                </strong>
+              </p>
+              <p>
+                <span>Queue depth</span>
+                <strong><t t-esc="formatNumber(state.data.queue_depth)"/></strong>
+              </p>
+              <p>
+                <span>Avg. processing</span>
+                <strong><t t-esc="formatNumber(state.data.average_processing_ms)"/> ms</strong>
+              </p>
+            </div>
+          </article>
+        </section>
+
+        <section class="pancake-monitoring-bottom">
+          <article class="panel live-console"><header><div><h2>Live console</h2><p>Log rút gọn từ worker</p></div><button t-on-click="openLogs">Mở log đầy đủ</button></header><div class="console"><t t-foreach="state.data.recent_logs" t-as="log" t-key="log.id"><p t-att-class="log.level"><time><t t-esc="formatTime(log.time)"/></time> <b><t t-esc="log.level.toUpperCase()"/></b> <span><t t-esc="log.message"/></span></p></t><p t-if="!state.data.recent_logs.length" class="muted">Chưa có log đồng bộ.</p></div></article>
+          <article class="panel data-quality">
+            <header>
+              <div>
+                <h2>Data Quality</h2>
+                <p>Các lỗi dữ liệu chưa xử lý</p>
+              </div>
+              <span class="quality-badge">
+                ● <t t-esc="state.data.quality_issue_count"/> lỗi
+              </span>
+            </header>
+            <div class="quality-list">
+              <div class="quality-row critical">
+                <i>!</i>
+                <span>
+                  <strong>Critical · Customer mapping conflict</strong>
+                  <small><t t-esc="state.data.duplicate_customer_count"/> khách trùng số điện thoại</small>
+                </span>
+                <b class="chevron">›</b>
+              </div>
+              <div class="quality-row high">
+                <i>!</i>
+                <span>
+                  <strong>High · Missing Sale assignment</strong>
+                  <small><t t-esc="state.data.unassigned_conversation_count"/> hội thoại chưa có người phụ trách</small>
+                </span>
+                <b class="chevron">›</b>
+              </div>
+              <div class="quality-row high">
+                <i>!</i>
+                <span>
+                  <strong>High · Stale sync cursor</strong>
+                  <small><t t-esc="state.data.stale_page_name"/> · <t t-esc="state.data.stale_page_minutes"/> phút</small>
+                </span>
+                <b class="chevron">›</b>
+              </div>
+            </div>
+          </article>
+        </section>
+      </main>
+    </div>
+  </t>
+</templates>

@@ -1,0 +1,59 @@
+.pancake-monitoring-dashboard { height: 100%; overflow: auto; background: #f5f7fb; color: #172033; }
+.pancake-monitoring-shell { min-height: 100%; padding: 26px 30px 36px; }
+.pancake-monitoring-loading { height: 100%; display: grid; place-content: center; text-align: center; color: #718096; }
+.pancake-monitoring-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 18px; }
+.pancake-monitoring-breadcrumb { color: #929cad; font-weight: 400; font-size: 12px; margin-bottom: 8px; }
+.pancake-monitoring-header h1 { margin: 0 0 8px; font-size: 24px; font-weight: 700; }
+.pancake-monitoring-header p { margin: 0; color: #657187; font-size: 14px; }
+.pancake-monitoring-actions { display: flex; gap: 10px; }
+.pancake-monitoring-actions button { height: 48px; border: 1px solid #e1e6ef; border-radius: 10px; padding: 0 18px; background: white; color: #596579; font-weight: 750; white-space: nowrap; }
+.pancake-monitoring-actions .primary { background: #f6b900; border-color: #f6b900; color: #302600; }
+.pancake-monitoring-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 14px; }
+.pancake-monitoring-kpis article, .pancake-monitoring-dashboard .panel { position: relative; background: white; border: 1px solid #e3e8f0; border-radius: 14px; }
+.pancake-monitoring-kpis article { padding: 16px; }
+.pancake-monitoring-kpis small { display: block; color: #7d8797; font-size: 14px; font-weight: 700; margin-bottom: 8px; }
+.pancake-monitoring-kpis strong { display: block; font-size: 28px; font-weight: 800; }
+.pancake-monitoring-kpis p { margin: 5px 0 0; color: #8b96aa; font-size: 12px; font-weight: 700; }
+.pancake-monitoring-dashboard .success { color: #18aa63 !important; }
+.pancake-monitoring-dashboard .danger { color: #ee4266 !important; }
+.pancake-monitoring-kpis .icon { position: absolute; right: 20px; top: 20px; width: 32px; height: 32px; display: grid; place-items: center; border-radius: 12px; }
+.pancake-monitoring-kpis .blue { background: #eaf3ff; color: #3983df; }
+.pancake-monitoring-kpis .yellow { background: #fff3d0; color: #a87900; }
+.pancake-monitoring-kpis .green { background: #e8f8f1; color: #18aa63; }
+.pancake-monitoring-kpis .red { background: #fff0f4; color: #ee4266; }
+.pancake-monitoring-middle, .pancake-monitoring-bottom { display: grid; grid-template-columns: 1.55fr 1fr; gap: 18px; margin-bottom: 18px; }
+.pancake-monitoring-bottom { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.pancake-monitoring-dashboard .panel > header { min-height: 76px; padding: 14px 16px; border-bottom: 1px solid #e8edf4; display: flex; justify-content: space-between; align-items: center; }
+.pancake-monitoring-dashboard .panel h2 { margin: 0 0 4px; font-size: 16px; font-weight: 700; }
+.pancake-monitoring-dashboard .panel header p { margin: 0; color: #657187; font-size: 12px; }
+.progress-badge { color: #3478df; background: #eaf3ff; padding: 5px 10px; border-radius: 16px; font-weight: 800; }
+.panel-body { padding: 16px; }
+.panel-body .panel-group { margin-top: 14px; }
+.job-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.job-stats div { background: #f8fafc; border: 1px solid #edf0f4; border-radius: 10px; padding: 14px; }
+.job-stats small { display: block; color: #8b96aa; }
+.job-stats strong { font-size: 22px; }
+.bulk-job > label { display: block; padding: 0 20px 7px; color: #718096; }
+.progress { height: 9px; margin: 7px 0 0; background: #eef0f4; border-radius: 999px; overflow: hidden; }
+.progress i { display: block; height: 100%; background: #f6b900; border-radius: inherit; }
+.progress.blue i { background: #3983df; }
+.health-list { padding: 16px; }
+.health-list p { display: flex; justify-content: space-between; padding: 10px 0; margin: 0; border-bottom: 1px solid #edf0f4; }
+.healthy { color: #16965b; background: #e9f8f1; padding: 3px 8px; border-radius: 14px; }
+.live-console header button { border: 0; background: transparent; color: #896300; font-weight: 800; }
+.console { margin: 18px; padding: 16px; min-height: 185px; border-radius: 12px; background: #111a2a; color: #d8e1ee; font-family: monospace; }
+.console p { margin: 0 0 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.console time { color: #64d99b; }
+.console .warning b { color: #ffc94b; }
+.console .error b { color: #ff6685; }
+.quality-list { padding: 14px 20px; }
+.quality-badge { color: #ee4266; background: #fff0f4; padding: 5px 10px; border-radius: 16px; }
+.quality-row { display: grid; grid-template-columns: 42px 1fr auto; align-items: center; gap: 12px; padding: 14px 0; border-bottom: 1px solid #edf0f4; }
+.quality-row > i { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 10px; background: #fff3d8; color: #eb9500; font-style: normal; font-weight: 900; }
+.quality-row.critical > i { background: #fff0f4; color: #ee4266; }
+.quality-row span strong, .quality-row span small { display: block; }
+.quality-row span small { color: #8490a3; margin-top: 3px; }
+.quality-row > b { color: #596579; }
+.quality-row > .chevron { color: #aeb7c5; }
+@media (max-width: 1100px) { .pancake-monitoring-kpis { grid-template-columns: repeat(2, 1fr); } .pancake-monitoring-middle, .pancake-monitoring-bottom { grid-template-columns: 1fr; } }
+@media (max-width: 700px) { .pancake-monitoring-shell { padding: 16px; } .pancake-monitoring-header { flex-direction: column; } .pancake-monitoring-actions { flex-wrap: wrap; } .pancake-monitoring-kpis { grid-template-columns: 1fr; } .job-stats { grid-template-columns: repeat(2, 1fr); } }
