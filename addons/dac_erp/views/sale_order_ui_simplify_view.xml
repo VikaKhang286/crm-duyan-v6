@@ -175,6 +175,12 @@
                                 <div class="dac-summary-row" invisible="deposit_paid_display == 0"><span class="dac-summary-label">Cọc / Đã thanh toán</span><span class="dac-summary-value dac-summary-value--deposit"><field name="deposit_paid_display" readonly="1" widget="monetary" nolabel="1"/></span></div>
                                 <div class="dac-summary-row dac-summary-row--remaining" invisible="order_state_custom in ['cancel', 'completed']"><span class="dac-summary-label dac-summary-label--highlight">Còn thanh toán</span><span class="dac-summary-value--highlight"><field name="remaining_amount_display" readonly="1" widget="monetary" nolabel="1"/></span></div>
                                 <div class="dac-summary-row dac-summary-row--remaining" invisible="order_state_custom != 'completed'"><span class="dac-summary-label dac-summary-label--highlight">Còn thanh toán</span><span class="dac-summary-value--highlight"><field name="outstanding_amount_display" readonly="1" widget="monetary" nolabel="1"/></span></div>
+                                <button name="action_open_deposit_payment"
+                                        string="Ghi nhận thanh toán"
+                                        type="object"
+                                        class="btn btn-outline-secondary dac-v6-record-payment-btn"
+                                        groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_full_stack,dac_erp.group_dac_erp_manager"
+                                        invisible="order_state_custom == 'cancel'"/>
                             </div>
                         </section>
                         <aside class="dac-v6-sticky-rail">
@@ -342,7 +348,7 @@
                 <xpath expr="//div[hasclass('dac-box-tasks')]/field[@name='task_ids']" position="replace">
                     <field name="design_task_display_ids" nolabel="1"
                            domain="[('assigned_user_id', '=', uid)]"
-                           invisible="workflow_review_state != 'deposit'"
+                           invisible="not is_design_user or workflow_review_state != 'deposit'"
                            groups="dac_erp.group_dac_erp_design">
                         <kanban create="false" delete="false" quick_create="false" limit="100" class="dac-design-my-tasks">
                             <field name="name"/>
@@ -372,7 +378,9 @@
                             </templates>
                         </kanban>
                     </field>
-                    <field name="design_task_display_ids" nolabel="1" invisible="workflow_review_state != 'deposit'" groups="!dac_erp.group_dac_erp_design">
+                    <field name="design_task_display_ids" nolabel="1"
+                           invisible="is_design_user or workflow_review_state != 'deposit'"
+                           groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager,dac_erp.group_dac_erp_production,base.group_system">
                         <kanban create="false" delete="false" quick_create="false" limit="100">
                             <field name="name"/>
                             <field name="priority"/>

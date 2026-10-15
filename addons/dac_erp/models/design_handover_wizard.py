@@ -174,8 +174,6 @@ class SaleOrderDesignPanel(models.Model):
 
     def action_open_deposit_payment(self):
         self.ensure_one()
-        if self.order_state_custom != 'deposit':
-            raise UserError(_('Chỉ ghi nhận cọc ở bước Thiết kế & Đặt cọc.'))
         return {
             'type': 'ir.actions.act_window',
             'name': _('Ghi nhận thanh toán'),

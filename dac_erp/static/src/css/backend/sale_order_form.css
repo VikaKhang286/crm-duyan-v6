@@ -1102,6 +1102,7 @@
 .dac-v6-description-toast { position: fixed; z-index: 1400; top: 22px; right: 24px; display: flex; align-items: center; gap: 9px; min-width: 150px; padding: 13px 18px; border: 1px solid #badcc8; border-radius: 12px; background: #f0fff5; box-shadow: 0 12px 35px rgba(15, 23, 42, .18); color: #217143; font-size: 15px; font-weight: 800; opacity: 0; transform: translateY(-12px); transition: opacity 180ms ease, transform 180ms ease; }
 .dac-v6-description-toast.show { opacity: 1; transform: translateY(0); }
 .dac-v6-description-toast i { font-size: 19px; }
+.dac-v6-description-toast--error { border-color: #f2b8b5; background: #fff3f2; color: #b42318; }
 
 .dac-v6-stage-context { margin-top: 14px; padding: 14px; border: 1px solid #e3e7ee; border-radius: 11px; background: #f8f9fb; }
 .dac-v6-delivery-stage-card { display: flex; min-height: 100%; flex-direction: column; margin-top: 14px; overflow: hidden; border: 1px solid #e3e7ee; border-radius: 11px; background: #fff; }
@@ -2433,6 +2434,25 @@
 .dac-summary-row--remaining .dac-summary-value--highlight .o_field_monetary,
 .dac-summary-row--remaining .dac-summary-value--highlight .o_field_monetary * {
   color: #ffc20e !important;
+}
+
+.dac-summary-container .dac-v6-record-payment-btn {
+  width: 100%;
+  min-height: 42px;
+  margin-top: 12px;
+  border-color: #dce3ec;
+  border-radius: 8px;
+  background: #fff;
+  color: #566174;
+  font-size: 1rem;
+  font-weight: 750;
+}
+
+.dac-summary-container .dac-v6-record-payment-btn:hover,
+.dac-summary-container .dac-v6-record-payment-btn:focus {
+  border-color: #c4ccda;
+  background: #f8fafc;
+  color: #344054;
 }
 
 .dac-alert {

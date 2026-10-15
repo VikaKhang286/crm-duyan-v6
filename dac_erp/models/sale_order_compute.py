@@ -535,10 +535,11 @@ class SaleOrderCompute(models.Model):
         is_design = user.has_group('dac_erp.group_dac_erp_design')
         is_production = user.has_group('dac_erp.group_dac_erp_production')
         is_sale = user.has_group('dac_erp.group_dac_erp_sale')
+        is_worker_only = (is_design or is_production) and not (is_sale or is_manager or is_admin)
 
         for rec in self:
             rec.is_admin_user = is_admin
             rec.is_manager_user = is_manager
-            rec.is_design_user = is_design
-            rec.is_production_user = is_production
+            rec.is_design_user = is_design and is_worker_only
+            rec.is_production_user = is_production and is_worker_only
             rec.is_sale_user = is_sale

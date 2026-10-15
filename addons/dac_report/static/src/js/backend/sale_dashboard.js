@@ -15,6 +15,7 @@ class DacSaleDashboard extends Component {
   setup() {
     this.orm = useService("orm");
     this.action = useService("action");
+    this.menu = useService("menu");
     this.notification = useService("notification");
     this.quickSale = useService("dac_quick_sale");
     this.state = useState({ loading: true, data: null, error: null, period: 'month' });
@@ -29,6 +30,12 @@ class DacSaleDashboard extends Component {
 
     // --- OWL hooks (thay cho mounted()/willUnmount())
     onMounted(() => {
+      if (!this.menu.getCurrentApp()) {
+        const saleDashboardMenu = this.menu
+          .getAll()
+          .find((menu) => menu.xmlid === "dac_report.dac_sale_dashboard_menu_root");
+        if (saleDashboardMenu) this.menu.setCurrentMenu(saleDashboardMenu);
+      }
       // gắn class để CSS match
       document.body.classList.add("dac-dashboard-open", "dac-compact");
       const act =

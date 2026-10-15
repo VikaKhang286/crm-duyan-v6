@@ -29,10 +29,7 @@ class SaleOrder(models.Model):
         )
         state_labels = dict(order._fields['order_state_custom'].selection)
         task_state_labels = dict(self.env['dac.work.task']._fields['state'].selection)
-        restrict_quick_actions = (
-            self.env.user.has_group('dac_erp.group_dac_erp_design')
-            or self.env.user.has_group('dac_erp.group_dac_erp_production')
-        )
+        restrict_quick_actions = self.env.user._dac_is_worker_only()
 
         def _task_payload(task):
             return {
