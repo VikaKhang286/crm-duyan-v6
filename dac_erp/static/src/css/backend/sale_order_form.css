@@ -1172,17 +1172,26 @@
 .dac-v6-description-tools > button, .dac-v6-upload { display: grid; min-height: 48px; place-items: center; padding: 0 20px; border: 1px solid #dce3ec; border-radius: 11px; background: #fff; color: #566174; font-size: 16px; font-weight: 750; cursor: pointer; }
 .dac-v6-description-tools > button { width: 50px; padding: 0; font-size: 20px; }
 .dac-v6-description-tools > span { margin-left: auto; color: #8a95a5; font-size: 14px; font-weight: 650; }
-.dac-v6-description-title { width: 100%; margin-bottom: 8px; padding: 12px 20px; border: 2px solid #f0b400; border-radius: 13px; outline: 0; font-size: 18px; font-weight: 800; }
+.dac-v6-description-title { display: none; }
 .dac-v6-description-editor { min-height: 240px; padding: 22px; border: 2px solid #f0b400; border-radius: 15px; outline: 5px solid #fff4c4; font-size: 20px; line-height: 1.55; white-space: pre-wrap; }
 .dac-v6-description-editor img { max-width: 220px; height: auto; margin: 8px; border-radius: 10px; vertical-align: middle; }
 .dac-v6-attachments-head { display: flex; align-items: center; justify-content: space-between; margin: 25px 0 12px; }
 .dac-v6-attachments-head h3 { margin: 0; font-size: 18px; font-weight: 850; }
 .dac-v6-attachments-head span { color: #8a95a5; font-size: 14px; font-weight: 650; }
 .dac-v6-description-gallery { display: flex; min-height: 90px; flex-wrap: wrap; gap: 12px; }
-.dac-v6-description-image { width: 180px; overflow: hidden; padding: 0 0 10px; border: 1px solid #dce3ec; border-radius: 11px; background: #fff; text-align: center; }
-.dac-v6-description-image img { display: block; width: 100%; height: 120px; object-fit: cover; }
-.dac-v6-description-image b, .dac-v6-description-image span { display: block; overflow: hidden; padding: 7px 8px 0; text-overflow: ellipsis; white-space: nowrap; }
-.dac-v6-description-image span { padding-top: 2px; color: #a47a00; }
+.dac-v6-description-image { width: 180px; overflow: hidden; padding: 0; border: 1px solid #dce3ec; border-radius: 11px; background: #fff; text-align: center; }
+.dac-v6-description-image-content { display: block; width: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
+.dac-v6-description-image-content img { display: block; width: 100%; height: 115px; object-fit: cover; background: #edf1f5; }
+.dac-v6-description-image-content b { display: block; overflow: hidden; margin: 7px 4px; font-size: 14px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.dac-v6-description-image > a { display: inline-block; margin: 0 0 9px; color: #967000 !important; font-size: 13px; text-decoration: underline; cursor: pointer; }
+.dac-v6-image-viewer-backdrop { position: fixed; z-index: 1100; inset: 0; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(17, 24, 39, .72); }
+.dac-v6-image-viewer { display: flex; width: min(96vw, 1400px); max-height: 94vh; flex-direction: column; overflow: hidden; border-radius: 22px; background: #fff; }
+.dac-v6-image-viewer > header, .dac-v6-image-viewer > footer { display: flex; align-items: center; justify-content: space-between; padding: 22px 28px; }
+.dac-v6-image-viewer h2 { margin: 0; font-size: 22px; font-weight: 800; }
+.dac-v6-image-viewer header button { width: 52px; height: 52px; border: 1px solid #dce3ec; border-radius: 14px; background: #fff; color: #596579; font-size: 34px; line-height: 1; }
+.dac-v6-image-viewer > main { display: flex; min-height: 0; flex: 1; align-items: center; justify-content: center; padding: 0 28px; overflow: auto; }
+.dac-v6-image-viewer > main img { display: block; max-width: 100%; max-height: calc(94vh - 180px); object-fit: contain; }
+.dac-v6-image-viewer footer a { padding: 12px 18px; border: 1px solid #dce3ec; border-radius: 10px; color: #596579 !important; font-size: 16px; font-weight: 750; text-decoration: underline; }
 .dac-v6-description-modal > footer { display: flex; align-items: center; justify-content: space-between; padding: 20px 32px; border-top: 1px solid #e1e6ed; }
 .dac-v6-save-state { color: #9aa4b3; font-weight: 700; }
 .dac-v6-description-modal footer div { display: flex; gap: 12px; }

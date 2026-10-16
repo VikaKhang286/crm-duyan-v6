@@ -689,6 +689,8 @@ class SaleOrder(models.Model):
                 vals['date'] = fields.Datetime.now()
             if vals.get('user_id_production') and not vals.get('production_assigned_date'):
                 vals['production_assigned_date'] = fields.Date.context_today(self)
+            if vals.get('user_id_design') and not vals.get('design_assigned_date'):
+                vals['design_assigned_date'] = fields.Date.context_today(self)
             if not vals.get('is_priority'):
                 vals['is_priority_today'] = False
             vals.setdefault('workflow_review_state', vals.get('order_state_custom', 'quotation'))
@@ -701,6 +703,10 @@ class SaleOrder(models.Model):
                 })
             if rec.user_id_production and rec.user_id_production in rec.production_group_ids:
                 rec.production_group_ids = [(3, rec.user_id_production.id)]
+            # Khi designer được chọn ngay trên đơn mới, write() chưa chạy nên
+            # phải chủ động tạo task để bên người được giao thấy tức thì.
+            if rec.user_id_design:
+                rec._sync_design_task()
         return records
 
     # Cho nút mở hội thoại
@@ -896,6 +902,7 @@ class SaleOrder(models.Model):
         string="Hình ảnh mẫu xe", attachment=True,
         help="Hình ảnh mẫu xe đẩy của khách hàng",
     )
+    cart_sample_image_filename = fields.Char(string="Tên ảnh mẫu xe")
     cart_design_approval_image = fields.Binary(
         string="Hình ảnh duyệt thiết kế", attachment=True,
         help="Hình ảnh thiết kế xe đẩy đã được khách duyệt",

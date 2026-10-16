@@ -30,17 +30,17 @@ class SaleOrderTask(models.Model):
         ], limit=1)
         dl = self.design_deadline
         deadline_dt = (str(dl) + ' 23:59:00') if dl else False
-        order_ref = self.order_number or self.name
         task_priority = self._get_design_task_priority()
         if existing:
             existing.with_context(dac_skip_order_sync=True).write({
+                'name': 'Thiết kế bản vẽ sản xuất',
                 'assigned_user_id': self.user_id_design.id,
                 'deadline': deadline_dt,
                 'priority': task_priority,
             })
         else:
             Task.with_context(dac_skip_order_sync=True).create({
-                'name': 'Thiết kế: ' + order_ref,
+                'name': 'Thiết kế bản vẽ sản xuất',
                 'task_type': 'design',
                 'order_id': self.id,
                 'assigned_user_id': self.user_id_design.id,

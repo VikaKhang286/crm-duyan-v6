@@ -169,13 +169,13 @@ class SaleOrder(models.Model):
         active_domain = [
             ('task_type', '=', 'design'),
             ('state', 'not in', ['done', 'cancelled']),
-            ('order_id.order_state_custom', '=', 'deposit'),
+            ('order_id.order_state_custom', 'in', ['quotation', 'deposit']),
         ]
         completed_domain = [
             ('task_type', '=', 'design'),
             ('state', '=', 'done'),
             ('write_date', '>=', fields.Datetime.to_string(month_start)),
-            ('order_id.order_state_custom', '=', 'deposit'),
+            ('order_id.order_state_custom', 'in', ['quotation', 'deposit']),
         ]
         if not user._dac_is_manager():
             active_domain.append(('assigned_user_id', '=', uid))
@@ -209,7 +209,7 @@ class SaleOrder(models.Model):
                 'description': _first_line(task.description),
             }
 
-        design_order_domain = [('order_state_custom', '=', 'deposit')]
+        design_order_domain = [('order_state_custom', 'in', ['quotation', 'deposit'])]
         if not user._dac_is_manager():
             design_order_domain.append(('user_id_design', '=', uid))
         design_orders = self.env['sale.order'].sudo().search(design_order_domain)
@@ -234,12 +234,19 @@ class SaleOrder(models.Model):
                 'order_number': order.order_number or order.name or False,
                 'order_title': order.order_title or False,
                 'partner_name': order.partner_id.name or '',
-                'priority': 'urgent' if order.is_priority_today else ('high' if order.is_priority else 'normal'),
+                # Cả hai cờ mới là mức cao nhất. Danh sách vẫn bao gồm mọi
+                # loại đơn; đơn chỉ bật "Trong ngày" không được tự nâng hạng.
+                'priority': (
+                    'urgent'
+                    if order.is_priority and order.is_priority_today
+                    else ('high' if order.is_priority else 'normal')
+                ),
                 'deadline_str': deadline.strftime('%d/%m/%Y') if deadline else False,
                 'is_overdue': is_overdue,
                 'days_left': days_left,
                 'description': _('còn %s task') % len(unfinished),
             })
+        # Thứ tự nhóm là tuyệt đối; deadline chỉ dùng để sắp trong cùng nhóm.
         priority_rank = {'urgent': 0, 'high': 1, 'normal': 2}
         priority_orders.sort(key=lambda item: (
             priority_rank.get(item['priority'], 2),

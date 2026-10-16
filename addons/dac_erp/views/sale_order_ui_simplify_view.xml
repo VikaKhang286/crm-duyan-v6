@@ -321,7 +321,6 @@
                         </span>
                         <span invisible="not is_design_user or workflow_review_state != 'deposit'">Task của tôi</span>
                         <small class="dac-design-role-label" invisible="not is_design_user or workflow_review_state != 'deposit'">Thiết kế</small>
-                        <button name="action_quick_create_task" type="object" string="+ Task" class="btn btn-sm btn-outline-primary py-0 px-2" invisible="workflow_review_state not in ['deposit', 'production'] or workflow_review_state != order_state_custom" groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager"/>
                     </h5>
                 </xpath>
                 <xpath expr="//div[hasclass('dac-box-document')]/group" position="attributes">
@@ -537,9 +536,7 @@
                         <div><field name="design_revision_display" nolabel="1" readonly="1"/> · <span invisible="not design_done">Thiết kế đã duyệt</span><span invisible="design_done">Thiết kế chờ duyệt</span></div>
                         <div>Cọc: <field name="deposit_paid_display" nolabel="1" readonly="1" widget="monetary"/></div>
                     </div>
-                    <div class="dac-v6-task-progress" invisible="workflow_review_state != 'deposit'">
-                        <field name="design_task_done_count" nolabel="1" readonly="1"/>/<field name="design_task_count" nolabel="1" readonly="1"/> task hoàn thành
-                    </div>
+                    
                     <xpath expr="//div[hasclass('dac-box-tasks')]" position="move"/>
                     <div class="dac-v6-design-next-step dac-v6-design-next-step--blocked" invisible="is_design_user or workflow_review_state != 'deposit' or design_tasks_complete">
                         <div><b>Bước tiếp theo: Sản xuất</b><span>Chưa thể chuyển: Thiết kế chưa hoàn tất (<field name="design_task_progress_percent" nolabel="1" readonly="1"/>%). Hoàn tất công việc thiết kế rồi bấm tiếp tục lại.</span></div>

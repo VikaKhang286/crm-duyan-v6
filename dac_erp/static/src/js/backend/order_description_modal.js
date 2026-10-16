@@ -1,8 +1,35 @@
 /** @odoo-module **/
 
 import { rpc } from "@web/core/network/rpc";
+import { FormController } from "@web/views/form/form_controller";
+import { patch } from "@web/core/utils/patch";
+import { onWillUnmount } from "@odoo/owl";
 
 const MODAL_ID = "dac-v6-order-description-modal";
+const SAVE_EVENT = "DAC-ORDER-DESCRIPTION:SAVE";
+
+patch(FormController.prototype, {
+    setup() {
+        super.setup();
+        if (this.props?.resModel !== "sale.order") return;
+
+        const saveDescription = async ({ detail }) => {
+            const root = this.model?.root;
+            if (!root || (detail.orderId && root.resId && Number(root.resId) !== Number(detail.orderId))) return;
+            detail.handled = true;
+            try {
+                await root.update(detail.values);
+                const saved = await this.save();
+                if (!saved) throw new Error("Odoo did not save the sale order");
+                detail.resolve();
+            } catch (error) {
+                detail.reject(error);
+            }
+        };
+        document.addEventListener(SAVE_EVENT, saveDescription);
+        onWillUnmount(() => document.removeEventListener(SAVE_EVENT, saveDescription));
+    },
+});
 
 function fieldInput(block, name) {
     const selector = `[name="${name}"] input, [name="${name}"] textarea, .o_field_widget[name="${name}"] input, .o_field_widget[name="${name}"] textarea`;
@@ -14,10 +41,11 @@ function fieldInput(block, name) {
 function isDescriptionReadOnly(block, titleInput, summaryInput) {
     const roleMarker = block.querySelector(".dac-v6-description-readonly-role");
     const roleIsReadOnly = roleMarker && !roleMarker.classList.contains("d-none") && !roleMarker.classList.contains("o_invisible_modifier");
+    if (roleMarker) return Boolean(roleIsReadOnly);
     const fieldIsReadOnly = [titleInput, summaryInput].some((input) =>
         input?.readOnly || input?.disabled || input?.closest(".o_readonly_modifier")
     );
-    return Boolean(roleIsReadOnly || fieldIsReadOnly);
+    return Boolean(fieldIsReadOnly);
 }
 
 function setOdooValue(input, value) {
@@ -36,14 +64,38 @@ function renderDescriptionPreview(block, title, summary, imageCount = 0) {
         preview.className = "dac-v6-description-preview";
         block.appendChild(preview);
     }
+    const readOnly = isDescriptionReadOnly(block, fieldInput(block, "order_title"), fieldInput(block, "order_summary"));
     preview.innerHTML = `
-      <div class="dac-v6-description-preview-head"><strong></strong><span>Soạn thảo</span></div>
+      <div class="dac-v6-description-preview-head"><strong></strong><span>${readOnly ? "Xem chi tiết" : "Soạn thảo"}</span></div>
       <p></p>
       <small></small>`;
     preview.querySelector("strong").textContent = title || "Mô tả đơn hàng";
     preview.querySelector("p").textContent = summary || "Chưa có mô tả. Bấm để bổ sung yêu cầu thiết kế.";
     preview.querySelector("small").textContent = `${imageCount} ảnh đính kèm`;
     block.dataset.descriptionImages = String(imageCount);
+}
+
+function openImageViewer(image) {
+    document.querySelector(".dac-v6-image-viewer-backdrop")?.remove();
+    const viewer = document.createElement("div");
+    viewer.className = "dac-v6-image-viewer-backdrop";
+    viewer.innerHTML = `
+      <section class="dac-v6-image-viewer" role="dialog" aria-modal="true" aria-label="Xem ảnh đính kèm">
+        <header><h2></h2><button type="button" aria-label="Đóng">×</button></header>
+        <main><img alt=""/></main>
+        <footer><a download>Tải ảnh</a></footer>
+      </section>`;
+    viewer.querySelector("h2").textContent = image.name || "Ảnh 1";
+    const previewImage = viewer.querySelector("img");
+    previewImage.src = image.src;
+    previewImage.alt = image.name || "Ảnh đính kèm";
+    const downloadLink = viewer.querySelector("a");
+    downloadLink.href = image.src;
+    downloadLink.download = image.name || "anh-dinh-kem";
+    const close = () => viewer.remove();
+    viewer.querySelector("button").addEventListener("click", close);
+    viewer.addEventListener("click", (event) => { if (event.target === viewer) close(); });
+    document.body.appendChild(viewer);
 }
 
 function showSavedToast() {
@@ -74,44 +126,63 @@ function showImageLimitError() {
 
 function initializePreviews(root = document) {
     root.querySelectorAll?.(".dac-v6-order-description").forEach((block) => {
-        if (block.querySelector(".dac-v6-description-preview")) return;
+        const previewExists = Boolean(block.querySelector(".dac-v6-description-preview"));
         const title = fieldInput(block, "order_title")?.value || "";
         const summary = fieldInput(block, "order_summary")?.value || "";
         const sampleImage = block.closest(".o_form_view")?.querySelector('.o_field_widget[name="cart_sample_image"] img');
         const hasImage = sampleImage?.src && !sampleImage.src.includes("placeholder");
-        renderDescriptionPreview(block, title, summary, hasImage ? 1 : 0);
-        const orderId = currentOrderId();
-        if (orderId) {
-            readStoredDescription(orderId).then((stored) => {
-                if (!stored || !block.isConnected) return;
-                renderDescriptionPreview(
-                    block,
-                    stored.order_title || "",
-                    stored.order_summary || stored.cart_design_description || "",
-                    stored.cart_sample_image ? 1 : 0,
-                );
-            });
+        if (!previewExists) {
+            renderDescriptionPreview(block, title, summary, hasImage ? 1 : 0);
         }
+        const orderId = currentOrderId();
+        if (!orderId) return;
+
+        const orderKey = String(orderId);
+        if (
+            block.dataset.descriptionLoadedOrderId === orderKey
+            || block.dataset.descriptionLoadingOrderId === orderKey
+        ) return;
+
+        block.dataset.descriptionLoadingOrderId = orderKey;
+        readStoredDescription(orderId).then((stored) => {
+            if (!stored || !block.isConnected) return;
+            renderDescriptionPreview(
+                block,
+                stored.order_title || "",
+                stored.order_summary || stored.cart_design_description || "",
+                stored.cart_sample_image ? 1 : 0,
+            );
+            block.dataset.descriptionLoadedOrderId = orderKey;
+        }).finally(() => {
+            if (block.dataset.descriptionLoadingOrderId === orderKey) {
+                delete block.dataset.descriptionLoadingOrderId;
+            }
+        });
     });
 }
 
 function appendImageCard(image, gallery, editor, interactive = true) {
-    const card = document.createElement(interactive ? "button" : "div");
-    if (interactive) card.type = "button";
+    const card = document.createElement("div");
     card.className = "dac-v6-description-image";
     card.dataset.name = image.name || "Ảnh đính kèm";
     card.dataset.src = image.src;
-    card.title = interactive ? "Chèn ảnh tại vị trí con trỏ" : card.dataset.name;
-    card.innerHTML = '<img alt=""/><b></b><span>Ảnh đính kèm</span>';
+    card.innerHTML = '<button type="button" class="dac-v6-description-image-content"><img alt=""/><b></b></button><a download>Tải ảnh</a>';
     card.querySelector("img").src = image.src;
     card.querySelector("img").alt = card.dataset.name;
     card.querySelector("b").textContent = card.dataset.name;
-    if (interactive) {
-        card.addEventListener("click", () => {
+    const downloadLink = card.querySelector("a");
+    downloadLink.href = image.src;
+    downloadLink.download = card.dataset.name;
+    const imageButton = card.querySelector("button");
+    imageButton.title = interactive ? "Chèn ảnh tại vị trí con trỏ" : "Xem ảnh";
+    imageButton.addEventListener("click", () => {
+        if (interactive) {
             editor.focus();
             document.execCommand("insertImage", false, image.src);
-        });
-    }
+        } else {
+            openImageViewer(image);
+        }
+    });
     gallery.appendChild(card);
 }
 
@@ -145,19 +216,27 @@ async function imagesAsComposite(cards) {
 }
 
 function currentOrderId() {
-    const match = window.location.pathname.match(/sale\.order\/(\d+)(?:\/|$)/)
+    const pathMatch = window.location.pathname.match(/sale\.order\/(\d+)(?:\/|$)/)
         || window.location.pathname.match(/action-\d+\/(\d+)(?:\/|$)/);
-    return match ? Number(match[1]) : null;
+    if (pathMatch) return Number(pathMatch[1]);
+
+    const search = new URLSearchParams(window.location.search);
+    const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    const model = search.get("model") || hash.get("model");
+    const id = search.get("id") || hash.get("id");
+    return model === "sale.order" && /^\d+$/.test(id || "") ? Number(id) : null;
 }
 
 function addImage(files, gallery, editor) {
-    [...files].filter((file) => file.type.startsWith("image/")).forEach((file) => {
+    return Promise.all([...files].filter((file) => file.type.startsWith("image/")).map((file) => new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => {
             appendImageCard({ name: file.name, src: reader.result }, gallery, editor);
+            resolve();
         };
+        reader.onerror = reject;
         reader.readAsDataURL(file);
-    });
+    })));
 }
 
 async function readStoredDescription(orderId) {
@@ -166,7 +245,7 @@ async function readStoredDescription(orderId) {
         const rows = await rpc("/web/dataset/call_kw/sale.order/read", {
             model: "sale.order",
             method: "read",
-            args: [[orderId], ["order_title", "order_summary", "cart_design_description", "cart_sample_image"]],
+            args: [[orderId], ["order_title", "order_summary", "cart_design_description", "cart_sample_image", "cart_sample_image_filename"]],
             kwargs: { context: { bin_size: false } },
         });
         return rows[0] || null;
@@ -174,6 +253,34 @@ async function readStoredDescription(orderId) {
         console.error("Cannot read order description", error);
         return null;
     }
+}
+
+async function saveDescription(orderId, values) {
+    let resolveSave;
+    let rejectSave;
+    const completion = new Promise((resolve, reject) => {
+        resolveSave = resolve;
+        rejectSave = reject;
+    });
+    const detail = {
+        orderId,
+        values,
+        handled: false,
+        resolve: resolveSave,
+        reject: rejectSave,
+    };
+    document.dispatchEvent(new CustomEvent(SAVE_EVENT, { detail }));
+    if (detail.handled) {
+        await completion;
+        return;
+    }
+    if (!orderId) throw new Error("Sale order must be saved before attaching an image");
+    await rpc("/web/dataset/call_kw/sale.order/write", {
+        model: "sale.order",
+        method: "write",
+        args: [[orderId], values],
+        kwargs: {},
+    });
 }
 
 async function openDescriptionModal(block, forceReadOnly = false) {
@@ -201,7 +308,7 @@ async function openDescriptionModal(block, forceReadOnly = false) {
           </div>
           <input class="dac-v6-description-title" placeholder="Tiêu đề đơn hàng"/>
           <div class="dac-v6-description-editor" contenteditable="true" role="textbox" aria-multiline="true"></div>
-          <div class="dac-v6-attachments-head"><h3>Ảnh đính kèm</h3><span>Đặt con trỏ trong mô tả rồi chọn ảnh để chèn nhãn</span></div>
+          <div class="dac-v6-attachments-head"><h3>Ảnh đính kèm</h3><span>${readOnly ? "Bấm ảnh để xem, hoặc tải về" : "Đặt con trỏ trong mô tả rồi chọn ảnh để chèn nhãn"}</span></div>
           <div class="dac-v6-description-gallery"></div>
         </main>
         <footer><span class="dac-v6-save-state">Đã lưu</span><div><button type="button" class="dac-v6-modal-cancel">Đóng</button><button type="button" class="dac-v6-modal-save">Lưu mô tả</button></div></footer>
@@ -211,6 +318,7 @@ async function openDescriptionModal(block, forceReadOnly = false) {
     const title = modal.querySelector(".dac-v6-description-title");
     const editor = modal.querySelector(".dac-v6-description-editor");
     const gallery = modal.querySelector(".dac-v6-description-gallery");
+    let pendingImageLoad = Promise.resolve();
     title.value = stored?.order_title || titleInput?.value || "";
     editor.textContent = stored?.order_summary || stored?.cart_design_description || summaryInput?.value || "";
     const sampleImage = block.closest(".o_form_view")?.querySelector('.o_field_widget[name="cart_sample_image"] img');
@@ -219,7 +327,7 @@ async function openDescriptionModal(block, forceReadOnly = false) {
         : null;
     const sampleImageUrl = storedImageUrl || (sampleImage?.src && !sampleImage.src.includes("placeholder") ? sampleImage.src : null);
     if (sampleImageUrl) {
-        appendImageCard({ name: "Hình ảnh mẫu xe", src: sampleImageUrl }, gallery, editor, !readOnly);
+        appendImageCard({ name: stored?.cart_sample_image_filename || "Ảnh đính kèm", src: sampleImageUrl }, gallery, editor, !readOnly);
     }
 
     if (readOnly) {
@@ -239,7 +347,7 @@ async function openDescriptionModal(block, forceReadOnly = false) {
         modal.querySelector('input[type="file"]').addEventListener("change", (event) => {
             if (!event.target.files.length) return;
             gallery.replaceChildren();
-            addImage([event.target.files[0]], gallery, editor);
+            pendingImageLoad = addImage([event.target.files[0]], gallery, editor);
         });
         editor.addEventListener("paste", (event) => {
             const images = [...event.clipboardData.files].filter((file) => file.type.startsWith("image/"));
@@ -251,7 +359,7 @@ async function openDescriptionModal(block, forceReadOnly = false) {
             if (images.length === 1) {
                 event.preventDefault();
                 gallery.replaceChildren();
-                addImage(images, gallery, editor);
+                pendingImageLoad = addImage(images, gallery, editor);
             }
         });
         modal.querySelector(".dac-v6-modal-save").addEventListener("click", async () => {
@@ -261,25 +369,22 @@ async function openDescriptionModal(block, forceReadOnly = false) {
             const saveButton = modal.querySelector(".dac-v6-modal-save");
             saveButton.disabled = true;
             saveButton.textContent = "Đang lưu...";
-            setOdooValue(titleInput, nextTitle);
-            setOdooValue(summaryInput, nextSummary);
-            setOdooValue(designDescriptionInput, nextSummary);
             try {
-                if (orderId) {
-                    const values = {
-                        order_title: nextTitle,
-                        order_summary: nextSummary,
-                        cart_design_description: nextSummary,
-                    };
-                    const composite = await imagesAsComposite(cards);
-                    if (composite) values.cart_sample_image = composite;
-                    await rpc("/web/dataset/call_kw/sale.order/write", {
-                        model: "sale.order",
-                        method: "write",
-                        args: [[orderId], values],
-                        kwargs: {},
-                    });
+                await pendingImageLoad;
+                setOdooValue(titleInput, nextTitle);
+                setOdooValue(summaryInput, nextSummary);
+                setOdooValue(designDescriptionInput, nextSummary);
+                const values = {
+                    order_title: nextTitle,
+                    order_summary: nextSummary,
+                    cart_design_description: nextSummary,
+                };
+                const composite = await imagesAsComposite(cards);
+                if (composite) {
+                    values.cart_sample_image = composite;
+                    values.cart_sample_image_filename = cards[0]?.dataset.name || "anh-dinh-kem.jpg";
                 }
+                await saveDescription(orderId, values);
                 renderDescriptionPreview(block, nextTitle, nextSummary, cards.length);
                 close();
                 showSavedToast();

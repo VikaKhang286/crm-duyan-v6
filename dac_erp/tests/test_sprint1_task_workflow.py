@@ -143,6 +143,46 @@ class TestSprint1SnapshotFields(TransactionCase):
         task, _ = Task._create_from_order(order, 'design')
         self.assertTrue(task.snap_order_number, 'snap_order_number should be set on factory-created task')
 
+    def test_assign_designer_creates_named_design_task(self):
+        """Assigning a designer creates the task shown on their task block."""
+        designer = self.env['res.users'].create({
+            'name': 'Sprint1 Designer',
+            'login': 'sprint1.designer@example.invalid',
+        })
+        order = self._make_order(order_state_custom='deposit')
+
+        order.write({'user_id_design': designer.id})
+
+        task = self.env['dac.work.task'].sudo().search([
+            ('order_id', '=', order.id),
+            ('task_type', '=', 'design'),
+            ('created_by_agent', '=', 'sale_assignment'),
+        ])
+        self.assertEqual(len(task), 1)
+        self.assertEqual(task.assigned_user_id, designer)
+        self.assertEqual(task.name, 'Thiết kế bản vẽ sản xuất')
+
+    def test_create_quotation_with_designer_creates_design_task(self):
+        """A designer selected before the first save receives the task immediately."""
+        designer = self.env['res.users'].create({
+            'name': 'Sprint1 Quotation Designer',
+            'login': 'sprint1.quotation.designer@example.invalid',
+        })
+
+        order = self._make_order(
+            order_state_custom='quotation',
+            user_id_design=designer.id,
+        )
+
+        task = self.env['dac.work.task'].sudo().search([
+            ('order_id', '=', order.id),
+            ('task_type', '=', 'design'),
+            ('created_by_agent', '=', 'sale_assignment'),
+        ])
+        self.assertEqual(len(task), 1)
+        self.assertEqual(task.assigned_user_id, designer)
+        self.assertEqual(task.name, 'Thiết kế bản vẽ sản xuất')
+
     # ── _refresh_snapshot ─────────────────────────────────────────────
 
     def test_refresh_snapshot_updates_fields(self):

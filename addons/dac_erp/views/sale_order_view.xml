@@ -205,7 +205,6 @@
                                         <span invisible="is_design_user and order_state_custom == 'deposit'"><i class="fa fa-calendar-check-o me-2" invisible="order_state_custom in ['deposit', 'production']"/><i class="fa fa-pencil me-2" invisible="order_state_custom != 'deposit'"/><i class="fa fa-industry me-2" invisible="order_state_custom != 'production'"/><span invisible="order_state_custom in ['deposit', 'production']">Báo giá &amp; lịch hẹn</span><span invisible="order_state_custom != 'deposit'">Thiết kế &amp; Đặt cọc</span><span invisible="order_state_custom != 'production'">Sản xuất</span></span>
                                         <span invisible="not is_design_user or order_state_custom != 'deposit'">Task của tôi</span>
                                         <small class="dac-design-role-label" invisible="not is_design_user or order_state_custom != 'deposit'">Thiết kế</small>
-                                        <button name="action_quick_create_task" type="object" string="+ Task" class="btn btn-sm btn-outline-primary py-0 px-2" invisible="order_state_custom not in ['deposit', 'production']" groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager"/>
                                     </h5>
                                     <group>
                                         <field name="order_number" string="Số đặt hàng" placeholder="VD: 8766" readonly="is_design_user or is_production_user"/>
@@ -299,7 +298,8 @@
                                             <label for="cart_sample_image" class="fw-bold d-block mb-1">
                                                 <i class="fa fa-image me-1"/>Hình ảnh mẫu xe
                                             </label>
-                                            <field name="cart_sample_image" widget="image" class="oe_avatar dac-production-image"/>
+                                            <field name="cart_sample_image_filename" invisible="1"/>
+                                            <field name="cart_sample_image" filename="cart_sample_image_filename" widget="image" class="oe_avatar dac-production-image"/>
                                         </div>
                                     </div>
                                     <div class="col-md-4">
@@ -621,7 +621,7 @@
                                                     <i class="fa fa-users"/><span class="visually-hidden">Sale phụ trách</span>
                                                 </span>
                                                 <span class="dac-v6-metric-value">
-                                                    <field name="user_id" widget="many2one_avatar_user" nolabel="1" readonly="is_design_user or is_production_user"/>
+                                                    <field name="user_id" nolabel="1" readonly="is_design_user or is_production_user"/>
                                                 </span>
                                             </div>
                                             <div class="dac-v6-metric-row">
@@ -629,7 +629,7 @@
                                                     <i class="fa fa-pencil"/><span class="visually-hidden">Người thiết kế</span>
                                                 </span>
                                                 <span class="dac-v6-metric-value">
-                                                    <field name="user_id_design" widget="many2one_avatar_user" nolabel="1" readonly="is_design_user or is_production_user"/>
+                                                    <field name="user_id_design" nolabel="1" readonly="is_design_user or is_production_user"/>
                                                 </span>
                                             </div>
                                             <div class="dac-v6-metric-row">
@@ -637,8 +637,7 @@
                                                     <i class="fa fa-cogs"/><span class="visually-hidden">Xưởng sản xuất</span>
                                                 </span>
                                                 <span class="dac-v6-metric-value">
-                                                    <field name="user_id_production" widget="many2one_avatar_user" nolabel="1" readonly="is_design_user or is_production_user"/>
-                                                    <field name="production_group_ids" widget="many2many_tags" nolabel="1" readonly="is_design_user or is_production_user" invisible="order_state_custom == 'quotation'"/>
+                                                    <field name="user_id_production" nolabel="1" readonly="is_design_user or is_production_user"/>
                                                 </span>
                                             </div>
                                             <div class="dac-v6-metric-row">
@@ -654,7 +653,7 @@
                                 </div>
 
                                 <!-- Cột 3: Tiến độ công việc -->
-                                <div class="col-12 mb-3">
+                                <div class="col-12 mb-3" invisible="not is_design_user and not is_production_user">
                                     <div class="dac-box-card dac-box-tasks h-100">
                                         <field name="task_ids" nolabel="1"
                                             domain="[('task_type', '=', order_state_custom == 'deposit' and 'design' or 'production'), ('state', 'not in', ['cancelled'])]">
