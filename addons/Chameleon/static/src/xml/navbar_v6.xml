@@ -21,8 +21,9 @@
                     <div class="dac_v6_tools" role="search">
                         <label class="dac_v6_search">
                             <i class="fa fa-search" aria-hidden="true"/>
-                            <input type="search" placeholder="Tìm chức năng..." aria-label="Tìm chức năng"
-                                   t-on-input="filterDacMenu"/>
+                            <input type="search" placeholder="Tìm kiếm..." aria-label="Tìm kiếm toàn cục"
+                                   readonly="readonly" t-on-click="openDacGlobalSearch"/>
+                            <span class="key-search">Ctrl K</span>
                         </label>
                         <button class="dac_v6_tool_button" type="button" title="Làm mới trang"
                                 aria-label="Làm mới trang" t-on-click="refreshDacPage">
@@ -81,6 +82,43 @@
                         </t>
                     </div>
                 </nav>
+                <div t-if="dacSearchState.open" class="dac_v6_search_backdrop" t-on-click="closeDacSearchFromBackdrop">
+                    <section class="dac_v6_search_dialog" role="dialog" aria-modal="true" aria-label="Tìm kiếm toàn cục">
+                        <div class="dac_v6_search_dialog_input">
+                            <i class="fa fa-search" aria-hidden="true"/>
+                            <input t-ref="dacSearchInput" type="search"
+                                   placeholder="Tìm đơn hàng, khách hàng, hội thoại, công việc..."
+                                   t-att-value="dacSearchState.query" t-on-input="onDacSearchInput"
+                                   t-on-keydown="onDacSearchKeydown"/>
+                            <button type="button" t-on-click="closeDacGlobalSearch">ESC</button>
+                        </div>
+                        <div class="dac_v6_search_filters">
+                            <button t-foreach="dacSearchCategories" t-as="category" t-key="category[0]" type="button"
+                                    t-attf-class="{{ dacSearchState.category === category[0] ? 'is-active' : '' }}"
+                                    t-on-click="() => this.selectDacSearchCategory(category[0])">
+                                <t t-esc="category[1]"/>
+                            </button>
+                        </div>
+                        <div class="dac_v6_search_results">
+                            <div t-if="dacSearchState.loading" class="dac_v6_search_empty">
+                                <i class="fa fa-spinner fa-spin"/> Đang tìm kiếm...
+                            </div>
+                            <button t-else="" t-foreach="dacSearchItems" t-as="item" t-key="item.key" type="button"
+                                    t-attf-class="dac_v6_search_result {{ dacSearchState.activeIndex === item_index ? 'is-active' : '' }}"
+                                    t-on-mouseenter="() => this.dacSearchState.activeIndex = item_index"
+                                    t-on-click="() => this.openDacSearchItem(item)">
+                                <span t-attf-class="dac_v6_search_result_icon is-{{ item.kind }}" t-esc="item.icon"/>
+                                <span class="dac_v6_search_result_copy">
+                                    <strong t-esc="item.title"/>
+                                    <small t-if="item.subtitle" t-esc="item.subtitle"/>
+                                </span>
+                                <span class="dac_v6_search_result_type" t-esc="item.typeLabel"/>
+                            </button>
+                            <div t-if="!dacSearchState.loading and !dacSearchItems.length" class="dac_v6_search_empty">Không tìm thấy kết quả phù hợp</div>
+                        </div>
+                        <footer class="dac_v6_search_footer"><span>↑↓ Di chuyển</span><span>↵ Mở</span><span>Esc Đóng</span></footer>
+                    </section>
+                </div>
             </aside>
         </xpath>
     </t>

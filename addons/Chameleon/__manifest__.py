@@ -50,6 +50,7 @@
             'Chameleon/static/src/js/settings.js',
             'Chameleon/static/src/js/navbar_v6.js',
             'Chameleon/static/src/xml/navbar_v6.xml',
+            'Chameleon/static/src/scss/global_search.scss',
             'Chameleon/static/src/scss/layout_v6.scss',
         ],
        

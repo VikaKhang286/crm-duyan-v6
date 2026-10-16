@@ -71,7 +71,11 @@ function renderDescriptionPreview(block, title, summary, imageCount = 0) {
       <small></small>`;
     preview.querySelector("strong").textContent = title || "Mô tả đơn hàng";
     preview.querySelector("p").textContent = summary || "Chưa có mô tả. Bấm để bổ sung yêu cầu thiết kế.";
-    preview.querySelector("small").textContent = `${imageCount} ảnh đính kèm`;
+    if (imageCount > 0) {
+        preview.querySelector("small").textContent = `${imageCount} ảnh đính kèm`;
+    } else {
+        preview.querySelector("small").textContent = "Yêu cầu thiết kế & sản xuất";
+    }
     block.dataset.descriptionImages = String(imageCount);
 }
 
@@ -184,6 +188,21 @@ function appendImageCard(image, gallery, editor, interactive = true) {
         }
     });
     gallery.appendChild(card);
+}
+
+function updateGalleryEmptyState(gallery) {
+    const cardCount = gallery.querySelectorAll(".dac-v6-description-image").length;
+    let emptyState = gallery.querySelector(".dac-v6-description-gallery-empty");
+    if (cardCount === 0) {
+        if (!emptyState) {
+            emptyState = document.createElement("p");
+            emptyState.className = "dac-v6-description-gallery-empty";
+            emptyState.textContent = "Chưa có ảnh đính kèm";
+            gallery.appendChild(emptyState);
+        }
+    } else {
+        emptyState?.remove();
+    }
 }
 
 async function imagesAsComposite(cards) {
@@ -329,6 +348,7 @@ async function openDescriptionModal(block, forceReadOnly = false) {
     if (sampleImageUrl) {
         appendImageCard({ name: stored?.cart_sample_image_filename || "Ảnh đính kèm", src: sampleImageUrl }, gallery, editor, !readOnly);
     }
+    updateGalleryEmptyState(gallery);
 
     if (readOnly) {
         title.readOnly = true;
@@ -347,7 +367,7 @@ async function openDescriptionModal(block, forceReadOnly = false) {
         modal.querySelector('input[type="file"]').addEventListener("change", (event) => {
             if (!event.target.files.length) return;
             gallery.replaceChildren();
-            pendingImageLoad = addImage([event.target.files[0]], gallery, editor);
+            pendingImageLoad = addImage([event.target.files[0]], gallery, editor).then(() => updateGalleryEmptyState(gallery));
         });
         editor.addEventListener("paste", (event) => {
             const images = [...event.clipboardData.files].filter((file) => file.type.startsWith("image/"));
@@ -359,18 +379,19 @@ async function openDescriptionModal(block, forceReadOnly = false) {
             if (images.length === 1) {
                 event.preventDefault();
                 gallery.replaceChildren();
-                pendingImageLoad = addImage(images, gallery, editor);
+                pendingImageLoad = addImage(images, gallery, editor).then(() => updateGalleryEmptyState(gallery));
             }
         });
         modal.querySelector(".dac-v6-modal-save").addEventListener("click", async () => {
             const nextTitle = title.value.trim();
             const nextSummary = editor.innerText.trim();
-            const cards = [...gallery.querySelectorAll(".dac-v6-description-image")];
             const saveButton = modal.querySelector(".dac-v6-modal-save");
             saveButton.disabled = true;
             saveButton.textContent = "Đang lưu...";
             try {
                 await pendingImageLoad;
+                const cards = [...gallery.querySelectorAll(".dac-v6-description-image")];
+                const cardCount = cards.length;
                 setOdooValue(titleInput, nextTitle);
                 setOdooValue(summaryInput, nextSummary);
                 setOdooValue(designDescriptionInput, nextSummary);
@@ -385,7 +406,7 @@ async function openDescriptionModal(block, forceReadOnly = false) {
                     values.cart_sample_image_filename = cards[0]?.dataset.name || "anh-dinh-kem.jpg";
                 }
                 await saveDescription(orderId, values);
-                renderDescriptionPreview(block, nextTitle, nextSummary, cards.length);
+                renderDescriptionPreview(block, nextTitle, nextSummary, cardCount);
                 close();
                 showSavedToast();
             } catch (error) {

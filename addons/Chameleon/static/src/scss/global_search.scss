@@ -1,0 +1,208 @@
+/* DAC global search / command palette */
+.dac_v6_search {
+    cursor: pointer;
+
+    > .key-search {
+        flex: 0 0 auto;
+        padding: 2px 4px;
+        border: 1px solid #353840;
+        border-radius: 6px;
+        background: #1c212b;
+        color: #acb7c8;
+        font-size: 12px !important;
+    }
+}
+
+.dac_v6_search_backdrop {
+    position: fixed;
+    z-index: 1100;
+    inset: 0;
+    display: flex;
+    padding: 7vh 16px 24px;
+    align-items: flex-start;
+    justify-content: center;
+    background: rgba(15, 23, 42, 0.42);
+    backdrop-filter: blur(3px);
+}
+
+.dac_v6_search_dialog {
+    display: flex;
+    width: 92vw;
+    max-width: 680px;
+    max-height: 80dvh;
+    overflow: hidden;
+    flex-direction: column;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    background: #fff;
+    color: #172033;
+    box-shadow: 0 24px 70px rgba(28, 34, 55, .24);
+}
+
+.dac_v6_search_dialog_input {
+    display: grid;
+    flex: 0 0 auto;
+    padding: 14px 16px;
+    grid-template-columns: 32px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+
+    > i {
+        color: #172033;
+        font-size: 19px;
+    }
+
+    > input {
+        width: 100%;
+        min-width: 0;
+        border: 0;
+        outline: 0;
+        background: transparent;
+        color: #172033;
+        font-size: 16px;
+        font-weight: 400;
+    }
+
+    > input::placeholder { color: #7b7d82; }
+
+    > button {
+        border: 0;
+        background: transparent;
+        color: #8a93a3;
+        font-size: 9px;
+        font-weight: 400;
+    }
+}
+
+.dac_v6_search_filters {
+    display: flex;
+    flex: 0 0 auto;
+    padding: 10px 14px;
+    overflow-x: auto;
+    gap: 5px;
+    border-block: 1px solid #e2e8f0;
+
+    > button {
+        padding: 6px 9px;
+        border: 0;
+        border-radius: 7px;
+        background: #f5f6f8;
+        color: #737d8d;
+        font-size: 14px;
+        font-weight: 400;
+        white-space: nowrap;
+    }
+
+    > button.is-active {
+        background: #fff5d1;
+        color: #805b00;
+    }
+}
+
+.dac_v6_search_results {
+    flex: 1 1 auto;
+    max-height: 420px;
+    padding: 8px;
+    overflow-y: auto;
+}
+
+.dac_v6_search_result {
+    display: grid;
+    width: 100%;
+    padding: 10px;
+    grid-template-columns: 48px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    color: inherit;
+    text-align: left;
+
+    &.is-active,
+    &:hover { background: #fff8df; }
+}
+
+.dac_v6_search_result_icon {
+    display: grid;
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
+    place-items: center;
+    background: #fff5d1;
+    color: #805b00;
+    font-size: 16px;
+    font-weight: 800;
+
+    &.is-customer { background: #e8f4ff; color: #1967a7; }
+    &.is-conversation { background: #eee9ff; color: #6550b8; }
+    &.is-task { background: #e8f8ef; color: #277a4d; }
+}
+
+.dac_v6_search_result_copy {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 4px;
+
+    > strong,
+    > small {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    > strong { font-size: 14px; }
+    > small { color: #718096; font-size: 12px; }
+}
+
+.dac_v6_search_result_type {
+    color: #8b95a7;
+    font-size: 12px;
+}
+
+.dac_v6_search_empty {
+    display: grid;
+    min-height: 190px;
+    place-items: center;
+    color: #8b95a7;
+    font-size: 15px;
+}
+
+.dac_v6_search_footer {
+    display: flex;
+    flex: 0 0 auto;
+    padding: 15px 28px;
+    gap: 24px;
+    border-top: 1px solid #e2e8f0;
+    color: #8b95a7;
+    font-size: 13px;
+}
+
+body.o_web_client.dac-v6-sidebar-collapsed .dac_v6_search > .key-search { display: none; }
+
+@media (max-width: 767.98px) {
+    .dac_v6_search_backdrop { padding: 10px; }
+
+    .dac_v6_search_dialog {
+        width: 100%;
+        max-height: calc(100vh - 20px);
+        border-radius: 18px;
+    }
+
+    .dac_v6_search_dialog_input {
+        min-height: 92px;
+        padding: 18px;
+        grid-template-columns: 24px minmax(0, 1fr) auto;
+        gap: 10px;
+
+        > i { font-size: 20px; }
+        > input { font-size: 18px; }
+    }
+
+    .dac_v6_search_filters { padding: 10px 14px; }
+    .dac_v6_search_results { padding: 10px; }
+    .dac_v6_search_result { grid-template-columns: 42px minmax(0, 1fr); }
+    .dac_v6_search_result_type { display: none; }
+}
+

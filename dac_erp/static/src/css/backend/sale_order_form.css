@@ -1910,9 +1910,9 @@
 }
 
 .dac-v6-description-preview small {
-  color: #9aa4b3;
-  font-size: 13px;
-  font-weight: 650;
+  color: #949eaa;
+  font-size: 12px;
+  font-weight: 400;
 }
 
 .dac-v6-description-toast {
@@ -2420,9 +2420,14 @@
 
 .dac-v6-description-gallery {
   display: flex;
-  min-height: 90px;
   flex-wrap: wrap;
   gap: 12px;
+}
+
+.dac-v6-description-gallery-empty {
+  font-size: 14px;
+  color: #929da9;
+  margin: 0;
 }
 
 .dac-v6-description-image {

@@ -198,6 +198,69 @@
     transform: translateY(-1px);
 }
 
+/* Sidebar thu gọn: giữ nút chấm công dưới dạng một status dot có thể bấm. */
+@media (min-width: 992px) {
+    body.o_web_client.dac-v6-sidebar-collapsed {
+        .o_dac_attendance_systray {
+            width: 100%;
+            margin: 0;
+            justify-content: center;
+        }
+
+        .o_dac_attendance_box {
+            width: 12px;
+            min-width: 12px;
+            min-height: 12px;
+            padding: 0;
+            gap: 0;
+            border: 0;
+            border-radius: 50%;
+            background: transparent;
+            box-shadow: none;
+        }
+
+        .o_dac_attendance_box_content {
+            display: none;
+        }
+
+        .o_dac_attendance_action {
+            width: 12px;
+            min-width: 12px;
+            height: 12px;
+            min-height: 12px;
+            padding: 0;
+            border-radius: 50%;
+            font-size: 0;
+            box-shadow: none;
+        }
+
+        .o_dac_attendance_action > span {
+            display: none;
+        }
+
+        .o_dac_attendance_box--ready .o_dac_attendance_action {
+            background: #3b82f6;
+        }
+
+        .o_dac_attendance_box--working .o_dac_attendance_action {
+            background: #16a34a;
+            animation: dac_attendance_pulse 2s ease-in-out infinite;
+        }
+
+        .o_dac_attendance_box--late .o_dac_attendance_action {
+            background: #f59e0b;
+        }
+
+        .o_dac_attendance_box--loading .o_dac_attendance_action {
+            background: #94a3b8;
+        }
+
+        .o_dac_attendance_action:hover {
+            transform: scale(1.2);
+        }
+    }
+}
+
 /* ---- Pulse animation ---- */
 @keyframes dac_attendance_pulse {
 

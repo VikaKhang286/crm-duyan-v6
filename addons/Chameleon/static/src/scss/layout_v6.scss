@@ -287,7 +287,6 @@
         position: relative;
         display: flex;
         width: 54px;
-        min-height: 55px;
         padding: 6px 3px;
         align-items: center;
         justify-content: center;
@@ -339,12 +338,9 @@
     .dac_v6_app_name {
         display: block;
         width: 100%;
-        overflow: hidden;
         font-size: 10px;
         line-height: 1.3;
         text-align: center;
-        text-overflow: ellipsis;
-        white-space: nowrap;
     }
 
     .dac_v6_section_panel {
