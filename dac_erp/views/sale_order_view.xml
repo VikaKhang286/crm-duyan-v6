@@ -621,7 +621,7 @@
                                                     <i class="fa fa-users"/><span class="visually-hidden">Sale phụ trách</span>
                                                 </span>
                                                 <span class="dac-v6-metric-value">
-                                                    <field name="user_id" widget="many2one_avatar_user" nolabel="1" readonly="is_design_user or is_production_user"/>
+                                                    <field name="user_id" nolabel="1" readonly="is_design_user or is_production_user"/>
                                                 </span>
                                             </div>
                                             <div class="dac-v6-metric-row">
@@ -629,7 +629,7 @@
                                                     <i class="fa fa-pencil"/><span class="visually-hidden">Người thiết kế</span>
                                                 </span>
                                                 <span class="dac-v6-metric-value">
-                                                    <field name="user_id_design" widget="many2one_avatar_user" nolabel="1" readonly="is_design_user or is_production_user"/>
+                                                    <field name="user_id_design" nolabel="1" readonly="is_design_user or is_production_user"/>
                                                 </span>
                                             </div>
                                             <div class="dac-v6-metric-row">
@@ -637,8 +637,7 @@
                                                     <i class="fa fa-cogs"/><span class="visually-hidden">Xưởng sản xuất</span>
                                                 </span>
                                                 <span class="dac-v6-metric-value">
-                                                    <field name="user_id_production" widget="many2one_avatar_user" nolabel="1" readonly="is_design_user or is_production_user"/>
-                                                    <field name="production_group_ids" widget="many2many_tags" nolabel="1" readonly="is_design_user or is_production_user" invisible="order_state_custom == 'quotation'"/>
+                                                    <field name="user_id_production" nolabel="1" readonly="is_design_user or is_production_user"/>
                                                 </span>
                                             </div>
                                             <div class="dac-v6-metric-row">

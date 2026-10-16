@@ -82,7 +82,7 @@ function openImageViewer(image) {
     viewer.innerHTML = `
       <section class="dac-v6-image-viewer" role="dialog" aria-modal="true" aria-label="Xem ảnh đính kèm">
         <header><h2></h2><button type="button" aria-label="Đóng">×</button></header>
-        <main><img alt=""/></main>
+        <img alt=""/>
         <footer><a download>Tải ảnh</a></footer>
       </section>`;
     viewer.querySelector("h2").textContent = image.name || "Ảnh 1";
