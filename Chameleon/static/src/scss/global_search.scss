@@ -205,4 +205,122 @@ body.o_web_client.dac-v6-sidebar-collapsed .dac_v6_search > .key-search { displa
     .dac_v6_search_result { grid-template-columns: 42px minmax(0, 1fr); }
     .dac_v6_search_result_type { display: none; }
 }
+/* Operational notifications opened by the sidebar Activities button. */
+.dac_v6_activity_backdrop {
+    position: fixed;
+    z-index: 1100;
+    inset: 0;
+    display: flex;
+    padding: 30vh 16px 24px;
+    align-items: flex-start;
+    justify-content: center;
+    background: rgba(15, 23, 42, 0.42);
+    backdrop-filter: blur(3px);
+}
+
+.dac_v6_activity_dialog {
+    display: flex;
+    width: calc(100vw - 32px);
+    max-width: 500px;
+    max-height: 85dvh;
+    flex-direction: column;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    background: #fff;
+    color: #172033;
+    z-index: 95;
+    box-shadow: 0 20px 70px #1a213533;
+    overflow: auto;
+
+    > header {
+        display: flex;
+        padding: 16px 20px;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid #e2e8f0;
+
+        > h2 { margin: 0; font-size: 20px; font-weight: 700; }
+        > button {
+            display: grid;
+            width: 38px;
+            height: 38px;
+            padding: 0;
+            place-items: center;
+            border: 1px solid #dbe2ec;
+            border-radius: 10px;
+            background: #fff;
+            color: #607089;
+            font-size: 16px;
+        }
+    }
+
+    > footer {
+        display: flex;
+        padding: 14px 20px;
+        align-items: center;
+        justify-content: flex-end;
+        border-top: 1px solid #e2e8f0;
+
+        > button {
+            padding: 0 13px;
+            border: 1px solid #dbe2ec;
+            border-radius: 7px;
+            background: #fff;
+            color: #586378;
+            font-size: 14px;
+            font-weight: 700;
+            height: 38px;
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            transition: .15s;
+        }
+    }
+}
+
+.dac_v6_activity_list {
+    display: flex;
+    padding: 20px;
+    flex-direction: column;
+    gap: 2px;
+
+    > button {
+        width: 100%;
+        border: 1px solid #dbe2ec;
+        background: #fff;
+        text-align: left;
+        transition: border-color 0.15s ease, background-color 0.15s ease;
+        font-size: 14px;
+        height: 38px;
+        border-radius: 7px;
+        padding: 0 13px;
+        color: #586378;
+        cursor: pointer;
+        font-weight: 700;
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        transition: .15s;
+
+        &:hover { border-color: #e5b629; background: #fffaf0; }
+        > strong { font-size: 14px; font-weight: 700; }
+    }
+}
+
+.dac_v6_activity_empty {
+    display: grid;
+    min-height: 158px;
+    place-items: center;
+    color: #8b95a7;
+}
+
+@media (max-width: 767.98px) {
+    .dac_v6_activity_backdrop { padding: 10px; }
+    .dac_v6_activity_dialog { width: 100%; }
+    .dac_v6_activity_dialog > header { min-height: 76px; padding: 16px 18px; }
+    .dac_v6_activity_dialog > header > h2 { font-size: 24px; }
+    .dac_v6_activity_list { padding: 18px; }
+    .dac_v6_activity_dialog > footer { min-height: 72px; padding: 14px 18px; }
+}
+
 

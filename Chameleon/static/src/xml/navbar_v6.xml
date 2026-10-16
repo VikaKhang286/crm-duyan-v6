@@ -30,12 +30,12 @@
                             <i class="fa fa-refresh" aria-hidden="true"/>
                         </button>
                         <button aria-expanded="false"
-                                class="o-dropdown dropdown-toggle dropdown dac_v6_tool_button dac_v6_messages"
+                                class="dac_v6_tool_button"
                                 type="button" title="Tin nhắn" t-on-click="openDacMessages">
                             <i class="fa fa-lg fa-comments" role="img" aria-label="Tin nhắn"/>
                         </button>
                         <button aria-expanded="false"
-                                class="o-dropdown dropdown-toggle dropdown dac_v6_tool_button dac_v6_activities"
+                                class="dac_v6_tool_button "
                                 type="button" title="Hoạt động" t-on-click="openDacActivities">
                             <i class="fa fa-lg fa-clock-o" role="img" aria-label="Hoạt động"/>
                         </button>
@@ -117,6 +117,31 @@
                             <div t-if="!dacSearchState.loading and !dacSearchItems.length" class="dac_v6_search_empty">Không tìm thấy kết quả phù hợp</div>
                         </div>
                         <footer class="dac_v6_search_footer"><span>↑↓ Di chuyển</span><span>↵ Mở</span><span>Esc Đóng</span></footer>
+                    </section>
+                </div>
++                <div t-if="dacActivityState.open" class="dac_v6_activity_backdrop" t-on-click="closeDacActivitiesFromBackdrop">
+                    <section class="dac_v6_activity_dialog" role="dialog" aria-modal="true" aria-label="Thông báo">
+                        <header>
+                            <h2>Thông báo</h2>
+                            <button type="button" title="Đóng" aria-label="Đóng" t-on-click="closeDacActivities">
+                                ✕
+                            </button>
+                        </header>
+                        <div class="dac_v6_activity_list">
+                            <div t-if="dacActivityState.loading" class="dac_v6_activity_empty">
+                                <i class="fa fa-spinner fa-spin"/> Đang tải thông báo...
+                            </div>
+                            <button t-else="" t-foreach="dacActivityState.items" t-as="item" t-key="item.key"
+                                    type="button" t-on-click="() => this.openDacActivityItem(item)">
+                                <strong><t t-esc="item.count"/> <t t-esc="item.label"/></strong>
+                            </button>
+                            <div t-if="!dacActivityState.loading and !dacActivityState.items.length" class="dac_v6_activity_empty">
+                                Không có thông báo cần xử lý
+                            </div>
+                        </div>
+                        <footer>
+                            <button type="button" t-on-click="closeDacActivities">Hủy</button>
+                        </footer>
                     </section>
                 </div>
             </aside>

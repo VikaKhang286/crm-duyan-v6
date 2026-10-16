@@ -50,6 +50,7 @@ patch(NavBar.prototype, {
             loading: false,
             activeIndex: 0,
         });
+        this.dacActivityState = useState({ open: false, loading: false, items: [] });
         this._dacSearchTimer = null;
         this._dacSearchRequest = 0;
         this._dacSearchKeydown = (event) => {
@@ -57,9 +58,10 @@ patch(NavBar.prototype, {
                 event.preventDefault();
                 event.stopImmediatePropagation();
                 this.openDacGlobalSearch();
-            } else if (event.key === "Escape" && this.dacSearchState.open) {
+            } else if (event.key === "Escape" && (this.dacSearchState.open || this.dacActivityState.open)) {
                 event.preventDefault();
                 this.closeDacGlobalSearch();
+                this.closeDacActivities();
             }
         };
         onMounted(() => document.addEventListener("keydown", this._dacSearchKeydown, true));
@@ -213,9 +215,35 @@ patch(NavBar.prototype, {
         messageIcon?.closest("button, .dropdown-toggle")?.click();
     },
 
-    openDacActivities(event) {
-        const shell = event.currentTarget.closest(".dac_v6_shell");
-        const activityIcon = shell?.querySelector(".o_menu_systray .fa-clock-o");
-        activityIcon?.closest("button, .dropdown-toggle")?.click();
+    async openDacActivities() {
+        this.dacActivityState.open = true;
+        this.dacActivityState.loading = true;
+        try {
+            this.dacActivityState.items = await this.dacSearchOrm.call("res.users", "dac_activity_summary", []);
+        } catch (error) {
+            console.warn("DAC activity summary failed", error);
+            this.dacActivityState.items = [];
+        } finally {
+            this.dacActivityState.loading = false;
+        }
+    },
+
+    closeDacActivities() {
+        this.dacActivityState.open = false;
+    },
+
+    closeDacActivitiesFromBackdrop(event) {
+        if (event.target === event.currentTarget) this.closeDacActivities();
+    },
+
+    openDacActivityItem(item) {
+        this.closeDacActivities();
+        const actionIds = {
+            production: 552,
+            delivery: 555,
+            design: 551,
+        };
+        const actionId = actionIds[item.key];
+        if (actionId) return this.dacSearchAction.doAction(actionId);
     },
 });

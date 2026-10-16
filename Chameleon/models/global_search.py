@@ -1,8 +1,43 @@
-from odoo import api, models
+from odoo import api, fields, models
 
 
 class ResUsers(models.Model):
     _inherit = "res.users"
+
+    @api.model
+    def dac_activity_summary(self):
+        """Return the operational alerts shown in the dark sidebar."""
+        if "sale.order" not in self.env:
+            return []
+        order_model = self.env["sale.order"]
+        required = {"order_state_custom", "production_deadline", "user_id_design"}
+        if not required.issubset(order_model._fields):
+            return []
+
+        today = fields.Date.context_today(self)
+        company_domain = [("company_id", "=", self.env.company.id)] if "company_id" in order_model._fields else []
+
+        production_domain = company_domain + [
+            ("order_state_custom", "=", "production"),
+            ("production_deadline", "!=", False),
+            ("production_deadline", "<", today),
+        ]
+        design_domain = company_domain + [
+            ("order_state_custom", "=", "deposit"),
+            ("user_id_design", "=", False),
+        ]
+        delivery_domain = company_domain + [("order_state_custom", "=", "delivery")]
+        delivery_orders = order_model.search(delivery_domain)
+        if "total_deposit_paid" in order_model._fields:
+            delivery_orders = delivery_orders.filtered(
+                lambda order: (order.total_deposit_paid or 0.0) < (order.amount_total or 0.0)
+            )
+
+        return [
+            {"key": "production", "count": order_model.search_count(production_domain), "label": "đơn sản xuất quá deadline", "domain": production_domain},
+            {"key": "delivery", "count": len(delivery_orders), "label": "đơn giao hàng chưa thu đủ", "domain": [("id", "in", delivery_orders.ids)]},
+            {"key": "design", "count": order_model.search_count(design_domain), "label": "đơn chưa phân công thiết kế", "domain": design_domain},
+        ]
 
     @api.model
     def dac_global_search(self, query="", category="all", limit=8):
