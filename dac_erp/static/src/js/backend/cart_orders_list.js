@@ -5,6 +5,7 @@ import { ListController } from "@web/views/list/list_controller";
 import { listView } from "@web/views/list/list_view";
 import { onMounted, onPatched, onWillUnmount } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
+import { user } from "@web/core/user";
 
 const HERO_CLASS = "dac-cart-orders-hero";
 const TOOLBAR_CLASS = "dac-cart-orders-toolbar";
@@ -67,6 +68,20 @@ export class CartOrdersListController extends ListController {
         return this.quickSale.open(record.resId);
     }
 
+    isCartWorkspace() {
+        const context = this.props?.context || this.model?.root?.context || {};
+        return context.default_order_type === "cart";
+    }
+
+    isMyOrdersWorkspace() {
+        const context = this.props?.context || this.model?.root?.context || {};
+        return Boolean(context.dac_my_orders_workspace || context.search_default_my_orders);
+    }
+
+    getWorkspaceDomain() {
+        return this.model?.root?.domain || (this.isCartWorkspace() ? [["order_type", "=", "cart"]] : []);
+    }
+
     bindQuickSaleRows() {
         const rows = this.rootRef?.el?.querySelectorAll(".o_list_table tbody tr.o_data_row") || [];
         const records = this.model?.root?.records || [];
@@ -101,7 +116,7 @@ export class CartOrdersListController extends ListController {
 
     async loadCartStats() {
         try {
-            const baseDomain = [["order_type", "=", "cart"]];
+            const baseDomain = this.getWorkspaceDomain();
             const activeStates = ["quotation", "deposit", "production", "delivery", "installation"];
             const [total, active, orders] = await Promise.all([
                 this.orm.searchCount("sale.order", baseDomain),
@@ -141,7 +156,7 @@ export class CartOrdersListController extends ListController {
                 <div class="dac-cart-orders-heading">
                     <div>
                         <div class="dac-cart-orders-breadcrumb">DAC Bán hàng &amp; CRM <span>/</span> Bán hàng</div>
-                        <h1>Đơn hàng Xe đẩy</h1>
+                        <h1>${this.isCartWorkspace() ? "Đơn hàng Xe đẩy" : "Đơn hàng"}</h1>
                         <p>Quản lý đơn theo 5 bước: Báo giá → Thiết kế/Cọc → Sản xuất → Giao hàng → Hoàn thành.</p>
                     </div>
                     <div class="dac-cart-orders-actions">
@@ -270,7 +285,7 @@ export class CartOrdersListController extends ListController {
         try {
             records = await this.orm.searchRead(
                 "sale.order",
-                this.model?.root?.domain || [["order_type", "=", "cart"]],
+                this.getWorkspaceDomain(),
                 ["cart_order_code", "name", "partner_id", "user_id", "production_deadline", "amount_total", "order_state_custom"],
                 { limit: 2000 }
             );
@@ -347,6 +362,23 @@ export class CartOrdersListController extends ListController {
     async loadSaleOptions(toolbar) {
         const select = toolbar.querySelector(".dac-cart-sale-select");
         if (!select || select.dataset.loaded) return;
+        if (this.isMyOrdersWorkspace()) {
+            let saleName = "Sale của tôi";
+            try {
+                const [currentUser] = await this.orm.read("res.users", [user.userId], ["name"]);
+                saleName = currentUser?.name || saleName;
+            } catch (error) {
+                console.warn("Unable to load current sale name", error);
+            }
+            select.innerHTML = "";
+            const option = document.createElement("option");
+            option.value = String(user.userId);
+            option.textContent = saleName;
+            select.append(option);
+            select.disabled = true;
+            select.dataset.loaded = "true";
+            return;
+        }
         select.dataset.loaded = "loading";
         try {
             const users = await this.orm.searchRead(

@@ -28,7 +28,7 @@ const NAV_ITEMS = [
         key: "customers",
         label: "Khách hàng",
         icon: "fa fa-users",
-        actionXmlId: "dac_erp.dac_res_partner_customer_action_sale",
+        actionXmlId: "dac_erp.dac_res_partner_customer_action",
     },
 ];
 

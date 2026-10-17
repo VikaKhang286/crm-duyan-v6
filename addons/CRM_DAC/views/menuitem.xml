@@ -20,13 +20,13 @@
 
         <!-- Quản trị đồng bộ Pancake -->
         <menuitem id="menu_page_fm_sync_root"
-                  name="Đồng bộ Pancake"
+                  name="Tích hợp"
                   parent="dac_erp.dac_system_settings_root"
                   sequence="10"
                   groups="dac_erp.group_dac_erp_manager,base.group_system"/>
 
         <menuitem id="menu_pancake_monitoring_dashboard"
-                  name="Monitoring Pancake"
+                  name="Đồng bộ Pancake"
                   parent="menu_page_fm_sync_root"
                   action="action_pancake_monitoring_dashboard"
                   sequence="1"

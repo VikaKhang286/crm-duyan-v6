@@ -262,21 +262,28 @@
         <field name="context">{}</field>
     </record>
 
-    <!-- Lịch Thiết kế hiển thị trực tiếp trong phân hệ Sản xuất & Vận hành -->
-    <menuitem id="menu_dac_task_calendar_design"
-              name="Lịch làm việc Thiết kế"
-              action="action_dac_task_calendar_design"
+    <!-- Nhóm Lịch làm việc trong phân hệ Sản xuất & Vận hành -->
+    <menuitem id="menu_dac_task_calendar_root"
+              name="Lịch làm việc"
               parent="dac_erp.dac_operations_root"
-              groups="dac_erp.group_dac_erp_design,dac_erp.group_dac_erp_manager"
+              groups="dac_erp.group_dac_erp_design,dac_erp.group_dac_erp_production,dac_erp.group_dac_erp_manager"
               sequence="20"/>
 
-    <!-- Lịch Sản xuất hiển thị trực tiếp trong phân hệ Sản xuất & Vận hành -->
+    <!-- Lịch Thiết kế -->
+    <menuitem id="menu_dac_task_calendar_design"
+              name="Lịch Thiết kế"
+              action="action_dac_task_calendar_design"
+              parent="menu_dac_task_calendar_root"
+              groups="dac_erp.group_dac_erp_design,dac_erp.group_dac_erp_manager"
+              sequence="1"/>
+
+    <!-- Lịch Sản xuất -->
     <menuitem id="menu_dac_task_calendar_production"
-              name="Lịch làm việc Sản xuất"
+              name="Lịch Sản xuất"
               action="action_dac_task_calendar_production"
-              parent="dac_erp.dac_operations_root"
+              parent="menu_dac_task_calendar_root"
               groups="dac_erp.group_dac_erp_production,dac_erp.group_dac_erp_manager"
-              sequence="21"/>
+              sequence="2"/>
 
     <!-- Inherit sale.order custom form: thêm tab Tasks -->
     <record id="view_sale_order_form_task_tab" model="ir.ui.view">

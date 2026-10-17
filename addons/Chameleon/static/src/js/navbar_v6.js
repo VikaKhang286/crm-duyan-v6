@@ -169,6 +169,10 @@ patch(NavBar.prototype, {
 
     async openDacSearchItem(item) {
         this.closeDacGlobalSearch();
+        if (item.actionKey === "orders") {
+            window.location.assign("/odoo/action-555");
+            return;
+        }
         if (item.resId) {
             return this.dacSearchAction.doAction({
                 type: "ir.actions.act_window",
@@ -180,7 +184,6 @@ patch(NavBar.prototype, {
         }
         const actionMap = {
             new_order: { res_model: "sale.order", views: [[false, "form"]] },
-            orders: { res_model: "sale.order", views: [[false, "list"], [false, "form"]] },
             customers: { res_model: "res.partner", views: [[false, "kanban"], [false, "list"], [false, "form"]] },
             conversations: { res_model: "page.fm.conversation", views: [[false, "list"], [false, "form"]] },
             tasks: { res_model: "dac.work.task", views: [[false, "kanban"], [false, "list"], [false, "form"]] },

@@ -194,7 +194,7 @@ class DacSaleDashboard extends Component {
   }
 
   openOrders() {
-    return this.action.doAction(this.state.data?.header?.is_manager ? 'dac_erp.dac_sale_order_manager_action' : 'dac_erp.dac_sale_order_custom_action');
+    return this.action.doAction('dac_erp.dac_sale_order_custom_action');
   }
 
   openAllOrders() {
@@ -461,11 +461,7 @@ class DacSaleDashboard extends Component {
 
   // mở list theo box, bật filter tương ứng
   openListByBox(type) {
-    const header = this.state.data?.header || {};
-    const isManager = !!header.is_manager;
-    const actXmlId = isManager
-      ? "dac_erp.dac_sale_order_manager_action"
-      : "dac_erp.dac_sale_order_custom_action";
+    const actXmlId = "dac_erp.dac_sale_order_custom_action";
 
     let ctx = {};
     if (type === "quotation") {

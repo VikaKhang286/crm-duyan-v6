@@ -5,18 +5,45 @@
          1. PHÂN HỆ BÁN HÀNG & CRM (dac_erp.dac_sale_crm_root)
          ======================================================== -->
     
+    <!-- Nhóm Tổng quan -->
+    <menuitem id="dac_sale_overview_menu_root"
+              name="Tổng quan"
+              parent="dac_erp.dac_sale_crm_root"
+              sequence="1"
+              groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager"/>
+
     <!-- Dashboard Bán Hàng -->
     <menuitem id="dac_sale_dashboard_menu_root"
-              name="Dashboard"
-              parent="dac_erp.dac_sale_crm_root"
+              name="Dashboard Sale"
+              parent="dac_sale_overview_menu_root"
               action="dac_sale_dashboard_action"
               groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager"
               sequence="1"/>
 
+    <!-- Dashboard Tin nhắn được khai báo trong CRM_DAC -->
+    <record id="CRM_DAC.menu_pancake_message_dashboard_main" model="ir.ui.menu">
+      <field name="parent_id" ref="dac_sale_overview_menu_root"/>
+      <field name="sequence">2</field>
+    </record>
+
+    <!-- Nhóm Kinh doanh -->
+    <menuitem id="dac_sale_business_menu_root"
+              name="Kinh doanh"
+              parent="dac_erp.dac_sale_crm_root"
+              sequence="2"
+              groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager"/>
+
+    <!-- Nhóm Bán hàng -->
+    <menuitem id="dac_sale_orders_menu_root"
+              name="Bán hàng"
+              parent="dac_sale_business_menu_root"
+              sequence="1"
+              groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager"/>
+
     <!-- Hội thoại Pancake (Nhận tin nhắn & Chat) — chỉ Manager -->
     <menuitem id="dac_sale_conversation_queue_menu"
               name="Hội thoại Pancake"
-              parent="dac_erp.dac_sale_crm_root"
+              parent="dac_sale_business_menu_root"
               action="CRM_DAC.action_page_fm_conversation_queue"
               sequence="5"
               groups="dac_erp.group_dac_erp_manager"/>
@@ -24,7 +51,7 @@
     <!-- Đơn hàng Bán -->
     <menuitem id="dac_sale_order_menu_sale"
               name="Đơn hàng"
-              parent="dac_erp.dac_sale_crm_root"
+              parent="dac_sale_orders_menu_root"
               action="dac_erp.dac_sale_order_custom_action"
               sequence="10"
               groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager"/>
@@ -32,7 +59,7 @@
     <!-- Đơn hàng Xe đẩy -->
     <menuitem id="dac_sale_order_cart_menu"
               name="Đơn hàng Xe đẩy"
-              parent="dac_erp.dac_sale_crm_root"
+              parent="dac_sale_orders_menu_root"
               action="dac_erp.dac_sale_order_cart_action"
               sequence="12"
               groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager"/>
@@ -40,7 +67,7 @@
     <!-- Lịch Thiết kế & Sản xuất (Sale nắm deadline để phân bổ) -->
     <menuitem id="dac_task_calendar_menu_sale"
               name="Lịch Thiết kế &amp; Sản xuất"
-              parent="dac_erp.dac_sale_crm_root"
+              parent="dac_sale_business_menu_root"
               action="dac_erp.action_dac_task_calendar_sale"
               sequence="15"
               groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager"/>
@@ -48,8 +75,8 @@
     <!-- Khách hàng -->
     <menuitem id="dac_res_partner_customer_menu_sale"
               name="Khách hàng"
-              parent="dac_erp.dac_sale_crm_root"
-              action="dac_erp.dac_res_partner_customer_action_sale"
+              parent="dac_sale_business_menu_root"
+              action="dac_erp.dac_res_partner_customer_action"
               sequence="20"
               groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager"/>
 
@@ -58,13 +85,23 @@
          2. PHÂN HỆ SẢN XUẤT & VẬN HÀNH (dac_erp.dac_operations_root)
          ======================================================== -->
 
-    <!-- Bảng Điều Phối Đơn (Cho Manager) -->
+    <!-- Nhóm Điều phối -->
     <menuitem id="dac_manager_dashboard_menu_root"
-              name="Bảng Điều Phối Đơn"
+              name="Điều phối"
               parent="dac_erp.dac_operations_root"
-              action="dac_manager_dashboard_action"
-              groups="dac_erp.group_dac_erp_manager"
+              groups="dac_erp.group_dac_erp_design,dac_erp.group_dac_erp_production,dac_erp.group_dac_erp_manager"
               sequence="1"/>
+    <record id="dac_manager_dashboard_menu_root" model="ir.ui.menu">
+      <field name="action" eval="False"/>
+    </record>
+
+    <!-- Tab mở trang tổng quan điều phối bên trong phân hệ -->
+    <menuitem id="dac_manager_dashboard_menu"
+              name="Bảng điều phối đơn"
+              parent="dac_manager_dashboard_menu_root"
+              action="dac_manager_dashboard_action"
+              sequence="1"
+              groups="dac_erp.group_dac_erp_manager"/>
 
     <!-- Đơn hàng (Tổng thể dành cho Manager) -->
     <menuitem id="dac_sale_order_menu_manager"
@@ -73,6 +110,9 @@
               action="dac_erp.dac_sale_order_manager_action"
               sequence="10"
               groups="dac_erp.group_dac_erp_manager"/>
+    <record id="dac_sale_order_menu_manager" model="ir.ui.menu">
+      <field name="active" eval="False"/>
+    </record>
 
     <!-- Khách hàng (Tổng thể dành cho Manager) -->
     <menuitem id="dac_res_partner_customer_menu"
@@ -81,6 +121,9 @@
               action="dac_erp.dac_res_partner_customer_action"
               sequence="20"
               groups="dac_erp.group_dac_erp_manager"/>
+    <record id="dac_res_partner_customer_menu" model="ir.ui.menu">
+      <field name="active" eval="False"/>
+    </record>
 
     <!-- Hội thoại (Tổng thể dành cho Manager dưới Điều phối) -->
     <menuitem id="dac_manager_conversation_queue_menu"
@@ -89,20 +132,23 @@
               action="CRM_DAC.action_page_fm_conversation_queue"
               sequence="30"
               groups="dac_erp.group_dac_erp_manager"/>
+    <record id="dac_manager_conversation_queue_menu" model="ir.ui.menu">
+      <field name="active" eval="False"/>
+    </record>
 
     <!-- SỬA LỖI DEV MODE: Hiển thị Dashboard Thiết Kế & Sản Xuất trực tiếp cho nhân viên vận hành -->
     <menuitem id="menu_dashboards_manage_design"
               name="Dashboard Thiết Kế"
-              parent="dac_erp.dac_operations_root"
+              parent="dac_manager_dashboard_menu_root"
               action="dac_erp.dac_design_dashboard_action"
-              sequence="15"
+              sequence="2"
               groups="dac_erp.group_dac_erp_design,dac_erp.group_dac_erp_manager"/>
 
     <menuitem id="menu_dashboards_manage_production"
               name="Dashboard Sản Xuất"
-              parent="dac_erp.dac_operations_root"
+              parent="dac_manager_dashboard_menu_root"
               action="dac_erp.dac_production_dashboard_action"
-              sequence="16"
+              sequence="3"
               groups="dac_erp.group_dac_erp_production,dac_erp.group_dac_erp_manager"/>
 
 
