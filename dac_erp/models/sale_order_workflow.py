@@ -352,7 +352,7 @@ class SaleOrderWorkflow(models.Model):
     def action_open_sales_list(self):
         return {
             'type': 'ir.actions.act_url',
-            'url': '/odoo/sales',
+            'url': '/odoo/action-555',
             'target': 'self',
         }
 

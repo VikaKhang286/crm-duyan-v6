@@ -16,7 +16,7 @@ class SaleOrder(models.Model):
         """Open the native new quotation page from custom order lists."""
         return {
             'type': 'ir.actions.act_url',
-            'url': '/odoo/sales/new',
+            'url': '/odoo/action-555/new',
             'target': 'blank',
         }
 

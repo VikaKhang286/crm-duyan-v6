@@ -612,6 +612,10 @@ export class ManagerDashboard extends Component {
     return this.quickSale.open(orderId);
   }
 
+  openAllOrders() {
+    window.location.assign("/odoo/action-555");
+  }
+
   /**
    * Mở danh sách đơn hàng theo trạng thái
    */

@@ -197,6 +197,10 @@ class DacSaleDashboard extends Component {
     return this.action.doAction(this.state.data?.header?.is_manager ? 'dac_erp.dac_sale_order_manager_action' : 'dac_erp.dac_sale_order_custom_action');
   }
 
+  openAllOrders() {
+    window.location.assign('/odoo/action-555');
+  }
+
   createOrder() {
     return this.action.doAction({ type: 'ir.actions.act_window', res_model: 'sale.order', target: 'current', views: [[false, 'form']] });
   }

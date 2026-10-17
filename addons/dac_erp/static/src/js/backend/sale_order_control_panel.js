@@ -233,7 +233,7 @@ patch(FormController.prototype, {
       const newTab = window.open("about:blank", "_blank");
       if (newTab) {
         newTab.opener = null;
-        newTab.location.replace("/odoo/sales/new");
+        newTab.location.replace("/odoo/action-555/new");
       }
     };
     sourceBar.addEventListener("click", onClick, true);

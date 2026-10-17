@@ -7,7 +7,7 @@ import { ListRenderer } from "@web/views/list/list_renderer";
 
 export class SaleOrderNoteEditableListController extends ListController {
   createRecord() {
-    window.location.assign("/odoo/sales/new");
+    window.location.assign("/odoo/action-555/new");
   }
 }
 
