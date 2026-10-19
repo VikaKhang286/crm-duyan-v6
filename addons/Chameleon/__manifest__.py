@@ -1,7 +1,7 @@
 {
     # Tên module
     'name': 'Chameleon Odoo 18.0',
-    'version': '1.4',
+    'version': '1.5',
 
     # Loại module
     'category': '1. Duy An ERP',

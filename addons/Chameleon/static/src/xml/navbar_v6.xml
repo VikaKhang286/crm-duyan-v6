@@ -12,8 +12,10 @@
                             <strong>Duy An ERP</strong>
                             <small>ERP / CRM · v6</small>
                         </span>
-                        <button class="dac_v6_collapse" type="button" title="Thu gọn sidebar"
-                                aria-label="Thu gọn sidebar" t-on-click="toggleDacSidebar">
+                        <button class="dac_v6_tool_button" type="button"
+                                t-att-title="dacSidebarState.collapsed ? 'Mở rộng sidebar' : 'Thu gọn sidebar'"
+                                t-att-aria-label="dacSidebarState.collapsed ? 'Mở rộng sidebar' : 'Thu gọn sidebar'"
+                                t-on-click="toggleDacSidebar">
                             <i class="fa fa-bars"/>
                         </button>
                     </div>
@@ -73,6 +75,11 @@
                     </div>
 
                     <div class="o_menu_systray d-flex flex-shrink-0 ms-auto" role="menu">
+                        <button class="sidebar-collapse" type="button"
+                                t-att-title="dacSidebarState.collapsed ? 'Mở rộng sidebar' : 'Thu gọn sidebar'"
+                                t-att-aria-label="dacSidebarState.collapsed ? 'Mở rộng sidebar' : 'Thu gọn sidebar'"
+                                t-on-click="toggleDacSidebar"
+                                t-esc="dacSidebarState.collapsed ? 'Mở rộng' : 'Thu gọn'"/>
                         <t t-foreach="systrayItems" t-as="item" t-key="item.key">
                             <div t-att-data-index="item.index"/>
                             <ErrorHandler onError="error => this.handleItemError(error, item)">

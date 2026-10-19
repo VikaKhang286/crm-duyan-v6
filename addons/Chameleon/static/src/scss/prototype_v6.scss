@@ -54,10 +54,8 @@
     width: 100% !important;
     height: 100% !important;
     min-height: 100% !important;
-    padding: 14px 12px !important;
     flex-direction: column !important;
     align-items: stretch !important;
-    gap: 5px;
     overflow: hidden;
     background: transparent !important;
     border: 0 !important;
@@ -70,16 +68,13 @@
   }
 
   .dac_v6_brand {
-    order: -20;
     display: flex;
-    min-height: 58px;
     align-items: center;
     gap: 10px;
-    padding: 5px 8px 13px;
-    margin-bottom: 8px;
-    border-bottom: 1px solid #2a2d34;
+    padding: 18px 12px 14px;
+    flex: none;
   }
-
+  
   .dac_v6_brandmark {
     display: grid;
     width: 38px;
@@ -103,15 +98,15 @@
   .dac_v6_brandcopy strong {
     display: block;
     color: #fff;
-    font-size: 14px;
+    font-size: 15px;
     white-space: nowrap;
   }
 
   .dac_v6_brandcopy small {
     display: block;
-    margin-top: 6px;
-    color: #858b98;
-    font-size: 10px;
+    margin-top: 5px;
+    color: #9ba6b7;
+    font-size: 11px;
     letter-spacing: .3px;
     white-space: nowrap;
   }
@@ -185,8 +180,8 @@
     order: 10;
     width: 100% !important;
     margin: auto 0 0 !important;
-    padding-top: 10px;
-    border-top: 1px solid #2a2d34;
+    padding: 13px 12px;
+    border-top: 1px solid #303641;
   }
 
   html body .o_navbar.dac_v6_shell .o_navbar_apps_menu .dropdown-toggle,
@@ -212,6 +207,26 @@
   html body .o_navbar.dac_v6_shell .o_menu_sections .dropdown-toggle:hover {
     background: #292b31 !important;
     color: #ffc20e !important;
+  }
+
+  html body .o_navbar.dac_v6_shell .o_menu_systray .sidebar-collapse {
+    width: 100%;
+    height: 30px;
+    margin-bottom: 12px;
+    justify-content: center;
+    background: #262d39;
+    border-color: #394150;
+    color: #bcc7d7;
+    font-size: 12px;
+    border-radius: 7px;
+    border: 1px solid #303641;
+    padding: 0 13px;
+    cursor: pointer;
+    font-weight: 650;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    transition: .15s;
   }
 
   html body .o_navbar.dac_v6_shell .o_menu_systray .dropdown-toggle {
@@ -366,10 +381,8 @@
     width: var(--dac-v6-sidebar-width) !important;
     height: 100vh !important;
     min-height: 100vh !important;
-    padding: 18px 12px !important;
     flex-direction: column !important;
     align-items: stretch !important;
-    gap: 6px;
     overflow: visible;
     background: #14161b !important;
     border: 0 !important;
@@ -488,7 +501,6 @@ html body.o_web_client {
 
 html body .o_main_navbar {
   min-height: 68px;
-  padding: 0 18px;
   background: rgba(255, 255, 255, 0.95) !important;
   border-bottom: 1px solid var(--dac-v6-line) !important;
   box-shadow: none !important;
@@ -664,7 +676,6 @@ html body .form-select:focus {
 @media (min-width: 992px) {
   html body .o_main_navbar {
     min-height: 100vh !important;
-    padding: 18px 12px !important;
     background: #14161b !important;
     border: 0 !important;
     border-right: 1px solid #282b32 !important;

@@ -102,10 +102,10 @@
         display: grid;
         width: 100%;
         min-width: 0;
-        padding: 4px 0 7px;
+        padding: 0 12px 12px;
         grid-template-columns: minmax(0, 1fr) 34px 34px 34px;
         align-items: center;
-        gap: 7px;
+        gap: 5px;
     }
 
     .dac_v6_search {
@@ -140,7 +140,12 @@
     .dac_v6_search input::placeholder {
         color: #858b98;
     }
-
+    html body .o_navbar .o_main_navbar .dac_v6_brand .dac_v6_tool_button {
+        width: 30px !important;
+        height: 32px !important;
+        flex: none;
+        border: 0 !important;
+    }
     .dac_v6_tool_button {
         display: grid !important;
         width: 34px !important;
@@ -480,7 +485,7 @@
         display: grid !important;
         width: 100% !important;
         min-height: 104px;
-        padding: 8px 0 10px !important;
+        padding: 14px 8px !important;
         grid-template-columns: minmax(0, 1fr);
         grid-template-rows: 41px 38px;
         align-items: center;

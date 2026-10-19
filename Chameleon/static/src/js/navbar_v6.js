@@ -60,7 +60,12 @@ patch(NavBar.prototype, {
         } catch {
             // The sidebar still works when browser storage is unavailable.
         }
-        this.dacSidebarState = useState({ collapsedGroups: {}, activeMenuXmlid, userSelectedMenu: false });
+        this.dacSidebarState = useState({
+            collapsedGroups: {},
+            activeMenuXmlid,
+            userSelectedMenu: false,
+            collapsed: document.body.classList.contains("dac-v6-sidebar-collapsed"),
+        });
         this.dacRole = null;
         onWillStart(async () => {
             try {
@@ -224,7 +229,8 @@ patch(NavBar.prototype, {
     },
 
     toggleDacSidebar() {
-        document.body.classList.toggle("dac-v6-sidebar-collapsed");
+        const isCollapsed = document.body.classList.toggle("dac-v6-sidebar-collapsed");
+        this.dacSidebarState.collapsed = isCollapsed;
     },
 
     isDacMenuGroupCollapsed(menu) {
