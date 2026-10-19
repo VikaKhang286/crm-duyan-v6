@@ -16,7 +16,7 @@ const DAC_ROLE_LABELS = {
     design_production: "Thiết kế + Sản xuất",
     full_stack: "Full-stack",
 };
-const DAC_ACTIVE_SIDEBAR_MENU_STORAGE_KEY = "dac_v6_active_sidebar_menu";
+const DAC_ACTIVE_SIDEBAR_MENU_STORAGE_KEY = "dac_v6_active_sidebar_xmlid";
 
 patch(BurgerMenu.prototype, {
     setup() {
@@ -54,13 +54,13 @@ patch(NavBar.prototype, {
             activeIndex: 0,
         });
         this.dacActivityState = useState({ open: false, loading: false, items: [] });
-        let activeMenuId = null;
+        let activeMenuXmlid = null;
         try {
-            activeMenuId = window.localStorage.getItem(DAC_ACTIVE_SIDEBAR_MENU_STORAGE_KEY);
+            activeMenuXmlid = window.localStorage.getItem(DAC_ACTIVE_SIDEBAR_MENU_STORAGE_KEY);
         } catch {
             // The sidebar still works when browser storage is unavailable.
         }
-        this.dacSidebarState = useState({ collapsedGroups: {}, activeMenuId });
+        this.dacSidebarState = useState({ collapsedGroups: {}, activeMenuXmlid, userSelectedMenu: false });
         this.dacRole = null;
         onWillStart(async () => {
             try {
@@ -90,12 +90,14 @@ patch(NavBar.prototype, {
         onMounted(() => document.addEventListener("keydown", this._dacSearchKeydown, true));
         onMounted(() => {
             this._syncDacSidebarMenu(true);
-            this._dacSidebarHashChange = () => this._syncDacSidebarMenu();
-            window.addEventListener("hashchange", this._dacSidebarHashChange);
+            this._dacSidebarRouteChange = () => this._syncDacSidebarMenu();
+            window.addEventListener("hashchange", this._dacSidebarRouteChange);
+            window.addEventListener("popstate", this._dacSidebarRouteChange);
         });
         onWillUnmount(() => {
             document.removeEventListener("keydown", this._dacSearchKeydown, true);
-            window.removeEventListener("hashchange", this._dacSidebarHashChange);
+            window.removeEventListener("hashchange", this._dacSidebarRouteChange);
+            window.removeEventListener("popstate", this._dacSidebarRouteChange);
             clearTimeout(this._dacSearchTimer);
         });
     },
@@ -235,31 +237,34 @@ patch(NavBar.prototype, {
     },
 
     isDacSidebarMenuActive(menu) {
-        const routeAction = window.location.pathname.match(/\/action-(\d+)/)?.[1]
-            || new URLSearchParams(window.location.hash.slice(1)).get("action");
-        const routeLandingXmlid = {
-            "402": "home_menu.home_dashboard_menu",
-            "611": "dac_report.dac_sale_dashboard_menu_root",
-            "551": "dac_report.menu_dashboards_manage_design",
-            "552": "dac_report.menu_dashboards_manage_production",
-        }[routeAction];
-        if (routeLandingXmlid) return menu.xmlid === routeLandingXmlid;
-        const roleLanding = {
-            manager: { action: "402", xmlid: "home_menu.home_dashboard_menu" },
-            sale: { action: "611", xmlid: "dac_report.dac_sale_dashboard_menu_root" },
-            sale_all: { action: "611", xmlid: "dac_report.dac_sale_dashboard_menu_root" },
-            design: { action: "551", xmlid: "dac_report.menu_dashboards_manage_design" },
-            production: { action: "552", xmlid: "dac_report.menu_dashboards_manage_production" },
-            design_production: { action: "552", xmlid: "dac_report.menu_dashboards_manage_production" },
-            full_stack: { action: "611", xmlid: "dac_report.dac_sale_dashboard_menu_root" },
-        }[this.dacRole];
-        if (roleLanding && routeAction === roleLanding.action) {
-            return menu.xmlid === roleLanding.xmlid;
-        }
-        return String(this.dacSidebarState.activeMenuId) === String(menu.id);
+        return this.getDacSidebarActiveMenuXmlid() === menu.xmlid;
     },
 
-    async _syncDacSidebarMenu(forceRoleMenu = false) {
+    getDacSidebarActiveMenuXmlid() {
+        if (this.dacSidebarState.userSelectedMenu && this.dacSidebarState.activeMenuXmlid) {
+            return this.dacSidebarState.activeMenuXmlid;
+        }
+        const params = new URLSearchParams(window.location.hash.slice(1));
+        const action = window.location.pathname.match(/\/action-(\d+)/)?.[1]
+            || params.get("action");
+        const actionXmlids = {
+            "dac_report.dac_sale_dashboard_action": "dac_report.dac_sale_dashboard_menu_root",
+            "611": "dac_report.dac_sale_dashboard_menu_root",
+            "dac_erp.dac_production_dashboard_action": "dac_report.menu_dashboards_manage_production",
+            "552": "dac_report.menu_dashboards_manage_production",
+            "dac_erp.dac_design_dashboard_action": "dac_report.menu_dashboards_manage_design",
+            "551": "dac_report.menu_dashboards_manage_design",
+            "home_menu.home_menu_action": "home_menu.home_dashboard_menu",
+            "402": "home_menu.home_dashboard_menu",
+        };
+        // A recognized route identifies the active landing menu. For all
+        // other menu actions, keep the XML ID selected by the sidebar click.
+        return actionXmlids[action] || this.dacSidebarState.activeMenuXmlid || null;
+    },
+
+    async _syncDacSidebarMenu(initialLoad = false) {
+        // Only derive a menu from the route when loading/navigating into a
+        // known dashboard. Other actions retain the menu explicitly selected.
         const roleXmlids = {
             manager: "home_menu.home_dashboard_menu",
             sale: "dac_report.dac_sale_dashboard_menu_root",
@@ -271,34 +276,40 @@ patch(NavBar.prototype, {
         };
         const roleXmlid = roleXmlids[this.dacRole];
         const params = new URLSearchParams(window.location.hash.slice(1));
-        const action = params.get("action");
-        if (!action && !forceRoleMenu) return;
-        const actionXmlids = {
-            "dac_report.dac_sale_dashboard_action": "dac_report.dac_sale_dashboard_menu_root",
-            "611": "dac_report.dac_sale_dashboard_menu_root",
-            "dac_erp.dac_production_dashboard_action": "dac_report.menu_dashboards_manage_production",
-            "552": "dac_report.menu_dashboards_manage_production",
-            "dac_erp.dac_design_dashboard_action": "dac_report.menu_dashboards_manage_design",
-            "551": "dac_report.menu_dashboards_manage_design",
-            "home_menu.home_menu_action": "home_menu.home_root",
-            "402": "home_menu.home_dashboard_menu",
+        const routeAction = window.location.pathname.match(/\/action-(\d+)/)?.[1]
+            || params.get("action");
+        const landingActions = {
+            manager: "402",
+            sale: "611",
+            sale_all: "611",
+            design: "551",
+            production: "552",
+            design_production: "552",
+            full_stack: "611",
         };
-        const xmlid = forceRoleMenu && roleXmlid ? roleXmlid : (actionXmlids[action] || roleXmlid);
+        const isRoleLanding = routeAction === landingActions[this.dacRole];
+        if (initialLoad && isRoleLanding) {
+            this.dacSidebarState.userSelectedMenu = false;
+        }
+        const routeXmlid = isRoleLanding ? roleXmlid : this.getDacSidebarActiveMenuXmlid();
+        const xmlid = routeXmlid ||
+            (window.location.pathname === "/odoo/" ? roleXmlid : null);
         if (!xmlid) return;
         const allMenus = [];
         const visit = (items) => items.forEach((item) => { allMenus.push(item); visit(item.childrenTree || []); });
         visit(this.dacMenuService.getApps());
         const menu = allMenus.find((item) => item.xmlid === xmlid);
-        if (menu && String(this.dacSidebarState.activeMenuId) !== String(menu.id)) {
-            this.dacSidebarState.activeMenuId = menu.id;
-            try { window.localStorage.setItem(DAC_ACTIVE_SIDEBAR_MENU_STORAGE_KEY, String(menu.id)); } catch {}
+        if (menu) {
+            this.dacSidebarState.activeMenuXmlid = menu.xmlid;
+            try { window.localStorage.setItem(DAC_ACTIVE_SIDEBAR_MENU_STORAGE_KEY, menu.xmlid); } catch {}
         }
     },
 
     onDacSidebarMenuSelection(menu) {
-        this.dacSidebarState.activeMenuId = menu.id;
+        this.dacSidebarState.activeMenuXmlid = menu.xmlid;
+        this.dacSidebarState.userSelectedMenu = true;
         try {
-            window.localStorage.setItem(DAC_ACTIVE_SIDEBAR_MENU_STORAGE_KEY, String(menu.id));
+            window.localStorage.setItem(DAC_ACTIVE_SIDEBAR_MENU_STORAGE_KEY, menu.xmlid);
         } catch {
             // Keeping the active state in memory is sufficient as a fallback.
         }
