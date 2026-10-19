@@ -51,8 +51,7 @@
                                     t-att-title="app.name"
                                     t-on-click="() => this.onNavBarDropdownItemSelection(app)">
                                 <span class="dac_v6_app_icon">
-                                    <img t-if="app.webIconData" t-att-src="app.webIconData" t-att-alt="app.name"/>
-                                    <i t-else="" class="fa fa-th-large"/>
+                                    <i t-attf-class="fa {{ dacAppIcon(app) }}" aria-hidden="true"/>
                                 </span>
                                 <span class="dac_v6_app_name" t-esc="app.name"/>
                             </button>
@@ -159,18 +158,30 @@
 
     <t t-name="Chameleon.SidebarMenuItem">
         <button t-if="!menu.childrenTree.length" type="button"
-                t-attf-class="dac_v6_section_item level-{{ level }}"
+                t-attf-class="dac_v6_section_item level-{{ level }} {{ isDacSidebarMenuActive(menu) ? 'is-active' : '' }}"
                 t-att-data-menu-xmlid="menu.xmlid"
-                t-on-click="() => this.onNavBarDropdownItemSelection(menu)">
-            <span class="dac_v6_section_dot"/>
+                t-on-click="() => this.onDacSidebarMenuSelection(menu)">
+            <span t-if="level &lt;= 1" t-attf-class="dac_v6_section_icon fa {{ dacSidebarMenuIcon(menu) }}" aria-hidden="true"/>
+            <span t-else="" class="dac_v6_section_dot"/>
             <span t-esc="menu.name"/>
         </button>
         <div t-else="" t-attf-class="dac_v6_section_group level-{{ level }}">
-            <div class="dac_v6_section_group_title" t-esc="menu.name"/>
-            <t t-foreach="menu.childrenTree" t-as="child" t-key="child.id">
-                <t t-call="Chameleon.SidebarMenuItem">
-                    <t t-set="menu" t-value="child"/>
-                    <t t-set="level" t-value="level + 1"/>
+            <button t-if="level === 1"
+                    type="button"
+                    t-attf-class="dac_v6_section_group_toggle {{ !isDacMenuGroupCollapsed(menu) ? 'is-active' : '' }}"
+                    t-att-aria-expanded="!isDacMenuGroupCollapsed(menu)"
+                    t-on-click="(event) => toggleDacMenuGroup(menu, event)">
+                <span t-attf-class="fa {{ dacSidebarMenuIcon(menu) }}" aria-hidden="true"/>
+                <span t-esc="menu.name"/>
+                <span class="caret">›</span>
+            </button>
+            <div t-else="" class="dac_v6_section_group_title" t-esc="menu.name"/>
+            <t t-if="!isDacMenuGroupCollapsed(menu)">
+                <t t-foreach="menu.childrenTree" t-as="child" t-key="child.id">
+                    <t t-call="Chameleon.SidebarMenuItem">
+                        <t t-set="menu" t-value="child"/>
+                        <t t-set="level" t-value="level + 1"/>
+                    </t>
                 </t>
             </t>
         </div>

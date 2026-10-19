@@ -5,5 +5,12 @@
                     sequence="-10"
                     groups="base.group_user"
                     action="home_menu_action"/>
+
+        <menuitem id="home_dashboard_menu"
+                    name="Trang chủ"
+                    parent="home_root"
+                    sequence="1"
+                    groups="base.group_user"
+                    action="home_menu_action"/>
     </data>
 </odoo>

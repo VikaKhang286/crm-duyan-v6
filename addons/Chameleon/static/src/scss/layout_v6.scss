@@ -286,28 +286,32 @@
     .dac_v6_app_button {
         position: relative;
         display: flex;
-        width: 54px;
-        padding: 6px 3px;
+        width: 44px;
+        padding: 1px 6px;
         align-items: center;
         justify-content: center;
         flex-direction: column;
         gap: 4px;
         border: 0;
-        border-radius: 11px;
+        border-radius: 8px;
         background: transparent;
-        color: #959ba8;
+        color: #9aa6b8;
         cursor: pointer;
     }
-
     .dac_v6_app_button:hover {
-        background: #292b31;
-        color: #ffc20e;
+        background: #282c31;
+        color: #ffcf44;
     }
 
-    .dac_v6_app_button.is-active {
+    .dac_v6_section_item:hover, .dac_v6_section_group_toggle:hover {
+        background: #2a313d;
+        color: #fff;
+    }
+
+    .dac_v6_app_button.is-active, .dac_v6_section_item.is-active {
         background: #3a3218;
         color: #ffc20e;
-        font-weight: 750;
+        font-weight: 700;
     }
 
     .dac_v6_app_button.is-active::before {
@@ -327,6 +331,8 @@
         place-items: center;
         font-size: 14px;
     }
+
+    .dac_v6_app_icon .fa { font-size: 22px; }
 
     .dac_v6_app_icon img {
         width: 20px;
@@ -381,7 +387,6 @@
         gap: 3px;
     }
 
-    .dac_v6_section_group { margin: 7px 0 9px; }
 
     .dac_v6_section_group_title {
         padding: 7px 10px 6px;
@@ -392,41 +397,44 @@
         text-transform: uppercase;
     }
 
-    .dac_v6_section_item {
+    .dac_v6_section_group_toggle .caret { text-align: right; margin-left: auto; transition: .18s; }
+    .dac_v6_section_group_toggle.is-active .caret { transform: rotate(90deg); }
+    .dac_v6_section_group.level-1 > .dac_v6_section_group_toggle { margin-left: 6px; width: calc(100% - 6px); }
+
+    .dac_v6_section_item, .dac_v6_section_group_toggle {
         display: flex;
         width: 100%;
         min-height: 38px;
-        padding: 8px 10px;
+        padding: 9px 6px;
         align-items: center;
         gap: 9px;
         border: 0;
         border-radius: 8px;
         background: transparent;
-        color: #d5d8df;
+        color: #bbc5d3;
         font-size: 14px;
         text-align: left;
         cursor: pointer;
     }
 
-    .dac_v6_section_item:hover {
-        background: #292b31;
-        color: #ffc20e;
-    }
-
     .dac_v6_section_item.level-1 { padding-left: 15px; }
-    .dac_v6_section_item.level-2 { padding-left: 25px; font-size: 11px; }
+    .dac_v6_section_item.level-2 { padding-left: 25px; font-size: 14px; }
 
     .dac_v6_section_dot {
         width: 6px;
         height: 6px;
-        flex: 0 0 6px;
-        border: 1.5px solid #737a87;
         border-radius: 50%;
+        border: 1.5px solid #bdc5d2;
+        flex: 0 0 6px;
     }
 
-    .dac_v6_section_item:hover .dac_v6_section_dot {
-        border-color: #ffc20e;
-        background: #ffc20e;
+    .dac_v6_section_icon {
+        display: inline-grid;
+        width: 14px;
+        flex: 0 0 14px;
+        place-items: center;
+        color: #aab3c2;
+        font-size: 13px;
     }
 
     body.o_web_client.dac-v6-sidebar-collapsed .dac_v6_navigation_grid {

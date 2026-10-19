@@ -4,6 +4,7 @@ import { patch } from "@web/core/utils/patch";
 import { NavBar } from "@web/webclient/navbar/navbar";
 import { BurgerMenu } from "@web/webclient/burger_menu/burger_menu";
 import { useService } from "@web/core/utils/hooks";
+import { user } from "@web/core/user";
 import { onMounted, onWillStart, onWillUnmount, useRef, useState } from "@odoo/owl";
 
 const DAC_ROLE_LABELS = {
@@ -15,6 +16,7 @@ const DAC_ROLE_LABELS = {
     design_production: "Thiết kế + Sản xuất",
     full_stack: "Full-stack",
 };
+const DAC_ACTIVE_SIDEBAR_MENU_STORAGE_KEY = "dac_v6_active_sidebar_menu";
 
 patch(BurgerMenu.prototype, {
     setup() {
@@ -41,6 +43,7 @@ patch(NavBar.prototype, {
         super.setup(...arguments);
         this.dacSearchOrm = useService("orm");
         this.dacSearchAction = useService("action");
+        this.dacMenuService = useService("menu");
         this.dacSearchInput = useRef("dacSearchInput");
         this.dacSearchState = useState({
             open: false,
@@ -51,6 +54,26 @@ patch(NavBar.prototype, {
             activeIndex: 0,
         });
         this.dacActivityState = useState({ open: false, loading: false, items: [] });
+        let activeMenuId = null;
+        try {
+            activeMenuId = window.localStorage.getItem(DAC_ACTIVE_SIDEBAR_MENU_STORAGE_KEY);
+        } catch {
+            // The sidebar still works when browser storage is unavailable.
+        }
+        this.dacSidebarState = useState({ collapsedGroups: {}, activeMenuId });
+        this.dacRole = null;
+        onWillStart(async () => {
+            try {
+                const [currentUser] = await this.dacSearchOrm.read(
+                    "res.users", [user.userId], ["dac_role"]
+                );
+                this.dacRole = currentUser?.dac_role || null;
+            } catch {
+                this.dacRole = null;
+            }
+        });
+        this.toggleDacMenuGroup = this.toggleDacMenuGroup.bind(this);
+        this.onDacSidebarMenuSelection = this.onDacSidebarMenuSelection.bind(this);
         this._dacSearchTimer = null;
         this._dacSearchRequest = 0;
         this._dacSearchKeydown = (event) => {
@@ -65,8 +88,14 @@ patch(NavBar.prototype, {
             }
         };
         onMounted(() => document.addEventListener("keydown", this._dacSearchKeydown, true));
+        onMounted(() => {
+            this._syncDacSidebarMenu(true);
+            this._dacSidebarHashChange = () => this._syncDacSidebarMenu();
+            window.addEventListener("hashchange", this._dacSidebarHashChange);
+        });
         onWillUnmount(() => {
             document.removeEventListener("keydown", this._dacSearchKeydown, true);
+            window.removeEventListener("hashchange", this._dacSidebarHashChange);
             clearTimeout(this._dacSearchTimer);
         });
     },
@@ -194,6 +223,143 @@ patch(NavBar.prototype, {
 
     toggleDacSidebar() {
         document.body.classList.toggle("dac-v6-sidebar-collapsed");
+    },
+
+    isDacMenuGroupCollapsed(menu) {
+        return Boolean(this.dacSidebarState.collapsedGroups[menu.id]);
+    },
+
+    toggleDacMenuGroup(menu, event) {
+        event.preventDefault();
+        this.dacSidebarState.collapsedGroups[menu.id] = !this.isDacMenuGroupCollapsed(menu);
+    },
+
+    isDacSidebarMenuActive(menu) {
+        const routeAction = window.location.pathname.match(/\/action-(\d+)/)?.[1]
+            || new URLSearchParams(window.location.hash.slice(1)).get("action");
+        const routeLandingXmlid = {
+            "402": "home_menu.home_dashboard_menu",
+            "611": "dac_report.dac_sale_dashboard_menu_root",
+            "551": "dac_report.menu_dashboards_manage_design",
+            "552": "dac_report.menu_dashboards_manage_production",
+        }[routeAction];
+        if (routeLandingXmlid) return menu.xmlid === routeLandingXmlid;
+        const roleLanding = {
+            manager: { action: "402", xmlid: "home_menu.home_dashboard_menu" },
+            sale: { action: "611", xmlid: "dac_report.dac_sale_dashboard_menu_root" },
+            sale_all: { action: "611", xmlid: "dac_report.dac_sale_dashboard_menu_root" },
+            design: { action: "551", xmlid: "dac_report.menu_dashboards_manage_design" },
+            production: { action: "552", xmlid: "dac_report.menu_dashboards_manage_production" },
+            design_production: { action: "552", xmlid: "dac_report.menu_dashboards_manage_production" },
+            full_stack: { action: "611", xmlid: "dac_report.dac_sale_dashboard_menu_root" },
+        }[this.dacRole];
+        if (roleLanding && routeAction === roleLanding.action) {
+            return menu.xmlid === roleLanding.xmlid;
+        }
+        return String(this.dacSidebarState.activeMenuId) === String(menu.id);
+    },
+
+    async _syncDacSidebarMenu(forceRoleMenu = false) {
+        const roleXmlids = {
+            manager: "home_menu.home_dashboard_menu",
+            sale: "dac_report.dac_sale_dashboard_menu_root",
+            sale_all: "dac_report.dac_sale_dashboard_menu_root",
+            design: "dac_report.menu_dashboards_manage_design",
+            production: "dac_report.menu_dashboards_manage_production",
+            design_production: "dac_report.menu_dashboards_manage_production",
+            full_stack: "dac_report.dac_sale_dashboard_menu_root",
+        };
+        const roleXmlid = roleXmlids[this.dacRole];
+        const params = new URLSearchParams(window.location.hash.slice(1));
+        const action = params.get("action");
+        if (!action && !forceRoleMenu) return;
+        const actionXmlids = {
+            "dac_report.dac_sale_dashboard_action": "dac_report.dac_sale_dashboard_menu_root",
+            "611": "dac_report.dac_sale_dashboard_menu_root",
+            "dac_erp.dac_production_dashboard_action": "dac_report.menu_dashboards_manage_production",
+            "552": "dac_report.menu_dashboards_manage_production",
+            "dac_erp.dac_design_dashboard_action": "dac_report.menu_dashboards_manage_design",
+            "551": "dac_report.menu_dashboards_manage_design",
+            "home_menu.home_menu_action": "home_menu.home_root",
+            "402": "home_menu.home_dashboard_menu",
+        };
+        const xmlid = forceRoleMenu && roleXmlid ? roleXmlid : (actionXmlids[action] || roleXmlid);
+        if (!xmlid) return;
+        const allMenus = [];
+        const visit = (items) => items.forEach((item) => { allMenus.push(item); visit(item.childrenTree || []); });
+        visit(this.dacMenuService.getApps());
+        const menu = allMenus.find((item) => item.xmlid === xmlid);
+        if (menu && String(this.dacSidebarState.activeMenuId) !== String(menu.id)) {
+            this.dacSidebarState.activeMenuId = menu.id;
+            try { window.localStorage.setItem(DAC_ACTIVE_SIDEBAR_MENU_STORAGE_KEY, String(menu.id)); } catch {}
+        }
+    },
+
+    onDacSidebarMenuSelection(menu) {
+        this.dacSidebarState.activeMenuId = menu.id;
+        try {
+            window.localStorage.setItem(DAC_ACTIVE_SIDEBAR_MENU_STORAGE_KEY, String(menu.id));
+        } catch {
+            // Keeping the active state in memory is sufficient as a fallback.
+        }
+        return this.onNavBarDropdownItemSelection(menu);
+    },
+
+    dacSidebarMenuIcon(menu) {
+        const icons = {
+           "home_menu.home_dashboard_menu": "fa-home",
+           "dac_erp.menu_dac_my_tasks": "fa-clock-o",
+            "dac_report.dac_sale_dashboard_menu_root": "fa-bar-chart",
+            "CRM_DAC.menu_pancake_message_dashboard_main": "fa-comments",
+            "dac_report.dac_sale_conversation_queue_menu": "fa-commenting",
+            "dac_report.dac_sale_orders_menu_root": "fa-list",
+            "dac_report.dac_task_calendar_menu_sale": "fa-calendar",
+            "dac_report.dac_res_partner_customer_menu_sale": "fa-users",
+            "dac_report.dac_manager_dashboard_menu": "fa-tachometer",
+            "dac_report.menu_dashboards_manage_design": "fa-pencil-square-o",
+            "dac_report.menu_dashboards_manage_production": "fa-industry",
+            "dac_erp.menu_dac_task_calendar_design": "fa-calendar-o",
+            "dac_erp.menu_dac_task_calendar_production": "fa-calendar-check-o",
+            "dac_report.dac_finance_dashboard_menu": "fa-line-chart",
+            "dac_report.dac_account_move_sale_menu": "fa-file-text-o",
+            "dac_report.dac_account_payment_sale_menu": "fa-credit-card",
+            "dac_erp.dac_sale_manage_users_menu_root": "fa-user-circle-o",
+            "dac_erp.menu_sale_order_line_import": "fa-upload",
+        };
+        if (icons[menu.xmlid]) {
+            return icons[menu.xmlid];
+        }
+        const name = (menu.name || "").toLocaleLowerCase();
+        if (name.includes("đơn hàng")) return "fa-shopping-cart";
+        if (name.includes("khách hàng")) return "fa-users";
+        if (name.includes("hội thoại") || name.includes("tin nhắn")) return "fa-comments";
+        if (name.includes("lịch")) return "fa-calendar";
+        if (name.includes("báo cáo") || name.includes("dashboard")) return "fa-bar-chart";
+        if (name.includes("công nợ") || name.includes("thanh toán")) return "fa-credit-card";
+        if (name.includes("cấu hình") || name.includes("quản trị")) return "fa-cog";
+        return "fa-bookmark-o";
+    },
+
+    dacAppIcon(app) {
+        const icons = {
+            "home_menu.home_root": "fa-home",
+            "dac_erp.dac_sale_crm_root": "fa-bar-chart",
+            "dac_erp.dac_operations_root": "fa-cube",
+            "dac_erp.dac_finance_root": "fa-plus-square-o",
+            "dac_attendance.menu_dac_attendance_root": "fa-user-o",
+            "dac_erp.dac_system_settings_root": "fa-cog",
+        };
+        if (icons[app.xmlid]) return icons[app.xmlid];
+        const name = (app.name || "").toLocaleLowerCase();
+        if (name.includes("home")) return "fa-home";
+        if (name.includes("bán hàng") || name.includes("crm")) return "fa-bar-chart";
+        if (name.includes("vận hành") || name.includes("sản xuất")) return "fa-cube";
+        if (name.includes("tài chính") || name.includes("công nợ")) return "fa-plus-square-o";
+        if (name.includes("chấm công")) return "fa-user-o";
+        if (name.includes("hệ thống") || name.includes("cấu hình") || name.includes("cài đặt")) return "fa-cog";
+        if (name.includes("trợ giúp") || name.includes("help")) return "fa-question";
+        if (name.includes("ứng dụng")) return "fa-th-large";
+        return "fa-bookmark-o";
     },
 
     refreshDacPage() {

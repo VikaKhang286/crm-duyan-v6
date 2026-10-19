@@ -27,10 +27,30 @@ class BeeoneHome(Home):
                 if not user or not user.id:
                     _logger.warning("[DEBUG_GUARD] User recordset is empty, skipping check")
                     return super().web_client(s_action=s_action, subpath=subpath, **kw)
+
+                req = request.httprequest
+                # The role landing page also applies to DAC managers who have
+                # system access; otherwise Odoo restores their previous action.
+                if req.path in ('/odoo', '/odoo/') and not req.args:
+                    role = user.dac_role if 'dac_role' in user._fields else False
+                    default_action = {
+                        'manager': 'home_menu.home_menu_action',
+                        'sale': 'dac_report.dac_sale_dashboard_action',
+                        'sale_all': 'dac_report.dac_sale_dashboard_action',
+                        'design': 'dac_erp.dac_design_dashboard_action',
+                        'production': 'dac_erp.dac_production_dashboard_action',
+                        'design_production': 'dac_erp.dac_production_dashboard_action',
+                        'full_stack': 'dac_report.dac_sale_dashboard_action',
+                    }.get(role)
+                    if default_action:
+                        if role == 'manager':
+                            target_url = '/web#action=402&model=home.menu&view_type=form&id=1'
+                        else:
+                            target_url = f'/web#action={default_action}'
+                        return request.redirect(target_url, 303)
                 
                 # Chỉ áp dụng cho non-admin users
                 if not user.has_group('base.group_system'):
-                    req = request.httprequest
                     args = dict(req.args)
                     has_debug_param = False
                     

@@ -43,6 +43,7 @@ patch(NavBar.prototype, {
       isMenuBlocked: false,
       rootMenuActionID: 0,
     });
+    this.landingOrm = useService("orm");
     this.homeAppsPopover = usePopover(HomeAppsMenu, {
       position: "bottom-start",
       arrow: false,
@@ -59,52 +60,25 @@ patch(NavBar.prototype, {
       );
 
       if (await user.hasGroup("base.group_system")) return;
-      if (await user.hasGroup("dac_erp.group_dac_erp_manager")) {
-        const rootMenuItem = menuItems.find(
-          (item) => item.xmlid === "dac_report.dac_manager_dashboard_menu_root"
-        );
-        console.log("Manager menu found:", rootMenuItem);
-        this.state.isMenuBlocked = true;
-        this.state.rootMenuActionID = rootMenuItem?.actionID;
-      } else if (await user.hasGroup("dac_erp.group_dac_erp_sale")) {
-        const rootMenuItem = menuItems.find(
-          (item) => item.xmlid === "dac_report.dac_sale_dashboard_menu_root"
-        );
-        console.log("Sale menu found:", rootMenuItem);
-        this.state.isMenuBlocked = true;
-        this.state.rootMenuActionID = rootMenuItem?.actionID;
-      } else if (
-        await user.hasGroup("dac_erp.group_dac_erp_design_production")
-      ) {
-        // Dual-role: đồng bộ với web_client (landing = Production dashboard)
-        const rootMenuItem = menuItems.find(
-          (item) => item.xmlid === "dac_erp.dac_production_root_menu"
-        );
-        console.log("Design+Production menu found:", rootMenuItem);
-        this.state.isMenuBlocked = true;
-        this.state.rootMenuActionID = rootMenuItem?.actionID;
-      } else if (await user.hasGroup("dac_erp.group_dac_erp_design")) {
-        const rootMenuItem = menuItems.find(
-          (item) => item.xmlid === "dac_erp.dac_design_root_menu"
-        );
-        console.log("Design menu found:", rootMenuItem);
-        this.state.isMenuBlocked = true;
-        this.state.rootMenuActionID = rootMenuItem?.actionID;
-      } else if (await user.hasGroup("dac_erp.group_dac_erp_production")) {
-        const rootMenuItem = menuItems.find(
-          (item) => item.xmlid === "dac_erp.dac_production_root_menu"
-        );
-        console.log("Production menu found:", rootMenuItem);
-        this.state.isMenuBlocked = true;
-        this.state.rootMenuActionID = rootMenuItem?.actionID;
-      } else {
-        const rootMenuItem = menuItems.find(
-          (item) => item.xmlid === "home_menu.home_root"
-        );
-        console.log("Home menu found:", rootMenuItem);
-        this.state.isMenuBlocked = true;
-        this.state.rootMenuActionID = rootMenuItem?.actionID;
-      }
+      const [currentUser] = await this.landingOrm.read(
+        "res.users",
+        [user.userId],
+        ["dac_role"]
+      );
+      const landingMenuByRole = {
+        manager: "home_menu.home_root",
+        sale: "dac_report.dac_sale_dashboard_menu_root",
+        sale_all: "dac_report.dac_sale_dashboard_menu_root",
+        design: "dac_report.menu_dashboards_manage_design",
+        production: "dac_report.menu_dashboards_manage_production",
+        design_production: "dac_report.menu_dashboards_manage_production",
+        full_stack: "dac_report.dac_sale_dashboard_menu_root",
+      };
+      const rootMenuItem = menuItems.find(
+        (item) => item.xmlid === landingMenuByRole[currentUser?.dac_role]
+      ) || menuItems.find((item) => item.xmlid === "home_menu.home_root");
+      this.state.isMenuBlocked = true;
+      this.state.rootMenuActionID = rootMenuItem?.actionID;
 
       console.log("Final rootMenuActionID:", this.state.rootMenuActionID);
     });
