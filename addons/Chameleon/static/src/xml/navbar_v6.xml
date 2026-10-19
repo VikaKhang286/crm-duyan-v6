@@ -21,7 +21,7 @@
                     <div class="dac_v6_tools" role="search">
                         <label class="dac_v6_search">
                             <i class="fa fa-search" aria-hidden="true"/>
-                            <input type="search" placeholder="Tìm kiếm..." aria-label="Tìm kiếm toàn cục"
+                            <input type="search" placeholder="Tìm kiếm" aria-label="Tìm kiếm toàn cục"
                                    readonly="readonly" t-on-click="openDacGlobalSearch"/>
                             <span class="key-search">Ctrl K</span>
                         </label>
