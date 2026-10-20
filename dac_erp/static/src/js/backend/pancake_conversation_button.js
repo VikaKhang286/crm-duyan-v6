@@ -59,7 +59,7 @@ class PancakeConversationDialog extends Component {
                 { order: "inserted_at_fm desc, id desc", limit: 100 }
             );
             this.state.name = conversation.customer_name_fm || partner.name || "Khách hàng";
-            this.state.phone = conversation.phone || partner.phone || "—";
+            this.state.phone = conversation.phone || partner.phone || "";
             this.state.platform = platformDisplay(conversation.platform_fm).name;
             this.state.messages = foundMessages.reverse().map((message) => {
                 const staffName = message.staff_name_fm || message.staff?.[1] || "";
