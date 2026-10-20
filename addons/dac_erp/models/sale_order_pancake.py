@@ -98,6 +98,25 @@ class SaleOrderPancake(models.Model):
                 _logger.warning(f"Error computing conversation buttons for order {order.name}: {str(e)}")
                 order.conversation_buttons_html = '<div style="color: #dc3545; font-size: 11px; font-style: italic;">Lỗi tải cuộc hội thoại</div>'
 
+    @api.depends('partner_id', 'conversation_id')
+    def _compute_primary_conversation_id(self):
+        for order in self:
+            try:
+                conversation = order.conversation_id
+                if not conversation and order.partner_id:
+                    conversation = self.env['page.fm.conversation'].search(
+                        [('partner_id', 'child_of', order.partner_id.commercial_partner_id.id)],
+                        order='updated_at_fm desc, id desc',
+                        limit=1,
+                    )
+                if conversation:
+                    order.primary_conversation_id = conversation.id
+                else:
+                    order.primary_conversation_id = False
+            except Exception as exc:
+                _logger.warning('Unable to render Pancake channel button for order %s: %s', order.id, exc)
+                order.primary_conversation_id = False
+
     def _get_conversation_button_label(self, conversation):
         recent_customer_name, recent_staff_name = self._get_recent_conversation_names(conversation)
         for candidate in [

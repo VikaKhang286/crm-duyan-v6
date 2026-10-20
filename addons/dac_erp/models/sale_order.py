@@ -717,6 +717,9 @@ class SaleOrder(models.Model):
     conversation_buttons_html = fields.Html(
         string='Conversation Buttons HTML', compute='_compute_conversation_buttons_html', store=False
     )
+    primary_conversation_id = fields.Integer(
+        string='Hội thoại Pancake', compute='_compute_primary_conversation_id', store=False
+    )
 
     # Thông tin bổ sung
     # Số điện thoại đơn hàng

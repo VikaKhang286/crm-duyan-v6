@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="dac_erp.PancakeConversationButton">
+        <button t-if="props.record.data[props.name]" type="button"
+                class="btn btn-sm dac-v6-channel-button"
+                t-on-click="openConversation">
+            <i t-att-class="'fa ' + state.platform.icon" aria-hidden="true"/>
+            <t t-esc="state.platform.name"/>
+        </button>
+    </t>
+
+    <t t-name="dac_erp.PancakeConversationDialog">
+        <Dialog title="'Hội thoại Pancake'" size="'xl'">
+            <div class="dac-pancake-popup-body">
+                <div t-if="state.loading" class="text-muted">Đang tải hội thoại...</div>
+                <div t-elif="state.error" class="alert alert-warning mb-0"><t t-esc="state.error"/></div>
+                <t t-else="">
+                    <div class="dac-pancake-popup-customer">
+                        <strong><t t-esc="state.name"/></strong> · <t t-esc="state.phone"/>
+                    </div>
+                    <div class="dac-pancake-popup-channel">Kênh: <t t-esc="state.platform"/></div>
+                    <div class="dac-pancake-popup-messages">
+                        <t t-if="state.messages.length">
+                            <div t-foreach="state.messages" t-as="message" t-key="message_index"
+                                 t-att-class="'dac-pancake-popup-message ' + (message.isStaff ? 'sale' : 'customer')">
+                                <strong><t t-esc="message.sender"/></strong>
+                                <div><t t-esc="message.body"/></div>
+                            </div>
+                        </t>
+                        <div t-else="" class="text-muted">Chưa có tin nhắn được đồng bộ.</div>
+                    </div>
+                </t>
+                <p class="dac-pancake-popup-note">Hội thoại đã đồng bộ từ Pancake.</p>
+            </div>
+            <t t-set-slot="footer">
+                <button type="button" class="btn btn-secondary" t-on-click="props.close">Hủy</button>
+            </t>
+        </Dialog>
+    </t>
+</templates>

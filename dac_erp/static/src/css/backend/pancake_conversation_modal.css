@@ -41,6 +41,52 @@
   border-bottom: 1px solid #e1e6ee;
 }
 
+.dac-pancake-popup-body {
+  color: #202938;
+  font-size: 20px;
+}
+
+.dac-pancake-popup-customer {
+  margin-bottom: 28px;
+  font-size: 23px;
+}
+
+.dac-pancake-popup-channel {
+  margin-bottom: 28px;
+  font-size: 21px;
+}
+
+.dac-pancake-popup-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 48vh;
+  overflow: auto;
+  padding: 20px 22px;
+  border-radius: 18px;
+  background: #f5f6f8;
+}
+
+.dac-pancake-popup-message {
+  max-width: 88%;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.dac-pancake-popup-message.sale {
+  align-self: flex-end;
+  text-align: right;
+}
+
+.dac-pancake-popup-message.customer {
+  align-self: flex-start;
+}
+
+.dac-pancake-popup-note {
+  margin: 24px 0 0;
+  color: #68758a;
+}
+
 .dac-pancake-dialog-header h2 {
   margin: 0;
   font-size: 32px;
