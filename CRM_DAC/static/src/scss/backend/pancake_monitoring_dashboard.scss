@@ -41,8 +41,8 @@
 .health-list p { display: flex; justify-content: space-between; padding: 10px 0; margin: 0; border-bottom: 1px solid #edf0f4; }
 .healthy { color: #16965b; background: #e9f8f1; padding: 3px 8px; border-radius: 14px; }
 .live-console header button { border: 0; background: transparent; color: #896300; font-weight: 800; }
-.console { margin: 18px; padding: 16px; min-height: 185px; border-radius: 12px; background: #111a2a; color: #d8e1ee; font-family: monospace; }
-.console p { margin: 0 0 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.console { margin: 16px; padding: 14px; min-height: 185px; border-radius: 12px; background: #111a2a; color: #d8e1ee; font-family: monospace; font-size: 9.5px; }
+.console p { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .console time { color: #64d99b; }
 .console .warning b { color: #ffc94b; }
 .console .error b { color: #ff6685; }

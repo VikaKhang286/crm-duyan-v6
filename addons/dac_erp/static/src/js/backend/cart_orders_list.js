@@ -10,6 +10,7 @@ import { user } from "@web/core/user";
 const HERO_CLASS = "dac-cart-orders-hero";
 const TOOLBAR_CLASS = "dac-cart-orders-toolbar";
 const KANBAN_CLASS = "dac-cart-orders-kanban";
+const BULK_ACTIONS_CLASS = "dac-cart-bulk-actions";
 const KANBAN_STAGES = [
     ["quotation", "Báo giá"],
     ["deposit", "Thiết kế/Cọc"],
@@ -52,6 +53,10 @@ export class CartOrdersListController extends ListController {
         this.cartSearchTimer = null;
         this.cartViewMode = "list";
         this.cartKanbanRequest = 0;
+        this.cartSelectionChangeHandler = () => {
+            window.requestAnimationFrame(() => this.refreshCartBulkActions(this.rootRef?.el));
+            window.setTimeout(() => this.refreshCartBulkActions(this.rootRef?.el), 0);
+        };
         onMounted(async () => {
             this.mountCartOrdersHero();
             this.bindQuickSaleRows();
@@ -214,6 +219,13 @@ export class CartOrdersListController extends ListController {
                     </select>
                     <select class="dac-cart-sale-select" aria-label="Sale"><option value="">Tất cả Sale</option></select>
                     <button type="button" class="dac-cart-toolbar-filter">Bộ lọc</button>
+                    <div class="${BULK_ACTIONS_CLASS}" hidden>
+                        <button type="button" class="dac-cart-bulk-actions-toggle" aria-expanded="false" aria-haspopup="true">
+                            <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
+                            <span>Tác vụ</span>
+                            <span class="dac-cart-bulk-actions-count" aria-label="Số đơn đã chọn">0</span>
+                        </button>
+                    </div>
                 </div>
                 <div class="dac-cart-view-toggle" aria-label="Kiểu hiển thị">
                     <button type="button" class="active">Danh sách</button>
@@ -238,6 +250,12 @@ export class CartOrdersListController extends ListController {
             toolbar.querySelector(".dac-cart-toolbar-filter")?.addEventListener("click", () => {
                 root.querySelector(".o_control_panel .o_searchview_dropdown_toggler")?.click();
             });
+            toolbar.querySelector(".dac-cart-bulk-actions-toggle")?.addEventListener("click", () => {
+                this.openNativeCartActions(root, toolbar.querySelector(".dac-cart-bulk-actions-toggle"));
+            });
+            root.addEventListener("change", this.cartSelectionChangeHandler);
+            root.addEventListener("input", this.cartSelectionChangeHandler, true);
+            root.addEventListener("click", this.cartSelectionChangeHandler, true);
             toolbar.querySelector(".dac-cart-stage-select")?.addEventListener("change", (event) => {
                 const value = event.currentTarget.value;
                 this.applyToolbarFilter("stage", value ? [["order_state_custom", "=", value]] : [], event.currentTarget.selectedOptions[0]?.textContent || "Giai đoạn");
@@ -253,6 +271,46 @@ export class CartOrdersListController extends ListController {
         } else if (toolbar.nextElementSibling !== renderer) {
             renderer.before(toolbar);
         }
+        this.refreshCartBulkActions(root);
+    }
+
+    getSelectedCartOrders(root) {
+        // The CheckBox rendered by Odoo's ListRenderer exposes the current
+        // selection in the row selector input. Read the rendered list rows so
+        // this remains correct even when the controller model is paged.
+        return Array.from(root?.querySelectorAll(
+            ".o_list_renderer tbody tr.o_data_row_selected"
+        ) || []);
+    }
+
+    refreshCartBulkActions(root) {
+        const wrap = root?.querySelector(`.${BULK_ACTIONS_CLASS}`);
+        const toggle = wrap?.querySelector(".dac-cart-bulk-actions-toggle");
+        const count = wrap?.querySelector(".dac-cart-bulk-actions-count");
+        if (!wrap || !toggle || !count) return;
+
+        const selected = this.getSelectedCartOrders(root);
+        wrap.hidden = selected.length === 0;
+        root?.classList.toggle("dac-cart-has-selection", selected.length > 0);
+        count.textContent = String(selected.length);
+        count.setAttribute("aria-label", `${selected.length} đơn đã chọn`);
+    }
+
+    openNativeCartActions(root, customButton) {
+        const nativeButton = root?.querySelector('.o_cp_action_menus button[data-hotkey="u"]');
+        if (!nativeButton || !customButton) return;
+        const rect = customButton.getBoundingClientRect();
+        Object.assign(nativeButton.style, {
+            position: "fixed",
+            left: `${rect.left}px`,
+            top: `${rect.top}px`,
+            width: `${rect.width}px`,
+            height: `${rect.height}px`,
+            opacity: "0",
+            pointerEvents: "none",
+            zIndex: "1050",
+        });
+        nativeButton.click();
     }
 
     setCartViewMode(mode) {
@@ -426,10 +484,15 @@ export class CartOrdersListController extends ListController {
     removeCartOrdersHero() {
         window.clearTimeout(this.cartSearchTimer);
         const root = this.rootRef?.el;
+        root?.removeEventListener("change", this.cartSelectionChangeHandler);
+        root?.removeEventListener("input", this.cartSelectionChangeHandler, true);
+        root?.removeEventListener("click", this.cartSelectionChangeHandler, true);
+        root?.querySelector('.o_cp_action_menus button[data-hotkey="u"]')?.removeAttribute("style");
         root?.querySelector(`.${HERO_CLASS}`)?.remove();
         root?.querySelector(`.${TOOLBAR_CLASS}`)?.remove();
         root?.querySelector(`.${KANBAN_CLASS}`)?.remove();
         root?.classList.remove("dac-cart-orders-list");
+        root?.classList.remove("dac-cart-has-selection");
     }
 }
 
