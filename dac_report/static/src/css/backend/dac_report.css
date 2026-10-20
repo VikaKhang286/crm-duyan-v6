@@ -910,8 +910,9 @@
   width: 42px;
   height: 42px;
   border-radius: 10px;
-  display: grid;
-  place-items: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
   font-size: 17px;
   flex: none
 }

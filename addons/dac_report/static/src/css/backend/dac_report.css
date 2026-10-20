@@ -910,8 +910,9 @@
   width: 42px;
   height: 42px;
   border-radius: 10px;
-  display: grid;
-  place-items: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
   font-size: 17px;
   flex: none
 }
@@ -1936,14 +1937,24 @@
   padding: 20px;
   align-items: flex-start;
   justify-content: space-between;
-  overflow: hidden
+  overflow: hidden;
+  width: 100%;
 }
 
 .dac-kpi-card .dac-kpi-main {
   display: flex;
   flex-direction: column;
   align-items: flex-start !important;
-  z-index: 1
+  z-index: 1;
+  width: 100%;
+}
+
+.dac-kpi-main .dac-kpi-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%
 }
 
 .dac-kpi-main>span {
@@ -1969,9 +1980,10 @@
 }
 
 .dac-kpi-card .dac-kpi-icon {
-  order: 2;
+  order: 0;
   width: 38px;
-  height: 38px
+  height: 38px;
+  flex: none
 }
 
 .dac-kpi-progress {
@@ -1993,23 +2005,11 @@
 
 .dac-spark {
   position: absolute;
-  right: 20px;
-  bottom: 18px;
-  width: 62px;
-  height: 22px;
-  border-bottom: 2px solid #ffca63;
-  transform: skewY(-12deg);
-  opacity: .9
-}
-
-.dac-spark:after {
-  content: "";
-  position: absolute;
-  right: 0;
-  bottom: -2px;
-  width: 18px;
-  border-top: 2px solid currentColor;
-  transform: skewY(-28deg)
+  right: 12px;
+  bottom: 9px;
+  width: 60px;
+  height: 34px;
+  opacity: .6
 }
 
 .dac-spark.yellow {
