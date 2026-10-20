@@ -350,11 +350,7 @@ class SaleOrderWorkflow(models.Model):
         return True
 
     def action_open_sales_list(self):
-        return {
-            'type': 'ir.actions.act_url',
-            'url': '/odoo/action-555',
-            'target': 'self',
-        }
+        return self.env.ref('dac_erp.dac_sale_order_cart_action').read()[0]
 
     def action_print_quotation(self):
         self.ensure_one()

@@ -206,8 +206,7 @@ patch(NavBar.prototype, {
     async openDacSearchItem(item) {
         this.closeDacGlobalSearch();
         if (item.actionKey === "orders") {
-            window.location.assign("/odoo/action-555");
-            return;
+            return this.dacSearchAction.doAction("dac_erp.dac_sale_order_cart_action");
         }
         if (item.resId) {
             return this.dacSearchAction.doAction({

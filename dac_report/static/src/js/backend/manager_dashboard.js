@@ -613,7 +613,7 @@ export class ManagerDashboard extends Component {
   }
 
   openAllOrders() {
-    window.location.assign("/odoo/action-555");
+    return this.action.doAction("dac_erp.dac_sale_order_cart_action");
   }
 
   /**

@@ -14,11 +14,7 @@ class SaleOrder(models.Model):
     @api.model
     def action_open_new_sale_order(self):
         """Open the native new quotation page from custom order lists."""
-        return {
-            'type': 'ir.actions.act_url',
-            'url': '/odoo/action-555/new',
-            'target': 'blank',
-        }
+        return self.env.ref('dac_erp.action_new_cart_sale_order').read()[0]
 
     def action_cancel(self):
         """Hủy trực tiếp một batch; giữ wizard chuẩn khi chỉ chọn một đơn."""
