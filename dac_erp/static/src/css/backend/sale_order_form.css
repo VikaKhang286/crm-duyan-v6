@@ -1741,7 +1741,10 @@
   font-size: 11px;
   font-weight: 800;
 }
-
+.dac-sale-form .dac-v6-customer-value>.o_field_widget {
+  display: flex;
+  align-items: center;
+}
 .dac-sale-form .dac-v6-customer-value>.o_field_widget,
 .dac-sale-form .dac-v6-customer-value .o_field_many2one_selection,
 .dac-sale-form .dac-v6-customer-value .o_input_dropdown,
@@ -1766,15 +1769,35 @@
 }
 
 .dac-sale-form .dac-v6-channel-button {
-  min-height: 31px;
-  padding: 6px 10px !important;
-  border: 1px solid #ead58a !important;
-  border-radius: 8px !important;
-  background: #fff9df !important;
-  color: #775a00 !important;
-  font-size: 9px !important;
-  font-weight: 800 !important;
+  margin-left: auto;
+  max-width: 100%;
+  border-radius: 7px !important;
+  padding: 6px 9px !important;
   white-space: nowrap;
+  flex: none;
+  background: #fff9df !important;
+  border: 1px solid #e9d897 !important;
+  color: #805b00 !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 38px;
+  transition: .15s;
+}
+.dac-sale-form .dac-v6-channel-button:before {
+    content: 'f';
+    display: grid;
+    place-items: center;
+    color: #fff;
+    background: #1877f2;
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    font-weight: 800;
+    font-size: 16px;
 }
 
 @media (max-width: 900px) {

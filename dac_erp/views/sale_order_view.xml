@@ -194,7 +194,7 @@
                                                 <div class="dac-v6-customer-row dac-v6-address-row" title="Địa chỉ giao hàng">
                                                     <span class="dac-v6-customer-icon"><i class="fa fa-map-marker"/><span class="visually-hidden">Địa chỉ giao hàng</span></span>
                                                     <span class="dac-v6-customer-value"><field name="customer_address" nolabel="1" placeholder="Nhập địa chỉ giao hàng" readonly="is_design_user or is_production_user"/></span>
-                                                    <button name="action_view_conversations" type="object" class="btn btn-sm dac-v6-channel-button" invisible="conversation_count &lt;= 0" groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager,base.group_system"><i class="fa fa-facebook-square me-1"/>Fanpage Facebook</button>
+                                                    <button name="action_view_conversations" type="object" class="btn btn-sm dac-v6-channel-button" invisible="conversation_count &lt;= 0" groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager,base.group_system">Fanpage Facebook</button>
                                                 </div>
                                             </div>
                                         </div>

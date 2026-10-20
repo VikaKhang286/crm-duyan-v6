@@ -7,28 +7,28 @@
         
         <!-- App 1: Bán Hàng & CRM -->
         <menuitem id="dac_sale_crm_root"
-                  name="DAC Bán Hàng &amp; CRM"
+                  name="CRM"
                   sequence="10"
                   web_icon="sale_management,static/description/icon.png"
                   groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager"/>
 
         <!-- App 2: Sản Xuất & Vận Hành -->
         <menuitem id="dac_operations_root"
-                  name="DAC Sản Xuất &amp; Vận Hành"
+                  name="Vận Hành"
                   sequence="20"
                   web_icon="mrp,static/description/icon.png"
                   groups="dac_erp.group_dac_erp_design,dac_erp.group_dac_erp_production,dac_erp.group_dac_erp_manager"/>
 
         <!-- App 3: Tài Chính & Công Nợ -->
         <menuitem id="dac_finance_root"
-                  name="DAC Tài Chính &amp; Công Nợ"
+                  name="Tài Chính"
                   sequence="30"
                   web_icon="account,static/description/icon.png"
                   groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager,base.group_system"/>
 
         <!-- App 5: Cấu Hình & Hệ Thống -->
         <menuitem id="dac_system_settings_root"
-                  name="DAC Cấu Hình Hệ Thống"
+                  name="Hệ Thống"
                   sequence="100"
                   web_icon="base,static/description/settings.png"
                   groups="dac_erp.group_dac_erp_manager,base.group_system"/>

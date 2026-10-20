@@ -1,0 +1,135 @@
+.dac-pancake-modal {
+  display: none;
+}
+
+.dac-pancake-modal:target {
+  display: flex;
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.dac-pancake-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(22, 30, 43, 0.42);
+}
+
+.dac-pancake-dialog {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(1000px, 96vw);
+  max-height: 90vh;
+  overflow: hidden;
+  border-radius: 24px;
+  background: #fff;
+  color: #202938;
+  box-shadow: 0 16px 60px rgba(20, 30, 50, 0.24);
+  font-size: 20px;
+}
+
+.dac-pancake-dialog-header,
+.dac-pancake-dialog-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 40px;
+  border-bottom: 1px solid #e1e6ee;
+}
+
+.dac-pancake-dialog-header h2 {
+  margin: 0;
+  font-size: 32px;
+  font-weight: 700;
+}
+
+.dac-pancake-close {
+  display: inline-flex;
+  width: 56px;
+  height: 56px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #dce2eb;
+  border-radius: 16px;
+  color: #596579;
+  font-size: 32px;
+  text-decoration: none;
+}
+
+.dac-pancake-dialog-body {
+  overflow: auto;
+  padding: 40px;
+}
+
+.dac-pancake-customer {
+  margin-bottom: 32px;
+  font-size: 24px;
+}
+
+.dac-pancake-channel {
+  margin-bottom: 32px;
+  font-size: 22px;
+}
+
+.dac-pancake-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 48vh;
+  overflow: auto;
+  padding: 20px 24px;
+  border-radius: 18px;
+  background: #f5f6f8;
+}
+
+.dac-pancake-message {
+  max-width: 88%;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.dac-pancake-message.sale {
+  align-self: flex-end;
+  text-align: right;
+}
+
+.dac-pancake-message.customer {
+  align-self: flex-start;
+}
+
+.dac-pancake-note {
+  margin: 28px 0 0;
+  color: #68758a;
+}
+
+.dac-pancake-dialog-footer {
+  justify-content: flex-end;
+  border-top: 1px solid #e1e6ee;
+  border-bottom: 0;
+}
+
+@media (max-width: 600px) {
+  .dac-pancake-modal:target {
+    padding: 8px;
+  }
+
+  .dac-pancake-dialog-header,
+  .dac-pancake-dialog-footer,
+  .dac-pancake-dialog-body {
+    padding: 20px;
+  }
+
+  .dac-pancake-dialog-header h2 {
+    font-size: 24px;
+  }
+
+  .dac-pancake-customer,
+  .dac-pancake-channel,
+  .dac-pancake-dialog {
+    font-size: 16px;
+  }
+}
