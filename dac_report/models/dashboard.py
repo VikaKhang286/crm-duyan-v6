@@ -194,7 +194,7 @@ class SaleOrderDashboardService(models.Model):
     
 
     @api.model
-    def dac_get_dashboard(self, date_from=False, date_to=False, company_id=False):
+    def dac_get_dashboard(self, date_from=False, date_to=False, company_id=False, comparison_period='month'):
         # Kiểm tra quyền xem Dashboard Sale
         user = self.env.user
         if not (user.has_group('dac_erp.group_dac_erp_manager') or 
@@ -216,6 +216,27 @@ class SaleOrderDashboardService(models.Model):
             date_from = today.replace(day=1)
         if not date_to:
             date_to = today
+
+        if comparison_period == 'month':
+            previous_to = date_from - timedelta(days=1)
+            previous_from = previous_to.replace(day=1)
+            elapsed_days = (date_to - date_from).days
+            previous_to = min(
+                previous_to,
+                previous_from + timedelta(days=elapsed_days),
+            )
+        elif comparison_period == 'quarter':
+            previous_to = date_from - timedelta(days=1)
+            quarter_start_month = ((previous_to.month - 1) // 3) * 3 + 1
+            previous_from = previous_to.replace(month=quarter_start_month, day=1)
+            elapsed_days = (date_to - date_from).days
+            previous_to = min(
+                previous_to,
+                previous_from + timedelta(days=elapsed_days),
+            )
+        else:
+            previous_to = date_from - timedelta(days=1)
+            previous_from = previous_to - (date_to - date_from)
 
         fmt = lambda a: formatLang(self.env, a, currency_obj=currency)
         doms = self._dashboard_domains()
@@ -253,8 +274,33 @@ class SaleOrderDashboardService(models.Model):
         total_revenue = self._safe_sum_amount_total(s_dom)
         closed_count = self._rg_count(self, s_dom, "id")
 
+        previous_s_dom = [
+            ("company_id", "=", company.id),
+            ("date_order", ">=", previous_from),
+            ("date_order", "<=", previous_to),
+        ]
+        if "order_state_custom" in self._fields:
+            previous_s_dom += [
+                "|",
+                ("state", "in", ("sale", "done")),
+                ("order_state_custom", "in", ["production", "delivery", "payment", "completed"])
+            ]
+        else:
+            previous_s_dom += [("state", "in", ("sale", "done"))]
+        if not manager:
+            previous_s_dom.append(("user_id", "=", uid))
+        previous_revenue = self._safe_sum_amount_total(previous_s_dom)
+        previous_closed_count = self._rg_count(self, previous_s_dom, "id")
+        closed_delta = closed_count - previous_closed_count
+        revenue_change_percent = (
+            round((total_revenue - previous_revenue) * 100.0 / previous_revenue, 1)
+            if previous_revenue else (0.0 if not total_revenue else None)
+        )
+
         # ---- EXPECTED (từ quotation) ----
         expected = self._dashboard_expected_revenue(date_from, date_to, company)
+        previous_expected = self._dashboard_expected_revenue(previous_from, previous_to, company)
+        expected_delta = expected - previous_expected
 
         # ---- INVOICES PAID (collected) ----
         Move = self.env["account.move"]
@@ -657,6 +703,9 @@ class SaleOrderDashboardService(models.Model):
                 'target': goal,
                 'closed': closed_count,
                 'expected': expected,
+                'revenue_change_percent': revenue_change_percent,
+                'closed_delta': closed_delta,
+                'expected_delta': expected_delta,
                 'progress_percent': round(progress_ratio * 100, 1),
             },
             'revenue_series': revenue_series,

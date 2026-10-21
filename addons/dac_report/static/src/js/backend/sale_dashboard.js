@@ -66,7 +66,7 @@ class DacSaleDashboard extends Component {
     this.state.loading = true;
     try {
       const [dateFrom, dateTo] = this._periodRange(this.state.period);
-      const data = await this.orm.call("sale.order", "dac_get_dashboard", [dateFrom, dateTo]);
+      const data = await this.orm.call("sale.order", "dac_get_dashboard", [dateFrom, dateTo, false, this.state.period]);
       this.state.data = data || {};
     } catch (e) {
       this.state.error = (e && e.message) || String(e);
@@ -103,6 +103,30 @@ class DacSaleDashboard extends Component {
 
   get periodTitle() {
     return { '7d': '7 ngày gần nhất', '30d': '30 ngày gần nhất', month: 'tháng này', quarter: 'quý này' }[this.state.period];
+  }
+
+  get comparisonPeriodTitle() {
+    return { '7d': '7 ngày trước', '30d': '30 ngày trước', month: 'tháng trước', quarter: 'quý trước' }[this.state.period];
+  }
+
+  get periodUnitTitle() {
+    return { '7d': '7 ngày', '30d': '30 ngày', month: 'tháng', quarter: 'quý' }[this.state.period];
+  }
+
+  formatSignedInteger(value) {
+    const amount = Number(value || 0);
+    return `${amount > 0 ? '+' : ''}${new Intl.NumberFormat('vi-VN').format(amount)}`;
+  }
+
+  formatSignedCompact(value) {
+    const amount = Number(value || 0);
+    return `${amount > 0 ? '+' : amount < 0 ? '-' : ''}${this.formatCompact(Math.abs(amount))}`;
+  }
+
+  formatSignedPercent(value) {
+    if (value === false || value === null || value === undefined) return 'Mới';
+    const amount = Number(value || 0);
+    return `${amount > 0 ? '+' : ''}${new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 1 }).format(amount)}%`;
   }
 
   get saleV6() {
