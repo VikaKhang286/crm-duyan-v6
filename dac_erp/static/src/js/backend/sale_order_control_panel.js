@@ -10,6 +10,53 @@ const ACTIVE_CLASS = "dac-sale-order-control-panel-active";
 const FLOATING_MENU_CLASS = "dac-title-actions-menu--floating";
 const STATE_CLASS_PREFIX = "dac-order-state-";
 const REVIEW_CLASS = "dac-workflow-review-mode";
+const SALE_ORDER_PHONE_SELECTOR = '.o_field_widget[name="phone"] input';
+
+function configureSaleOrderPhoneInput(input) {
+  input.inputMode = "numeric";
+  input.maxLength = 10;
+  input.setAttribute("pattern", "[0-9]{10}");
+  input.setAttribute("autocomplete", "tel-national");
+  const digits = input.value.replace(/[^0-9]/g, "");
+  if (digits.length === 10 && input.value !== digits) {
+    input.value = digits;
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+}
+
+document.addEventListener("focusin", (event) => {
+  const input = event.target.closest?.(SALE_ORDER_PHONE_SELECTOR);
+  if (input) {
+    configureSaleOrderPhoneInput(input);
+  }
+}, true);
+
+document.addEventListener("beforeinput", (event) => {
+  const input = event.target;
+  if (!input.matches?.(SALE_ORDER_PHONE_SELECTOR) || !event.inputType?.startsWith("insert")) {
+    return;
+  }
+  const inserted = event.data ?? event.dataTransfer?.getData("text/plain");
+  if (inserted == null) {
+    return;
+  }
+  const selectedLength = (input.selectionEnd || 0) - (input.selectionStart || 0);
+  if (/[^0-9]/.test(inserted) || input.value.length - selectedLength + inserted.length > 10) {
+    event.preventDefault();
+  }
+}, true);
+
+document.addEventListener("input", (event) => {
+  const input = event.target;
+  if (!input.matches?.(SALE_ORDER_PHONE_SELECTOR)) {
+    return;
+  }
+  const normalized = input.value.replace(/[^0-9]/g, "").slice(0, 10);
+  if (input.value !== normalized) {
+    input.value = normalized;
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+}, true);
 
 function isSaleOrderForm(controller) {
   return controller.props?.resModel === "sale.order";
@@ -154,6 +201,7 @@ patch(FormController.prototype, {
     onPatched(() => {
       this.mountSaleOrderControlPanel();
       this.syncSaleOrderDirtyState();
+      this.syncSaleOrderEditControls();
     });
 
     onWillUnmount(() => {
@@ -189,10 +237,69 @@ patch(FormController.prototype, {
     this.syncSaleOrderStateClass();
     this.syncWorkflowReviewMode();
     this.bindNewSaleOrderButton(sourceBar);
+    this.bindSaleOrderEditControls(sourceBar);
     this.bindWorkflowReviewSteps(sourceBar);
     this.bindSaleOrderActionMenu();
     this.syncInternalNoteBadge();
     this.syncSaleOrderDirtyState();
+    this.syncSaleOrderEditControls();
+  },
+
+  bindSaleOrderEditControls(sourceBar) {
+    if (this.__dacSaleOrderEditBar === sourceBar) {
+      return;
+    }
+    this.__dacSaleOrderEditCleanup?.();
+
+    const onClick = async (event) => {
+      const editButton = event.target.closest(".dac-edit-order-btn");
+      const saveButton = event.target.closest(".dac-save-btn");
+      if (!editButton && !saveButton) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation?.();
+
+      const root = this.model?.root;
+      if (!root) {
+        return;
+      }
+      if (editButton) {
+        if (!root.isInEdition && this.canEdit) {
+          await root.switchMode("edit");
+        }
+      } else if (root.isInEdition) {
+        const saved = await this.saveButtonClicked();
+        if (saved) {
+          await root.switchMode("readonly");
+        }
+      }
+      this.syncSaleOrderEditControls();
+    };
+
+    sourceBar.addEventListener("click", onClick, true);
+    this.__dacSaleOrderEditBar = sourceBar;
+    this.__dacSaleOrderEditCleanup = () => sourceBar.removeEventListener("click", onClick, true);
+  },
+
+  syncSaleOrderEditControls() {
+    const root = this.model?.root;
+    const sourceBar = getSourceBar(this);
+    const editButton = sourceBar?.querySelector(".dac-edit-order-btn");
+    const saveButton = sourceBar?.querySelector(".dac-save-btn");
+    if (!root || !sourceBar) {
+      return;
+    }
+    const editing = root.isInEdition;
+    if (editButton) {
+      const blocked = ["cancel", "completed"].includes(root.data?.order_state_custom);
+      editButton.hidden = editing || !root.resId || !this.canEdit || blocked;
+    }
+    if (saveButton) {
+      const blocked = ["cancel", "completed"].includes(root.data?.order_state_custom);
+      saveButton.hidden = !editing || blocked;
+    }
   },
 
   syncInternalNoteBadge() {
@@ -370,6 +477,9 @@ patch(FormController.prototype, {
     this.__dacWorkflowReviewCleanup?.();
     this.__dacWorkflowReviewCleanup = null;
     this.__dacWorkflowReviewBar = null;
+    this.__dacSaleOrderEditCleanup?.();
+    this.__dacSaleOrderEditCleanup = null;
+    this.__dacSaleOrderEditBar = null;
     this.__dacReviewedWorkflowState = null;
     this.unbindSaleOrderActionMenu();
     this.clearSaleOrderStateClass();

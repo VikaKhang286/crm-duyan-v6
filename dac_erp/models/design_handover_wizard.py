@@ -119,18 +119,13 @@ class SaleOrderDesignPanel(models.Model):
             order.delivery_method_display = 'Chành xe' if is_bus else 'Đơn vị vận chuyển'
             if is_bus:
                 carrier_name = order.bus_carrier_name or 'Chành xe'
-                tracking_reference = order.bus_shipping_info or 'Chưa có thông tin gửi hàng'
             else:
                 carrier_name = (
                     shipping_carrier_labels.get(order.shipping_carrier)
                     if order.shipping_carrier not in (False, 'choose-option')
                     else 'Đơn vị vận chuyển'
                 )
-                tracking_reference = order.shipping_tracking_code or 'Chưa có mã vận đơn'
-            order.delivery_shipping_summary = '%s · %s' % (
-                carrier_name,
-                tracking_reference,
-            )
+            order.delivery_shipping_summary = carrier_name
             order.delivery_can_complete = status == 'delivered'
             if status == 'returned':
                 order.delivery_next_message = (

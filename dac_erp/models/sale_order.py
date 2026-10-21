@@ -2,6 +2,7 @@ from odoo import models, fields, api, _
 from odoo.exceptions import UserError, ValidationError
 from odoo.osv import expression
 import logging
+import re
 from datetime import date, datetime, time, timedelta
 
 
@@ -489,6 +490,8 @@ class SaleOrder(models.Model):
 
     def write(self, vals):
         """Override write để trigger kiểm tra deposit khi cần"""
+        if 'phone' in vals:
+            self._validate_customer_phone(vals.get('phone'))
         if 'order_state_custom' in vals and 'workflow_review_state' not in vals:
             vals['workflow_review_state'] = vals['order_state_custom']
 
@@ -677,6 +680,8 @@ class SaleOrder(models.Model):
     def create(self, vals_list):
         """Override create để đảm bảo người tạo đơn hàng sẽ là người phụ trách và set đúng giờ cho trường date"""
         for vals in vals_list:
+            if 'phone' in vals:
+                self._validate_customer_phone(vals.get('phone'))
             # Nếu không có user_id được set, gán người tạo làm người phụ trách
             if not vals.get('user_id'):
                 vals['user_id'] = self.env.user.id
@@ -704,6 +709,12 @@ class SaleOrder(models.Model):
             if rec.user_id_design:
                 rec._sync_design_task()
         return records
+
+    @api.model
+    def _validate_customer_phone(self, phone):
+        """Allow an empty number, otherwise require exactly 10 ASCII digits."""
+        if phone and not re.fullmatch(r'[0-9]{10}', str(phone)):
+            raise ValidationError(_("Số điện thoại phải gồm đúng 10 chữ số."))
 
     # Cho nút mở hội thoại
     conversation_id = fields.Many2one(

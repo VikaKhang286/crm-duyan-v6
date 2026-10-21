@@ -612,7 +612,7 @@ export class ManagerDashboard extends Component {
     return this.quickSale.open(orderId);
   }
 
-  openAllOrders() {
+  openCartOrders() {
     return this.action.doAction("dac_erp.dac_sale_order_cart_action");
   }
 

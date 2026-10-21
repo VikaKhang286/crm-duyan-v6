@@ -41,7 +41,7 @@
             </div>
           </article>
           <article class="dac-sale-panel dac-source-panel">
-            <div class="dac-panel-head dac-chart-head"><div><h2>Nguồn khách hàng</h2><p>Phân bổ lead theo kênh</p></div><button class="dac-link-btn" t-on-click="openAllOrders">Chi tiết</button></div>
+            <div class="dac-panel-head dac-chart-head"><div><h2>Nguồn khách hàng</h2><p>Phân bổ lead theo kênh</p></div><button class="dac-link-btn" t-on-click="openOrders">Chi tiết</button></div>
             <div class="dac-source-content">
               <div class="dac-donut" t-att-style="'background:' + leadSourceStyle"><div><strong><t t-esc="leadSourceTotal"/></strong><span>lead mới</span></div></div>
               <div class="dac-source-list"><div t-foreach="saleV6.lead_sources" t-as="source" t-key="source.label"><span><i t-att-class="'source-' + source_index"/><t t-esc="source.label"/></span><strong><t t-esc="leadSourcePercent(source.count)"/>%</strong></div></div>
@@ -51,7 +51,7 @@
 
         <section class="dac-sale-grid dac-sale-focus-grid">
           <article class="dac-sale-panel dac-pipeline-panel">
-            <div class="dac-panel-head dac-focus-head"><div><h2>Sales Pipeline</h2><p>Tổng giá trị cơ hội: <strong><t t-esc="formatCompact(saleV6.pipeline_total)"/></strong></p></div><button class="dac-link-btn" t-on-click="openAllOrders">Xem toàn bộ</button></div>
+            <div class="dac-panel-head dac-focus-head"><div><h2>Sales Pipeline</h2><p>Tổng giá trị cơ hội: <strong><t t-esc="formatCompact(saleV6.pipeline_total)"/></strong></p></div><button class="dac-link-btn" t-on-click="openOrders">Xem toàn bộ</button></div>
             <div class="dac-pipeline">
               <article t-foreach="saleV6.pipeline" t-as="stage" t-key="stage.key" t-att-class="'dac-stage ' + stage.key">
                 <span><t t-esc="stage.label"/></span>
@@ -75,7 +75,7 @@
 
         <section class="dac-sale-grid dac-sale-grid-bottom dac-orders-only">
           <article class="dac-sale-panel dac-orders-panel">
-            <div class="dac-panel-head dac-orders-head"><div><h2>Đơn hàng gần đây</h2><p>Click một đơn để mở Quick View</p></div><button class="dac-link-btn" t-on-click="openAllOrders">Xem tất cả đơn</button></div>
+            <div class="dac-panel-head dac-orders-head"><div><h2>Đơn hàng gần đây</h2><p>Click một đơn để mở Quick View</p></div><button class="dac-link-btn" t-on-click="openOrders">Xem tất cả đơn</button></div>
             <div class="dac-orders-table-wrap"><table class="dac-orders-table"><thead><tr><th>Mã đơn</th><th>Khách hàng</th><th>Sale</th><th>Giai đoạn</th><th>Deadline</th><th>Tổng tiền</th><th>Công nợ</th></tr></thead><tbody>
               <tr t-foreach="saleV6.recent_orders" t-as="order" t-key="order.id" t-on-click="() => this.openForm('sale.order', order.id)">
                 <td class="dac-order-code"><strong><t t-esc="order.number"/></strong></td>

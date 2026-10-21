@@ -16,6 +16,11 @@
                     <attribute name="string">Sản xuất</attribute>
                 </xpath>
 
+                <!-- The product grid is rendered in the main V6 layout below.
+                     Remove its legacy notebook page so order_line has one widget
+                     instance on the form. -->
+                <xpath expr="//sheet/notebook[1]/page[1]" position="replace"/>
+
                 <xpath expr="//notebook" position="inside">
                     <page string="Thanh toán"
                           groups="dac_erp.group_dac_erp_manager,dac_erp.group_dac_erp_sale">
@@ -142,7 +147,7 @@
                             </div>
                             <div class="dac-order-lines-panel">
                                 <field name="order_line" widget="section_and_note_one2many" mode="list,kanban"
-                                       readonly="state == 'cancel' or locked"
+                                       readonly="state == 'cancel'"
                                        can_delete="can_delete_products"
                                        context="{'list_view_ref': 'dac_erp.sale_order_line_list_view'}">
                                     <list editable="bottom">
@@ -153,12 +158,12 @@
                                         </control>
                                         <field name="sequence" widget="handle" optional="show"/>
                                         <field name="product_id" string="Sản phẩm" context="{'display_default_code': False, 'dac_variant_display': True, 'dac_cart_accessory_prefix': True, 'dac_cart_product_create': parent.order_type == 'cart', 'default_type': 'cart' if parent.order_type == 'cart' else 'consu'}" domain="[('sale_ok', '=', True), ('type', 'in', ['cart', 'cart_accessory'])] if parent.order_type == 'cart' else [('sale_ok', '=', True)]" invisible="display_type"/>
-                                        <field name="description" string="Nội dung" invisible="display_type"/>
-                                        <field name="material_id" string="Chất liệu" invisible="display_type" options="{'no_create': True, 'no_open': True}" column_invisible="parent.order_type == 'general'"/>
-                                        <field name="cart_dimension_id" string="Kích thước" invisible="display_type" domain="[('is_standard', '=', True)]" options="{'no_quick_create': True}" column_invisible="parent.order_type != 'cart'"/>
+                                        <field name="description" string="Nội dung" invisible="display_type" readonly="parent.state == 'cancel'"/>
+                                        <field name="material_id" string="Chất liệu" invisible="display_type" options="{'no_create': True, 'no_open': True}" column_invisible="parent.order_type == 'general'" readonly="parent.state == 'cancel'"/>
+                                        <field name="cart_dimension_id" string="Kích thước" invisible="display_type" domain="[('is_standard', '=', True)]" options="{'no_quick_create': True}" column_invisible="parent.order_type != 'cart'" readonly="parent.state == 'cancel'"/>
                                         <field name="accessory_price_applied" column_invisible="True" force_save="1"/>
-                                        <field name="product_uom_qty" string="Số lượng" invisible="display_type"/>
-                                        <field name="price_unit" string="Đơn giá" widget="integer" invisible="display_type" column_invisible="parent.is_design_user or parent.is_production_user"/>
+                                        <field name="product_uom_qty" string="Số lượng" invisible="display_type" readonly="parent.state == 'cancel'"/>
+                                        <field name="price_unit" string="Đơn giá" widget="integer" invisible="display_type" column_invisible="parent.is_design_user or parent.is_production_user" readonly="parent.state == 'cancel'"/>
                                         <field name="price_subtotal" string="Thành tiền" readonly="1" invisible="display_type" column_invisible="parent.is_design_user or parent.is_production_user"/>
                                         <field name="company_id" invisible="1"/>
                                         <field name="currency_id" invisible="1"/>
@@ -169,7 +174,7 @@
                                 <field name="currency_id" invisible="1"/>
                                 <div class="dac-summary-row"><span class="dac-summary-label">Tạm tính</span><span class="dac-summary-value"><field name="amount_untaxed_original" readonly="1" widget="monetary" nolabel="1"/></span></div>
                                 <div class="dac-summary-row" invisible="order_type == 'cart'"><span class="dac-summary-label">Thuế</span><span class="dac-summary-value"><field name="amount_tax" readonly="1" widget="monetary" nolabel="1"/></span></div>
-                                <div class="dac-summary-row"><span class="dac-summary-label">Khuyến mãi/Giảm giá</span><span class="dac-summary-value"><field name="promotion_amount" widget="monetary" nolabel="1" readonly="is_design_user or is_production_user"/></span></div>
+                                <div class="dac-summary-row" invisible="1"><span class="dac-summary-label">Khuyến mãi/Giảm giá</span><span class="dac-summary-value"><field name="promotion_amount" widget="monetary" nolabel="1" readonly="is_design_user or is_production_user"/></span></div>
                                 <div class="dac-summary-row"><span class="dac-summary-label">Phí vận chuyển</span><span class="dac-summary-value"><field name="shipping_fee" widget="monetary" nolabel="1" readonly="is_design_user or is_production_user"/></span></div>
                                 <div class="dac-summary-row"><span class="dac-summary-label">Tổng</span><span class="dac-summary-value dac-summary-value--large"><field name="amount_total" readonly="1" widget="monetary" nolabel="1"/></span></div>
                                 <div class="dac-summary-row" invisible="deposit_paid_display == 0"><span class="dac-summary-label">Cọc / Đã thanh toán</span><span class="dac-summary-value dac-summary-value--deposit"><field name="deposit_paid_display" readonly="1" widget="monetary" nolabel="1"/></span></div>
@@ -200,7 +205,7 @@
                                         <div><span>Sale</span><b><field name="user_id" nolabel="1" readonly="1"/></b></div>
                                         <div><span>Ngày hẹn</span><b><field name="quotation_appointment_date" nolabel="1" readonly="1"/></b></div>
                                         <div><span>Thuế</span><b><field name="quotation_tax_display" nolabel="1" readonly="1"/></b></div>
-                                        <div><span>Giảm giá</span><b><field name="promotion_amount" nolabel="1" readonly="1" widget="monetary"/></b></div>
+                                        <div invisible="1"><span>Giảm giá</span><b><field name="promotion_amount" nolabel="1" readonly="1" widget="monetary"/></b></div>
                                         <div><span>Phí vận chuyển</span><b><field name="shipping_fee" nolabel="1" readonly="1" widget="monetary"/></b></div>
                                     </div>
                                     <div class="dac-v6-side-details" invisible="workflow_review_state != 'deposit'">
@@ -245,19 +250,19 @@
                                                     groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager,base.group_system"/>
                                         </div>
                                         <field name="shipping_carrier" nolabel="1" invisible="shipping_method != 'carrier'"/>
-                                        <label for="shipping_tracking_code" string="Mã vận đơn" invisible="shipping_method != 'carrier'"/>
-                                        <field name="shipping_tracking_code" nolabel="1" placeholder="Nhập mã đơn để theo dõi" invisible="shipping_method != 'carrier'"/>
-                                        <label for="shipping_status" string="Trạng thái giao hàng" invisible="shipping_method != 'carrier'"/>
-                                        <field name="shipping_status" nolabel="1" invisible="shipping_method != 'carrier'"/>
+                                        <label for="shipping_tracking_code" string="Mã vận đơn" invisible="1"/>
+                                        <field name="shipping_tracking_code" nolabel="1" placeholder="Nhập mã đơn để theo dõi" invisible="1"/>
+                                        <label for="shipping_status" string="Trạng thái giao hàng" invisible="1"/>
+                                        <field name="shipping_status" nolabel="1" invisible="1"/>
                                         <label for="shipping_cod" string="Số tiền thu hộ (COD)" invisible="shipping_method != 'carrier'"/>
                                         <field name="shipping_cod" nolabel="1" widget="monetary" invisible="shipping_method != 'carrier'"/>
                                         <label for="bus_carrier_name" string="Chành xe / nhà xe" invisible="shipping_method != 'bus'"/>
                                         <field name="bus_carrier_name" nolabel="1" placeholder="Tên chành xe" invisible="shipping_method != 'bus'"/>
                                         <label for="bus_shipping_info" string="Thông tin gửi hàng" invisible="shipping_method != 'bus'"/>
                                         <field name="bus_shipping_info" nolabel="1" placeholder="Số xe / số điện thoại / biên nhận" invisible="shipping_method != 'bus'"/>
-                                        <label for="bus_shipping_status" string="Trạng thái giao hàng" invisible="shipping_method != 'bus'"/>
-                                        <field name="bus_shipping_status" nolabel="1" invisible="shipping_method != 'bus'"/>
-                                        <div class="dac-v6-delivery-message dac-v6-delivery-message--waiting" invisible="shipping_method != 'carrier' or shipping_status != 'waiting'">Nhập mã vận đơn để bắt đầu theo dõi hành trình giao hàng.</div>
+                                        <label for="bus_shipping_status" string="Trạng thái giao hàng" invisible="1"/>
+                                        <field name="bus_shipping_status" nolabel="1" invisible="1"/>
+                                        <div class="dac-v6-delivery-message dac-v6-delivery-message--waiting" invisible="shipping_method != 'carrier' or shipping_status != 'waiting'">Đơn hàng đang chờ giao cho đơn vị vận chuyển.</div>
                                         <div class="dac-v6-delivery-message dac-v6-delivery-message--shipping" invisible="shipping_method != 'carrier' or shipping_status != 'shipping'">Đơn đang được vận chuyển. Tiền COD vẫn được theo dõi tại bước Giao hàng.</div>
                                         <div class="dac-v6-delivery-message dac-v6-delivery-message--failed" invisible="shipping_method != 'carrier' or shipping_status != 'failed'">Giao chưa thành công: giữ đơn ở bước Giao hàng để Sale tiếp tục xử lý và hẹn giao lại.</div>
                                         <div class="dac-v6-delivery-message dac-v6-delivery-message--delivered" invisible="shipping_method != 'carrier' or shipping_status != 'delivered'">Giao thành công: đơn đủ trạng thái để chuyển sang Hoàn thành.</div>
@@ -271,9 +276,6 @@
                                             <span>Còn phải thu khách<b><field name="remaining_amount_display" nolabel="1" readonly="1" widget="monetary"/></b></span>
                                             <span>Thu hộ dự kiến<b><field name="shipping_cod" nolabel="1" readonly="1" widget="monetary"/></b></span>
                                             <span>Đã đối soát<b>0đ</b></span>
-                                        </div>
-                                        <div class="dac-v6-delivery-actions" invisible="(shipping_method == 'carrier' and shipping_status != 'waiting') or (shipping_method == 'bus' and bus_shipping_status != 'waiting')">
-                                            <button name="action_start_delivery_tracking" string="Bắt đầu giao hàng" type="object" class="btn btn-warning"/>
                                         </div>
                                     </div>
                                     <div class="dac-v6-side-details" invisible="workflow_review_state != 'installation'">
@@ -488,21 +490,12 @@
                             <b>Chi tiết</b>
                         </div>
                         <div class="dac-v6-delivery-stage-body">
-                            <strong><field name="delivery_status_display" nolabel="1" readonly="1"/></strong>
                             <span><field name="delivery_shipping_summary" nolabel="1" readonly="1"/></span>
                             <span>Thu hộ: <field name="shipping_cod" nolabel="1" readonly="1" widget="monetary"/></span>
                         </div>
-                        <div class="dac-v6-delivery-stage-footer dac-v6-delivery-stage-footer--pending" invisible="delivery_can_complete or (shipping_method == 'carrier' and shipping_status == 'returned') or (shipping_method == 'bus' and bus_shipping_status == 'returned')">
-                            <div><b>Bước tiếp theo: Hoàn thành</b><span><field name="delivery_next_message" nolabel="1" readonly="1"/></span></div>
-                            <button name="dac_disabled_delivery_completion" string="Hoàn thành đơn" type="button" class="btn btn-secondary" disabled="1"/>
-                        </div>
-                        <div class="dac-v6-delivery-stage-footer dac-v6-delivery-stage-footer--returned" invisible="delivery_can_complete or (shipping_method == 'carrier' and shipping_status != 'returned') or (shipping_method == 'bus' and bus_shipping_status != 'returned')">
-                            <div><b>Bước tiếp theo: Hoàn thành</b><span><field name="delivery_next_message" nolabel="1" readonly="1"/></span></div>
-                            <button name="dac_disabled_delivery_completion" string="Hoàn thành đơn" type="button" class="btn btn-secondary" disabled="1"/>
-                        </div>
-                        <div class="dac-v6-delivery-stage-footer dac-v6-delivery-stage-footer--success" invisible="not delivery_can_complete">
-                            <div><b>Bước tiếp theo: Hoàn thành</b><span><field name="delivery_next_message" nolabel="1" readonly="1"/></span></div>
-                            <button name="action_confirm_info" string="Hoàn thành đơn" type="object" class="btn btn-success"/>
+                        <div class="dac-v6-delivery-stage-footer">
+                            <div><b>Bước tiếp theo: Hoàn thành</b><span>Bấm tiếp tục để chuyển đơn sang bước kế tiếp.</span></div>
+                            <button name="action_confirm_info" string="Hoàn thành đơn" type="object" class="btn btn-primary"/>
                         </div>
                     </div>
                     <div class="dac-v6-completed-stage-card" invisible="workflow_review_state != 'completed'">

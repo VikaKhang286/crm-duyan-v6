@@ -18,7 +18,7 @@
             <field name="model">sale.order</field>
             <field name="priority">1</field> <!-- Ưu tiên view này -->
             <field name="arch" type="xml">
-                <form string="Báo giá" class="dac-sale-form">
+                <form string="Báo giá" class="dac-sale-form" edit="true" create="true">
                     <header>
                         <div class="dac-control-panel-bar">
                             <div class="dac-control-panel-main">
@@ -92,9 +92,8 @@
                                         invisible="not id"/>
                                 <button name="action_save_custom"
                                         string="Lưu"
-                                        type="object"
-                                        class="btn btn-outline-primary dac-save-btn"
-                                        invisible="is_order_completed or order_state_custom == 'cancel'"/>
+                                        type="button"
+                                        class="btn btn-outline-primary dac-save-btn"/>
                                 <button name="action_confirm_info"
                                         string="Xác nhận báo giá"
                                         type="object"
@@ -241,7 +240,7 @@
                             <page string="Nội dung đơn hàng">
                                 <div class="dac-order-lines-panel">
                                     <field name="order_line" widget="section_and_note_one2many" mode="list,kanban" 
-                                           readonly="state == 'cancel' or locked"
+                                           readonly="state == 'cancel'"
                                            can_delete="can_delete_products"
                                            context="{'list_view_ref': 'dac_erp.sale_order_line_list_view'}">
                                         <list editable="bottom">
@@ -443,14 +442,14 @@
                                 </span>
                             </div>
                             <!-- 2b. Khuyến mãi toàn đơn -->
-                            <div class="dac-summary-row">
+                            <div class="dac-summary-row" invisible="1">
                                 <label for="promotion_amount" class="dac-summary-label">Khuyến mãi:</label>
                                 <span class="dac-summary-value">
                                     <field name="promotion_amount" widget="monetary"
                                            readonly="is_order_completed or order_state_custom == 'cancel'"/>
                                 </span>
                             </div>
-                            <div class="dac-summary-row" invisible="not promotion_note and (is_order_completed or order_state_custom == 'cancel')">
+                            <div class="dac-summary-row" invisible="1">
                                 <label for="promotion_note" class="dac-summary-label" style="font-size:0.85em;color:#888;">Nội dung:</label>
                                 <span class="dac-summary-value" style="font-size:0.85em;color:#888;">
                                     <field name="promotion_note" nolabel="1"

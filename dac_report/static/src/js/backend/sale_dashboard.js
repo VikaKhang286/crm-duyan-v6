@@ -197,7 +197,7 @@ class DacSaleDashboard extends Component {
     return this.action.doAction('dac_erp.dac_sale_order_custom_action');
   }
 
-  openAllOrders() {
+  openCartOrders() {
     return this.action.doAction('dac_erp.dac_sale_order_cart_action');
   }
 
