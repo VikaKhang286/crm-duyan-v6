@@ -305,16 +305,6 @@ class SaleOrderWorkflow(models.Model):
         if self.order_state_custom != 'delivery':
             raise UserError(_("Chỉ có thể xác nhận giao hàng ở bước giao hàng!"))
 
-        delivery_status = (
-            self.bus_shipping_status
-            if self.shipping_method == 'bus'
-            else self.shipping_status
-        )
-        if delivery_status != 'delivered':
-            raise UserError(_(
-                "Chưa thể chuyển bước: trạng thái giao hàng phải là 'Giao thành công'."
-            ))
-
         address = self.delivery_address if delivery_address is None else delivery_address
         address = (address or '').strip()
 
