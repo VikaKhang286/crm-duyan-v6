@@ -53,7 +53,7 @@
                         <div class="dac_v6_app_rail" aria-label="Ứng dụng">
                             <button t-foreach="dacVisibleApps" t-as="app" t-key="app.id"
                                     type="button"
-                                    t-attf-class="dac_v6_app_button {{ currentApp &amp;&amp; currentApp.id === app.id ? 'is-active' : '' }}"
+                                    t-attf-class="dac_v6_app_button {{ isDacAppActive(app) ? 'is-active' : '' }}"
                                     t-att-title="dacMenuName(app)"
                                     t-on-click="() => this.onNavBarDropdownItemSelection(app)">
                                 <span class="dac_v6_app_icon">

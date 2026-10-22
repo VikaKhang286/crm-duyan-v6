@@ -61,6 +61,19 @@ class ResUsersDac(models.Model):
              'Agent OpenClaw sẽ bỏ qua nhắc việc cá nhân cho tài khoản này.',
     )
 
+    @api.model_create_multi
+    def create(self, vals_list):
+        users = super().create(vals_list)
+        dashboard = self.env.ref(
+            'dac_attendance.dac_attendance_manager_dashboard_action',
+            raise_if_not_found=False,
+        )
+        if dashboard:
+            users.filtered(lambda user: not user.dac_role and not user.action_id).write({
+                'action_id': dashboard.id,
+            })
+        return users
+
     def _dac_groups(self):
         return {k: self.env.ref(v) for k, v in _DAC_XMLIDS.items()}
 

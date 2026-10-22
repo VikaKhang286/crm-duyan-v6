@@ -17,6 +17,7 @@ const DAC_ROLE_LABELS = {
     full_stack: "Full-stack",
 };
 const DAC_ACTIVE_SIDEBAR_MENU_STORAGE_KEY = "dac_v6_active_sidebar_xmlid";
+const DAC_ATTENDANCE_APP_XMLID = "dac_attendance.menu_dac_attendance_root";
 const DAC_HIDDEN_APP_XMLIDS = new Set([
     "home_menu.home_root",
     "mail.menu_root_discuss",
@@ -147,15 +148,19 @@ patch(NavBar.prototype, {
     },
 
     dacMenuName(menu) {
-        if (this.dacRole && this.dacRole !== "manager") {
-            if (menu.xmlid === "dac_attendance.menu_dac_attendance_root") return "Chấm công";
+        if (this.dacRole !== "manager") {
+            if (menu.xmlid === DAC_ATTENDANCE_APP_XMLID) return "Chấm công";
             if (menu.xmlid === "dac_attendance.menu_dac_attendance_amendment_admin") return "Đơn điều chỉnh";
         }
         return menu.name;
     },
 
     get dacVisibleApps() {
-        return this.dacMenuService.getApps().filter((app) => this.isDacMenuVisible(app));
+        const apps = this.dacMenuService.getApps();
+        if (!this.dacRole) {
+            return apps.filter((app) => app.xmlid === DAC_ATTENDANCE_APP_XMLID);
+        }
+        return apps.filter((app) => this.isDacMenuVisible(app));
     },
 
     get dacMessagesVisible() {
@@ -172,6 +177,15 @@ patch(NavBar.prototype, {
 
     dacVisibleMenuChildren(menu) {
         return (menu.childrenTree || []).filter((child) => this.isDacMenuVisible(child));
+    },
+
+    isDacAppActive(app) {
+        if (this.currentApp?.id === app.id) return true;
+        const activeXmlid = this.dacSidebarState.activeMenuXmlid;
+        if (!activeXmlid) return false;
+        const containsActiveMenu = (menu) => menu.xmlid === activeXmlid
+            || (menu.childrenTree || []).some(containsActiveMenu);
+        return containsActiveMenu(app);
     },
 
     get dacSearchActions() {
@@ -335,7 +349,9 @@ patch(NavBar.prototype, {
             design_production: "dac_report.menu_dashboards_manage_production",
             full_stack: "dac_report.dac_sale_dashboard_menu_root",
         };
-        const roleXmlid = roleXmlids[this.dacRole];
+        const roleXmlid = this.dacRole
+            ? roleXmlids[this.dacRole]
+            : "dac_attendance.menu_dac_attendance_manager_dashboard";
         const params = new URLSearchParams(window.location.hash.slice(1));
         const routeAction = window.location.pathname.match(/\/action-(\d+)/)?.[1]
             || params.get("action");
@@ -348,7 +364,8 @@ patch(NavBar.prototype, {
             design_production: "552",
             full_stack: "611",
         };
-        const isRoleLanding = routeAction === landingActions[this.dacRole];
+        const landingAction = this.dacRole ? landingActions[this.dacRole] : "526";
+        const isRoleLanding = routeAction === landingAction;
         if (initialLoad && isRoleLanding) {
             this.dacSidebarState.userSelectedMenu = false;
         }
