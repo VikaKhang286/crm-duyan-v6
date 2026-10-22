@@ -364,8 +364,9 @@ patch(NavBar.prototype, {
             design_production: "552",
             full_stack: "611",
         };
-        const landingAction = this.dacRole ? landingActions[this.dacRole] : "526";
-        const isRoleLanding = routeAction === landingAction;
+        const isRoleLanding = this.dacRole
+            ? routeAction === landingActions[this.dacRole]
+            : true;
         if (initialLoad && isRoleLanding) {
             this.dacSidebarState.userSelectedMenu = false;
         }

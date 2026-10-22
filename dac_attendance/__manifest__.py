@@ -6,7 +6,7 @@
     'sequence': 10,
     'summary': 'Hệ thống chấm công DAC: Dashboard nhân viên/quản lý, xin nghỉ phép, điều chỉnh chấm công',
     'description': '',
-    'depends': ['base', 'web', 'hr', 'hr_attendance'],
+    'depends': ['base', 'web', 'hr', 'hr_attendance', 'dac_erp'],
     'installable': True,
     'auto_install': False,
     'application': False,
@@ -18,6 +18,7 @@
         'views/dac_attendance_leave_views.xml',
         'views/dac_attendance_amendment_views.xml',
         'views/dashboard_actions.xml',
+        'data/no_role_home_action.xml',
         'views/attendance_menu.xml',
     ],
     'assets': {

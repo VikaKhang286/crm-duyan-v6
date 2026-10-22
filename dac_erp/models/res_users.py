@@ -74,6 +74,24 @@ class ResUsersDac(models.Model):
             })
         return users
 
+    @api.model
+    def _dac_assign_no_role_home_action(self):
+        dashboard = self.env.ref(
+            'dac_attendance.dac_attendance_manager_dashboard_action',
+            raise_if_not_found=False,
+        )
+        if not dashboard:
+            return False
+        dac_group_ids = [group.id for group in self._dac_groups().values()]
+        users = self.search([
+            ('active', '=', True),
+            ('share', '=', False),
+            ('action_id', '=', False),
+            ('groups_id', 'not in', dac_group_ids),
+        ])
+        users.write({'action_id': dashboard.id})
+        return True
+
     def _dac_groups(self):
         return {k: self.env.ref(v) for k, v in _DAC_XMLIDS.items()}
 
