@@ -12,10 +12,12 @@ _logger = logging.getLogger(__name__)
 class SaleOrderCompute(models.Model):
     _inherit = 'sale.order'
 
-    @api.depends('name', 'partner_id', 'partner_id.name')
+    @api.depends('order_number', 'name', 'partner_id', 'partner_id.name')
     def _compute_order_display_title(self):
         for order in self:
-            order_code = order.name if order.name and order.name != 'New' else 'Đơn mới'
+            order_code = order.order_number or (
+                order.name if order.name and order.name != 'New' else 'Đơn mới'
+            )
             customer_name = order.partner_id.name if order.partner_id else ''
             order.order_display_title = (
                 f'{order_code} · {customer_name}' if customer_name else order_code

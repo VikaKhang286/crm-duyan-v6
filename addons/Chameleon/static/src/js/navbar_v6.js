@@ -17,6 +17,26 @@ const DAC_ROLE_LABELS = {
     full_stack: "Full-stack",
 };
 const DAC_ACTIVE_SIDEBAR_MENU_STORAGE_KEY = "dac_v6_active_sidebar_xmlid";
+const DAC_HIDDEN_APP_XMLIDS = new Set([
+    "home_menu.home_root",
+    "mail.menu_root_discuss",
+    "sale.sale_menu_root",
+    "dac_erp.dac_design_root_menu",
+    "dac_erp.dac_production_root_menu",
+    "spreadsheet_dashboard.spreadsheet_dashboard_menu_root",
+    "account.menu_finance",
+    "event.event_main_menu",
+    "hr.menu_hr_root",
+    "hr_attendance.menu_hr_attendance_root",
+    "base.menu_administration",
+]);
+const DAC_HIDDEN_MENU_XMLIDS = new Set([
+    "dac_erp.menu_dac_work_task",
+    "dac_erp.menu_dac_openclaw_user_mapping",
+    "CRM_DAC.menu_pancake_message_dashboard_main",
+    "dac_attendance.menu_dac_attendance_config",
+    "dac_attendance.menu_hr_employee_attendance_config",
+]);
 
 patch(BurgerMenu.prototype, {
     setup() {
@@ -116,6 +136,42 @@ patch(NavBar.prototype, {
             ["task", "Công việc"],
             ["action", "Hành động"],
         ];
+    },
+
+    isDacMenuVisible(menu) {
+        if (!this.dacRole || this.dacRole === "manager") return true;
+        if (DAC_HIDDEN_APP_XMLIDS.has(menu.xmlid)) return false;
+        if (DAC_HIDDEN_MENU_XMLIDS.has(menu.xmlid)) return false;
+        if (menu.xmlid === "base.menu_management") return false;
+        return true;
+    },
+
+    dacMenuName(menu) {
+        if (this.dacRole && this.dacRole !== "manager") {
+            if (menu.xmlid === "dac_attendance.menu_dac_attendance_root") return "Chấm công";
+            if (menu.xmlid === "dac_attendance.menu_dac_attendance_amendment_admin") return "Đơn điều chỉnh";
+        }
+        return menu.name;
+    },
+
+    get dacVisibleApps() {
+        return this.dacMenuService.getApps().filter((app) => this.isDacMenuVisible(app));
+    },
+
+    get dacMessagesVisible() {
+        return !this.dacRole || this.dacRole === "manager";
+    },
+
+    get dacRoleLabel() {
+        return DAC_ROLE_LABELS[this.dacRole] || "";
+    },
+
+    get dacVisibleCurrentAppSections() {
+        return this.currentAppSections.filter((menu) => this.isDacMenuVisible(menu));
+    },
+
+    dacVisibleMenuChildren(menu) {
+        return (menu.childrenTree || []).filter((child) => this.isDacMenuVisible(child));
     },
 
     get dacSearchActions() {

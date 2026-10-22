@@ -330,10 +330,10 @@ class SaleOrder(models.Model):
         store=False,
     )
 
-    @api.depends('order_number', 'name')
+    @api.depends('order_number')
     def _compute_cart_order_code(self):
         for order in self:
-            order.cart_order_code = order.order_number or order.name or '—'
+            order.cart_order_code = order.order_number or '—'
 
     @api.depends('order_line.product_id', 'order_line.name', 'order_line.display_type')
     def _compute_cart_product_summary(self):
@@ -680,6 +680,11 @@ class SaleOrder(models.Model):
     def create(self, vals_list):
         """Override create để đảm bảo người tạo đơn hàng sẽ là người phụ trách và set đúng giờ cho trường date"""
         for vals in vals_list:
+            if not vals.get('order_number'):
+                sequence_date = fields.Date.context_today(self)
+                vals['order_number'] = self.env['ir.sequence'].next_by_code(
+                    'dac.sale.order.number', sequence_date=sequence_date,
+                )
             if 'phone' in vals:
                 self._validate_customer_phone(vals.get('phone'))
             # Nếu không có user_id được set, gán người tạo làm người phụ trách

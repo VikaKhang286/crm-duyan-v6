@@ -20,7 +20,7 @@
                         </button>
                     </div>
 
-                    <div class="dac_v6_tools" role="search">
+                    <div t-attf-class="dac_v6_tools {{ dacMessagesVisible ? 'has-messages' : 'without-messages' }}" role="search">
                         <label class="dac_v6_search">
                             <i class="fa fa-search" aria-hidden="true"/>
                             <input type="search" placeholder="Tìm kiếm" aria-label="Tìm kiếm toàn cục"
@@ -31,7 +31,7 @@
                                 aria-label="Làm mới trang" t-on-click="refreshDacPage">
                             <i class="fa fa-refresh" aria-hidden="true"/>
                         </button>
-                        <button aria-expanded="false"
+                        <button t-if="dacMessagesVisible" aria-expanded="false"
                                 class="dac_v6_tool_button"
                                 type="button" title="Tin nhắn" t-on-click="openDacMessages">
                             <i class="fa fa-lg fa-comments" role="img" aria-label="Tin nhắn"/>
@@ -42,29 +42,33 @@
                             <i class="fa fa-lg fa-clock-o" role="img" aria-label="Hoạt động"/>
                         </button>
                     </div>
-
+                    <div class="dac_v6_role_bar_container">
+                        <div t-if="dacRoleLabel" class="dac_v6_role_bar" aria-label="DAC role hiện tại">
+                            <div class="dac_v6_role_badge" t-esc="dacRoleLabel"></div>
+                        </div>
+                    </div>
                     <div class="o_navbar_breadcrumbs d-contents"/>
 
                     <div class="dac_v6_navigation_grid">
                         <div class="dac_v6_app_rail" aria-label="Ứng dụng">
-                            <button t-foreach="menuService.getApps()" t-as="app" t-key="app.id"
+                            <button t-foreach="dacVisibleApps" t-as="app" t-key="app.id"
                                     type="button"
                                     t-attf-class="dac_v6_app_button {{ currentApp &amp;&amp; currentApp.id === app.id ? 'is-active' : '' }}"
-                                    t-att-title="app.name"
+                                    t-att-title="dacMenuName(app)"
                                     t-on-click="() => this.onNavBarDropdownItemSelection(app)">
                                 <span class="dac_v6_app_icon">
                                     <i t-attf-class="fa {{ dacAppIcon(app) }}" aria-hidden="true"/>
                                 </span>
-                                <span class="dac_v6_app_name" t-esc="app.name"/>
+                                <span class="dac_v6_app_name" t-esc="dacMenuName(app)"/>
                             </button>
                         </div>
 
                         <div class="dac_v6_section_panel" aria-label="Chức năng">
                             <div class="dac_v6_section_heading" t-if="currentApp">
-                                <strong t-esc="currentApp.name"/>
+                                <strong t-esc="dacMenuName(currentApp)"/>
                             </div>
                             <div class="dac_v6_section_list">
-                                <t t-foreach="currentAppSections" t-as="section" t-key="section.id">
+                                <t t-foreach="dacVisibleCurrentAppSections" t-as="section" t-key="section.id">
                                     <t t-call="Chameleon.SidebarMenuItem">
                                         <t t-set="menu" t-value="section"/>
                                         <t t-set="level" t-value="0"/>
@@ -164,13 +168,13 @@
     </t>
 
     <t t-name="Chameleon.SidebarMenuItem">
-        <button t-if="!menu.childrenTree.length" type="button"
+        <button t-if="!dacVisibleMenuChildren(menu).length" type="button"
                 t-attf-class="dac_v6_section_item level-{{ level }} {{ isDacSidebarMenuActive(menu) ? 'is-active' : '' }}"
                 t-att-data-menu-xmlid="menu.xmlid"
                 t-on-click="() => this.onDacSidebarMenuSelection(menu)">
             <span t-if="level &lt;= 1" t-attf-class="dac_v6_section_icon fa {{ dacSidebarMenuIcon(menu) }}" aria-hidden="true"/>
             <span t-else="" class="dac_v6_section_dot"/>
-            <span t-esc="menu.name"/>
+            <span t-esc="dacMenuName(menu)"/>
         </button>
         <div t-else="" t-attf-class="dac_v6_section_group level-{{ level }}">
             <button t-if="level === 1"
@@ -179,12 +183,12 @@
                     t-att-aria-expanded="!isDacMenuGroupCollapsed(menu)"
                     t-on-click="(event) => toggleDacMenuGroup(menu, event)">
                 <span t-attf-class="fa {{ dacSidebarMenuIcon(menu) }}" aria-hidden="true"/>
-                <span t-esc="menu.name"/>
+                <span t-esc="dacMenuName(menu)"/>
                 <span class="caret">›</span>
             </button>
-            <div t-else="" class="dac_v6_section_group_title" t-esc="menu.name"/>
+            <div t-else="" class="dac_v6_section_group_title" t-esc="dacMenuName(menu)"/>
             <t t-if="!isDacMenuGroupCollapsed(menu)">
-                <t t-foreach="menu.childrenTree" t-as="child" t-key="child.id">
+                <t t-foreach="dacVisibleMenuChildren(menu)" t-as="child" t-key="child.id">
                     <t t-call="Chameleon.SidebarMenuItem">
                         <t t-set="menu" t-value="child"/>
                         <t t-set="level" t-value="level + 1"/>

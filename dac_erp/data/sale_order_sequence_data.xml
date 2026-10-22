@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="seq_dac_sale_order_number" model="ir.sequence">
+        <field name="name">Mã đơn hàng DAC</field>
+        <field name="code">dac.sale.order.number</field>
+        <field name="prefix">XD-</field>
+        <field name="suffix">/%(month)s/%(y)s</field>
+        <field name="padding">0</field>
+        <field name="company_id" eval="False"/>
+    </record>
+</odoo>

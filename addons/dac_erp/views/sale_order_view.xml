@@ -799,8 +799,7 @@
                     <field name="currency_id" column_invisible="1" optional="hide"/>
                     <field name="pricelist_id" column_invisible="1" optional="hide"/>
                     <field name="create_date" string="Ngày tạo đơn (hệ thống)" readonly="1" optional="hide"/>
-                    <field name="order_number" string="Số đặt hàng"
-                           readonly="order_state_custom in ['delivery', 'installation', 'completed', 'cancel']"/>
+                    <field name="order_number" string="Mã đơn" readonly="1"/>
                     <field name="date" string="Ngày đơn hàng"
                            readonly="order_state_custom in ['delivery', 'installation', 'completed', 'cancel']"/>
                     <field name="partner_id" widget="many2one"
@@ -847,8 +846,7 @@
                     <field name="currency_id" column_invisible="1" optional="hide"/>
                     <field name="pricelist_id" column_invisible="1" optional="hide"/>
                     <field name="create_date" string="Ngày tạo đơn (hệ thống)" readonly="1" optional="hide"/>
-                    <field name="order_number" string="Số đặt hàng"
-                           readonly="order_state_custom in ['delivery', 'installation', 'completed', 'cancel']"/>
+                    <field name="order_number" string="Mã đơn" readonly="1"/>
                     <field name="date" string="Ngày đơn hàng"
                            readonly="order_state_custom in ['delivery', 'installation', 'completed', 'cancel']"/>
                     <field name="partner_id" widget="many2one"

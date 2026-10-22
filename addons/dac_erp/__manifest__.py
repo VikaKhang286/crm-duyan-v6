@@ -41,6 +41,7 @@
         'security/account_access_rules.xml',
         'security/dac_work_task_access_rules.xml',
         'data/currency_data.xml',
+        'data/sale_order_sequence_data.xml',
         'data/sale_order_accessory_data.xml',
         'data/cart_dimension_data.xml',
         'data/cart_dimension_standard_data.xml',

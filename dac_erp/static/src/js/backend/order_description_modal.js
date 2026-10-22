@@ -264,7 +264,7 @@ async function readStoredDescription(orderId) {
         const rows = await rpc("/web/dataset/call_kw/sale.order/read", {
             model: "sale.order",
             method: "read",
-            args: [[orderId], ["order_title", "order_summary", "cart_design_description", "cart_sample_image", "cart_sample_image_filename"]],
+            args: [[orderId], ["order_number", "order_title", "order_summary", "cart_design_description", "cart_sample_image", "cart_sample_image_filename"]],
             kwargs: { context: { bin_size: false } },
         });
         return rows[0] || null;
@@ -310,7 +310,7 @@ async function openDescriptionModal(block, forceReadOnly = false) {
     const summaryInput = fieldInput(block, "order_summary");
     const designDescriptionInput = fieldInput(block, "cart_design_description");
     const readOnly = forceReadOnly || isDescriptionReadOnly(block, titleInput, summaryInput);
-    const orderName = document.querySelector(".dac-control-panel-title h1, .dac-control-panel-title")?.textContent?.trim() || "Đơn mới";
+    const orderNumber = stored?.order_number || fieldInput(block, "order_number")?.value?.trim() || "Đơn mới";
     const customer = document.querySelector('.o_field_widget[name="partner_id"] input')?.value || "Chưa chọn khách hàng";
 
     const modal = document.createElement("div");
@@ -333,7 +333,7 @@ async function openDescriptionModal(block, forceReadOnly = false) {
         <footer><span class="dac-v6-save-state">Đã lưu</span><div><button type="button" class="dac-v6-modal-cancel">Đóng</button><button type="button" class="dac-v6-modal-save">Lưu mô tả</button></div></footer>
       </section>`;
 
-    modal.querySelector("header p").textContent = `${orderName} · ${customer}`;
+    modal.querySelector("header p").textContent = `${orderNumber} · ${customer}`;
     const title = modal.querySelector(".dac-v6-description-title");
     const editor = modal.querySelector(".dac-v6-description-editor");
     const gallery = modal.querySelector(".dac-v6-description-gallery");

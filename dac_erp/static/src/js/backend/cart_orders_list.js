@@ -344,7 +344,7 @@ export class CartOrdersListController extends ListController {
             records = await this.orm.searchRead(
                 "sale.order",
                 this.getWorkspaceDomain(),
-                ["cart_order_code", "name", "partner_id", "user_id", "production_deadline", "amount_total", "order_state_custom"],
+                ["cart_order_code", "partner_id", "user_id", "production_deadline", "amount_total", "order_state_custom"],
                 { limit: 2000 }
             );
         } catch (error) {
@@ -379,7 +379,7 @@ export class CartOrdersListController extends ListController {
                 const saleName = sale?.display_name || sale?.name || sale?.[1] || "—";
                 const dateText = formatDate(deadline);
                 for (const [className, text] of [
-                    ["dac-cart-kanban-code", record.cart_order_code || record.name || "—"],
+                    ["dac-cart-kanban-code", record.cart_order_code || "—"],
                     ["dac-cart-kanban-customer", partnerName],
                     ["dac-cart-kanban-total", formatCurrency(record.amount_total)],
                     ["dac-cart-kanban-meta", `${dateText} · ${saleName}`],
