@@ -21,6 +21,16 @@ _DAC_XMLIDS = {
     'full_stack':        'dac_erp.group_dac_erp_full_stack',
 }
 
+_DAC_HOME_ACTION_XMLIDS = {
+    'manager':           'home_menu.home_menu_action',
+    'sale_all':          'dac_report.dac_sale_dashboard_action',
+    'sale':              'dac_report.dac_sale_dashboard_action',
+    'design':            'dac_erp.dac_design_dashboard_action',
+    'production':        'dac_erp.dac_production_dashboard_action',
+    'design_production': 'dac_erp.dac_production_dashboard_action',
+    'full_stack':        'dac_report.dac_sale_dashboard_action',
+}
+
 # Thứ tự NHẬN DIỆN khi compute (tách khỏi thứ tự hiển thị để bền vững):
 # combo nhiều implied nhất phải đứng trước nhóm con của nó, nếu không
 # một full_stack user (có cả sale/design/production) sẽ bị nhận nhầm.
@@ -95,6 +105,21 @@ class ResUsersDac(models.Model):
     def _dac_groups(self):
         return {k: self.env.ref(v) for k, v in _DAC_XMLIDS.items()}
 
+    def _dac_home_action(self, role):
+        xmlid = _DAC_HOME_ACTION_XMLIDS.get(role)
+        return self.env.ref(xmlid, raise_if_not_found=False) if xmlid else False
+
+    @api.model
+    def _dac_sync_role_home_actions(self):
+        """Keep existing DAC users' Home Action aligned with their role."""
+        for role in _DAC_ROLE_PRIORITY:
+            action = self._dac_home_action(role)
+            if action:
+                self.search(self._dac_exact_role_domain(role)).write({
+                    'action_id': action.id,
+                })
+        return True
+
     @api.model
     def _dac_exact_role_domain(self, role):
         # Match the same precedence as _compute_dac_role, including combo roles.
@@ -125,11 +150,15 @@ class ResUsersDac(models.Model):
         for user in self:
             non_dac = [gid for gid in user.groups_id.ids if gid not in all_ids]
             target_ids = set(non_dac)
+            action = user._dac_home_action(user.dac_role)
             if user.dac_role:
                 target = dac[user.dac_role]
                 target_ids.add(target.id)
                 target_ids.update(target.trans_implied_ids.ids)
-            user.write({'groups_id': [(6, 0, list(target_ids))]})
+            user.write({
+                'groups_id': [(6, 0, list(target_ids))],
+                'action_id': action.id if action else False,
+            })
 
     # ------------------------------------------------------------------
     # Helper phân quyền tập trung — thay cho has_group(...) rải rác.

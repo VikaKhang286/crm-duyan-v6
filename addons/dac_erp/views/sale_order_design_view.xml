@@ -76,21 +76,21 @@
 
         <record id="dac_design_root_menu" model="ir.ui.menu">
             <field name="name">Thiết kế</field>
-            <field name="action" ref="dac_design_dashboard_action"/>
+            <field name="action" ref="dac_design_role_dashboard_action"/>
             <field name="sequence">30</field>
             <field name="groups_id" eval="[(6, 0, [ref('dac_erp.group_dac_erp_design')])]"/>
         </record>
 
         <record id="dac_production_root_menu" model="ir.ui.menu">
             <field name="name">Sản xuất</field>
-            <field name="action" ref="dac_production_dashboard_action"/>
+            <field name="action" ref="dac_production_role_dashboard_action"/>
             <field name="sequence">31</field>
             <field name="groups_id" eval="[(6, 0, [ref('dac_erp.group_dac_erp_production')])]"/>
         </record>
 
         <record id="dac_design_dashboard_child_menu" model="ir.ui.menu">
             <field name="name">Dashboard</field>
-            <field name="action" ref="dac_design_dashboard_action"/>
+            <field name="action" ref="dac_design_role_dashboard_action"/>
             <field name="parent_id" ref="dac_design_root_menu"/>
             <field name="sequence">5</field>
             <field name="groups_id" eval="[(4, ref('dac_erp.group_dac_erp_design'))]"/>
@@ -98,7 +98,7 @@
 
         <record id="dac_production_dashboard_child_menu" model="ir.ui.menu">
             <field name="name">Dashboard</field>
-            <field name="action" ref="dac_production_dashboard_action"/>
+            <field name="action" ref="dac_production_role_dashboard_action"/>
             <field name="parent_id" ref="dac_production_root_menu"/>
             <field name="sequence">5</field>
             <field name="groups_id" eval="[(4, ref('dac_erp.group_dac_erp_production'))]"/>

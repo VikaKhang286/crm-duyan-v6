@@ -81,6 +81,7 @@
         'views/login_version_view.xml',
         'views/menuitem.xml',
         'report/account_report_invoice_inherit.xml',
+        'data/home_action_sync.xml',
     ],
 
     # Import các file cấu hình (chỉ gọi từ folder 'static')
