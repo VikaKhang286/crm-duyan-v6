@@ -76,14 +76,17 @@ class SaleOrderAccessController(http.Controller):
             _logger.info(f"[INTERCEPT] Admin redirect to: {full_url}")
             return request.redirect(full_url)
         
-        # Nếu user KHÔNG có bất kỳ DAC group nào → redirect về home menu
+        # Nếu user KHÔNG có bất kỳ DAC group nào → redirect về Dashboard chấm công
         if not (user.has_group('dac_erp.group_dac_erp_manager') or 
                 user.has_group('dac_erp.group_dac_erp_sale') or
                 user.has_group('dac_erp.group_dac_erp_design') or
                 user.has_group('dac_erp.group_dac_erp_production')):
             
-            _logger.warning(f"[INTERCEPT] User {user.name} has no DAC groups - redirecting to home menu")
-            redirect_url = self._build_url_with_debug('/web#action=home_menu.home_menu_action', kwargs)
+            _logger.warning(f"[INTERCEPT] User {user.name} has no DAC groups - redirecting to attendance dashboard")
+            redirect_url = self._build_url_with_debug(
+                '/web#action=dac_attendance.dac_attendance_manager_dashboard_action',
+                kwargs,
+            )
             return request.redirect(redirect_url)
         
         # Nếu có sale_order_id → kiểm tra quyền truy cập đơn hàng
@@ -127,8 +130,8 @@ class SaleOrderAccessController(http.Controller):
                     redirect_url = self._build_url_with_debug('/web', url_params)
                     return request.redirect(redirect_url)
                 else:
-                    # User không có quyền gì → redirect về Home menu
-                    redirect_url = self._build_url_with_debug('/web#action=home_menu.home_menu_action', url_params)
+                    # User không có quyền gì → redirect về Dashboard chấm công
+                    redirect_url = self._build_url_with_debug('/web#action=dac_attendance.dac_attendance_manager_dashboard_action', url_params)
                     return request.redirect(redirect_url)
             
             user = request.env.user
@@ -186,13 +189,19 @@ class SaleOrderAccessController(http.Controller):
                         redirect_url = self._build_url_with_debug('/web#action=dac_erp.dac_production_dashboard_action', url_params)
                         return request.redirect(redirect_url)
                     else:
-                        # Fallback: redirect về Home menu
-                        redirect_url = self._build_url_with_debug('/web#action=home_menu.home_menu_action', url_params)
+                        # Fallback: redirect về Dashboard chấm công
+                        redirect_url = self._build_url_with_debug(
+                            '/web#action=dac_attendance.dac_attendance_manager_dashboard_action',
+                            url_params,
+                        )
                         return request.redirect(redirect_url)
             
-            # CASE 3: User không thuộc nhóm nào → Redirect về Home menu
-            _logger.warning(f"[INTERCEPT] User {user.name} has no relevant groups - redirecting to home menu")
-            redirect_url = self._build_url_with_debug('/web#action=home_menu.home_menu_action', url_params)
+            # CASE 3: User không thuộc nhóm nào → Redirect về Dashboard chấm công
+            _logger.warning(f"[INTERCEPT] User {user.name} has no relevant groups - redirecting to attendance dashboard")
+            redirect_url = self._build_url_with_debug(
+                '/web#action=dac_attendance.dac_attendance_manager_dashboard_action',
+                url_params,
+            )
             return request.redirect(redirect_url)
             
         except Exception as e:
