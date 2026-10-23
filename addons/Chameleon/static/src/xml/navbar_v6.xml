@@ -55,7 +55,7 @@
                                     type="button"
                                     t-attf-class="dac_v6_app_button {{ isDacAppActive(app) ? 'is-active' : '' }}"
                                     t-att-title="dacMenuName(app)"
-                                    t-on-click="() => this.onNavBarDropdownItemSelection(app)">
+                                    t-on-click="() => this.onDacSidebarMenuSelection(app)">
                                 <span class="dac_v6_app_icon">
                                     <i t-attf-class="fa {{ dacAppIcon(app) }}" aria-hidden="true"/>
                                 </span>

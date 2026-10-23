@@ -18,6 +18,16 @@ const DAC_ROLE_LABELS = {
 };
 const DAC_ACTIVE_SIDEBAR_MENU_STORAGE_KEY = "dac_v6_active_sidebar_xmlid";
 const DAC_ATTENDANCE_APP_XMLID = "dac_attendance.menu_dac_attendance_root";
+const DAC_ATTENDANCE_DASHBOARD_MENU_XMLID = "dac_attendance.menu_dac_attendance_employee_dashboard";
+const DAC_ATTENDANCE_DASHBOARD_ACTION_XMLID = "dac_attendance.dac_attendance_employee_dashboard_action";
+const DAC_PRODUCTION_DASHBOARD_MENU_XMLID = "dac_report.menu_dashboards_manage_production";
+const DAC_PRODUCTION_DASHBOARD_ACTION_XMLID = "dac_erp.dac_production_dashboard_action";
+const DAC_PRODUCTION_HIDDEN_APP_XMLIDS = new Set([
+    "utm.menu_link_tracker_root",
+]);
+const DAC_PRODUCTION_HIDDEN_MENU_XMLIDS = new Set([
+    "dac_report.menu_dac_manage",
+]);
 const DAC_HIDDEN_APP_XMLIDS = new Set([
     "home_menu.home_root",
     "mail.menu_root_discuss",
@@ -141,6 +151,12 @@ patch(NavBar.prototype, {
 
     isDacMenuVisible(menu) {
         if (!this.dacRole || this.dacRole === "manager") return true;
+        if (this.dacRole === "production" && DAC_PRODUCTION_HIDDEN_APP_XMLIDS.has(menu.xmlid)) {
+            return false;
+        }
+        if (this.dacRole === "production" && DAC_PRODUCTION_HIDDEN_MENU_XMLIDS.has(menu.xmlid)) {
+            return false;
+        }
         if (DAC_HIDDEN_APP_XMLIDS.has(menu.xmlid)) return false;
         if (DAC_HIDDEN_MENU_XMLIDS.has(menu.xmlid)) return false;
         if (menu.xmlid === "base.menu_management") return false;
@@ -179,13 +195,53 @@ patch(NavBar.prototype, {
         return (menu.childrenTree || []).filter((child) => this.isDacMenuVisible(child));
     },
 
+    dacMenuByXmlid(xmlid) {
+        const findMenu = (menus) => {
+            for (const menu of menus) {
+                if (menu.xmlid === xmlid) return menu;
+                const child = findMenu(menu.childrenTree || []);
+                if (child) return child;
+            }
+            return null;
+        };
+        return findMenu(this.dacMenuService.getApps());
+    },
+
+    dacRouteMatchesMenu(routeAction, menuXmlid, actionXmlid) {
+        if (!routeAction) return false;
+        if (routeAction === actionXmlid) return true;
+        const menu = this.dacMenuByXmlid(menuXmlid);
+        return Boolean(menu?.actionID) && String(menu.actionID) === String(routeAction);
+    },
+
     isDacAppActive(app) {
-        if (this.currentApp?.id === app.id) return true;
-        const activeXmlid = this.dacSidebarState.activeMenuXmlid;
-        if (!activeXmlid) return false;
+        const params = new URLSearchParams(window.location.hash.slice(1));
+        const routeAction = window.location.pathname.match(/\/action-(\d+)/)?.[1]
+            || params.get("action");
+        if (!this.dacSidebarState.userSelectedMenu) {
+            if (this.dacRouteMatchesMenu(
+                routeAction,
+                DAC_PRODUCTION_DASHBOARD_MENU_XMLID,
+                DAC_PRODUCTION_DASHBOARD_ACTION_XMLID
+            )) {
+                return app.xmlid === "dac_erp.dac_operations_root";
+            }
+            if (this.dacRouteMatchesMenu(
+                routeAction,
+                DAC_ATTENDANCE_DASHBOARD_MENU_XMLID,
+                DAC_ATTENDANCE_DASHBOARD_ACTION_XMLID
+            )) {
+                return app.xmlid === DAC_ATTENDANCE_APP_XMLID;
+            }
+        }
+        const activeXmlid = this.getDacSidebarActiveMenuXmlid();
         const containsActiveMenu = (menu) => menu.xmlid === activeXmlid
             || (menu.childrenTree || []).some(containsActiveMenu);
-        return containsActiveMenu(app);
+        if (activeXmlid) {
+            const activeApp = this.dacMenuService.getApps().find(containsActiveMenu);
+            if (activeApp) return activeApp.id === app.id;
+        }
+        return this.currentApp?.id === app.id;
     },
 
     get dacSearchActions() {
@@ -322,11 +378,16 @@ patch(NavBar.prototype, {
         const params = new URLSearchParams(window.location.hash.slice(1));
         const action = window.location.pathname.match(/\/action-(\d+)/)?.[1]
             || params.get("action");
+        if (this.dacRouteMatchesMenu(
+            action,
+            DAC_PRODUCTION_DASHBOARD_MENU_XMLID,
+            DAC_PRODUCTION_DASHBOARD_ACTION_XMLID
+        )) {
+            return DAC_PRODUCTION_DASHBOARD_MENU_XMLID;
+        }
         const actionXmlids = {
             "dac_report.dac_sale_dashboard_action": "dac_report.dac_sale_dashboard_menu_root",
             "611": "dac_report.dac_sale_dashboard_menu_root",
-            "dac_erp.dac_production_dashboard_action": "dac_report.menu_dashboards_manage_production",
-            "552": "dac_report.menu_dashboards_manage_production",
             "dac_erp.dac_design_dashboard_action": "dac_report.menu_dashboards_manage_design",
             "551": "dac_report.menu_dashboards_manage_design",
             "home_menu.home_menu_action": "home_menu.home_dashboard_menu",
@@ -355,17 +416,21 @@ patch(NavBar.prototype, {
         const params = new URLSearchParams(window.location.hash.slice(1));
         const routeAction = window.location.pathname.match(/\/action-(\d+)/)?.[1]
             || params.get("action");
+        const isProductionLanding = ["production", "design_production"].includes(this.dacRole)
+            && this.dacRouteMatchesMenu(
+                routeAction,
+                DAC_PRODUCTION_DASHBOARD_MENU_XMLID,
+                DAC_PRODUCTION_DASHBOARD_ACTION_XMLID
+            );
         const landingActions = {
             manager: "402",
             sale: "611",
             sale_all: "611",
             design: "551",
-            production: "552",
-            design_production: "552",
             full_stack: "611",
         };
         const isRoleLanding = this.dacRole
-            ? routeAction === landingActions[this.dacRole]
+            ? isProductionLanding || routeAction === landingActions[this.dacRole]
             : true;
         if (initialLoad && isRoleLanding) {
             this.dacSidebarState.userSelectedMenu = false;
@@ -498,7 +563,7 @@ patch(NavBar.prototype, {
     openDacActivityItem(item) {
         this.closeDacActivities();
         const actionIds = {
-            production: 552,
+            production: DAC_PRODUCTION_DASHBOARD_ACTION_XMLID,
             delivery: 555,
             design: 551,
         };
