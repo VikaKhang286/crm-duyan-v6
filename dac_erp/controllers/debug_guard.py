@@ -44,7 +44,7 @@ class BeeoneHome(Home):
                     }.get(role)
                     if default_action:
                         if role == 'manager':
-                            target_url = '/web#action=402&model=home.menu&view_type=form&id=1'
+                            target_url = '/web#action=home_menu.home_menu_action&model=home.menu&view_type=form&id=1'
                         else:
                             target_url = f'/web#action={default_action}'
                         return request.redirect(target_url, 303)

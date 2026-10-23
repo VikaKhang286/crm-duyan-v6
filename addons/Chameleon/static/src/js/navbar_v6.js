@@ -22,6 +22,12 @@ const DAC_ATTENDANCE_DASHBOARD_MENU_XMLID = "dac_attendance.menu_dac_attendance_
 const DAC_ATTENDANCE_DASHBOARD_ACTION_XMLID = "dac_attendance.dac_attendance_employee_dashboard_action";
 const DAC_PRODUCTION_DASHBOARD_MENU_XMLID = "dac_report.menu_dashboards_manage_production";
 const DAC_PRODUCTION_DASHBOARD_ACTION_XMLID = "dac_erp.dac_production_dashboard_action";
+const DAC_DESIGN_DASHBOARD_MENU_XMLID = "dac_report.menu_dashboards_manage_design";
+const DAC_DESIGN_DASHBOARD_ACTION_XMLID = "dac_erp.dac_design_dashboard_action";
+const DAC_SALE_DASHBOARD_MENU_XMLID = "dac_report.dac_sale_dashboard_menu_root";
+const DAC_SALE_DASHBOARD_ACTION_XMLID = "dac_report.dac_sale_dashboard_action";
+const DAC_HOME_DASHBOARD_MENU_XMLID = "home_menu.home_dashboard_menu";
+const DAC_HOME_DASHBOARD_ACTION_XMLID = "home_menu.home_menu_action";
 const DAC_PRODUCTION_HIDDEN_APP_XMLIDS = new Set([
     "utm.menu_link_tracker_root",
 ]);
@@ -385,17 +391,17 @@ patch(NavBar.prototype, {
         )) {
             return DAC_PRODUCTION_DASHBOARD_MENU_XMLID;
         }
-        const actionXmlids = {
-            "dac_report.dac_sale_dashboard_action": "dac_report.dac_sale_dashboard_menu_root",
-            "611": "dac_report.dac_sale_dashboard_menu_root",
-            "dac_erp.dac_design_dashboard_action": "dac_report.menu_dashboards_manage_design",
-            "551": "dac_report.menu_dashboards_manage_design",
-            "home_menu.home_menu_action": "home_menu.home_dashboard_menu",
-            "402": "home_menu.home_dashboard_menu",
-        };
+        const landingMenus = [
+            [DAC_SALE_DASHBOARD_MENU_XMLID, DAC_SALE_DASHBOARD_ACTION_XMLID],
+            [DAC_DESIGN_DASHBOARD_MENU_XMLID, DAC_DESIGN_DASHBOARD_ACTION_XMLID],
+            [DAC_HOME_DASHBOARD_MENU_XMLID, DAC_HOME_DASHBOARD_ACTION_XMLID],
+        ];
         // A recognized route identifies the active landing menu. For all
         // other menu actions, keep the XML ID selected by the sidebar click.
-        return actionXmlids[action] || this.dacSidebarState.activeMenuXmlid || null;
+        const activeLandingMenu = landingMenus.find(([menuXmlid, actionXmlid]) =>
+            this.dacRouteMatchesMenu(action, menuXmlid, actionXmlid)
+        );
+        return activeLandingMenu?.[0] || this.dacSidebarState.activeMenuXmlid || null;
     },
 
     async _syncDacSidebarMenu(initialLoad = false) {
@@ -422,15 +428,20 @@ patch(NavBar.prototype, {
                 DAC_PRODUCTION_DASHBOARD_MENU_XMLID,
                 DAC_PRODUCTION_DASHBOARD_ACTION_XMLID
             );
-        const landingActions = {
-            manager: "402",
-            sale: "611",
-            sale_all: "611",
-            design: "551",
-            full_stack: "611",
+        const landingRoutes = {
+            manager: [DAC_HOME_DASHBOARD_MENU_XMLID, DAC_HOME_DASHBOARD_ACTION_XMLID],
+            sale: [DAC_SALE_DASHBOARD_MENU_XMLID, DAC_SALE_DASHBOARD_ACTION_XMLID],
+            sale_all: [DAC_SALE_DASHBOARD_MENU_XMLID, DAC_SALE_DASHBOARD_ACTION_XMLID],
+            design: [DAC_DESIGN_DASHBOARD_MENU_XMLID, DAC_DESIGN_DASHBOARD_ACTION_XMLID],
+            full_stack: [DAC_SALE_DASHBOARD_MENU_XMLID, DAC_SALE_DASHBOARD_ACTION_XMLID],
         };
+        const landingRoute = landingRoutes[this.dacRole];
         const isRoleLanding = this.dacRole
-            ? isProductionLanding || routeAction === landingActions[this.dacRole]
+            ? isProductionLanding || Boolean(landingRoute && this.dacRouteMatchesMenu(
+                routeAction,
+                landingRoute[0],
+                landingRoute[1]
+            ))
             : true;
         if (initialLoad && isRoleLanding) {
             this.dacSidebarState.userSelectedMenu = false;
@@ -562,12 +573,12 @@ patch(NavBar.prototype, {
 
     openDacActivityItem(item) {
         this.closeDacActivities();
-        const actionIds = {
+        const actionXmlids = {
             production: DAC_PRODUCTION_DASHBOARD_ACTION_XMLID,
-            delivery: 555,
-            design: 551,
+            delivery: "dac_erp.dac_sale_order_cart_action",
+            design: DAC_DESIGN_DASHBOARD_ACTION_XMLID,
         };
-        const actionId = actionIds[item.key];
-        if (actionId) return this.dacSearchAction.doAction(actionId);
+        const actionXmlid = actionXmlids[item.key];
+        if (actionXmlid) return this.dacSearchAction.doAction(actionXmlid);
     },
 });
