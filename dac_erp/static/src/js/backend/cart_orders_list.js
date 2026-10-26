@@ -216,6 +216,7 @@ export class CartOrdersListController extends ListController {
                         <option value="production">Sản xuất</option>
                         <option value="delivery">Giao hàng</option>
                         <option value="completed">Hoàn thành</option>
+                        <option value="cancel">Hủy</option>
                     </select>
                     <select class="dac-cart-sale-select" aria-label="Sale"><option value="">Tất cả Sale</option></select>
                     <button type="button" class="dac-cart-toolbar-filter">Bộ lọc</button>

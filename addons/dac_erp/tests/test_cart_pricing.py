@@ -15,6 +15,20 @@ class TestCartPricing(TransactionCase):
 
         self.assertTrue(result)
         self.assertEqual(set(orders.mapped('state')), {'cancel'})
+        self.assertEqual(set(orders.mapped('order_state_custom')), {'cancel'})
+
+    def test_mass_cancel_wizard_syncs_custom_order_state(self):
+        partner = self.env['res.partner'].create({'name': 'Khách hủy từ danh sách'})
+        order = self.env['sale.order'].create({'partner_id': partner.id})
+        order.write({'state': 'sale', 'order_state_custom': 'delivery'})
+
+        wizard = self.env['sale.mass.cancel.orders'].with_context(
+            active_ids=order.ids,
+        ).create({})
+        wizard.action_mass_cancel()
+
+        self.assertEqual(order.state, 'cancel')
+        self.assertEqual(order.order_state_custom, 'cancel')
 
     def test_action_cancel_single_order_keeps_standard_wizard(self):
         partner = self.env['res.partner'].create({'name': 'Khách hủy một đơn'})

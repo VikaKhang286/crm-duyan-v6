@@ -25,6 +25,18 @@ class SaleOrder(models.Model):
             )).action_cancel()
         return super().action_cancel()
 
+    def _action_cancel(self):
+        """Keep the DAC workflow stage in sync with Odoo's cancel state.
+
+        The standard list action uses ``sale.mass.cancel.orders`` and calls
+        this low-level method directly, bypassing ``action_cancel``.
+        """
+        result = super()._action_cancel()
+        orders_to_sync = self.filtered(lambda order: order.order_state_custom != 'cancel')
+        if orders_to_sync:
+            orders_to_sync.write({'order_state_custom': 'cancel'})
+        return result
+
     # Trạng thái đơn hàng tùy chỉnh
     order_state_custom = fields.Selection([
         ('quotation', 'Báo giá'),
@@ -492,7 +504,11 @@ class SaleOrder(models.Model):
         """Override write để trigger kiểm tra deposit khi cần"""
         if 'phone' in vals:
             self._validate_customer_phone(vals.get('phone'))
-        if 'order_state_custom' in vals and 'workflow_review_state' not in vals:
+        if (
+            'order_state_custom' in vals
+            and vals['order_state_custom'] != 'cancel'
+            and 'workflow_review_state' not in vals
+        ):
             vals['workflow_review_state'] = vals['order_state_custom']
 
         # workflow_review_state is presentation-only: users may inspect a
@@ -699,7 +715,11 @@ class SaleOrder(models.Model):
                 vals['design_assigned_date'] = fields.Date.context_today(self)
             if not vals.get('is_priority'):
                 vals['is_priority_today'] = False
-            vals.setdefault('workflow_review_state', vals.get('order_state_custom', 'quotation'))
+            review_state = vals.get('order_state_custom', 'quotation')
+            vals.setdefault(
+                'workflow_review_state',
+                review_state if review_state != 'cancel' else 'quotation',
+            )
         records = super().create(vals_list)
         for rec, vals in zip(records, vals_list):
             if (self.env.context.get('import_file')
