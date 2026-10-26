@@ -131,12 +131,6 @@
                                         class="btn btn-warning"
                                         invisible="order_state_custom != 'installation' or is_installation_confirmed"
                                         groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager,base.group_system"/>
-                                <button name="action_confirm_info"
-                                        string="Xác nhận giao hàng"
-                                        type="object"
-                                        class="btn btn-warning"
-                                        invisible="order_state_custom != 'delivery' or is_delivery_confirmed"
-                                        groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager,base.group_system"/>
                                 <button name="action_next_step"
                                         string="Thu tiền"
                                         type="object"
