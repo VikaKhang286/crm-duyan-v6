@@ -27,6 +27,11 @@
       <field name="mode">primary</field>
       <field name="priority">99</field>
       <field name="arch" type="xml">
+        <xpath expr="//field[@name='phone']" position="attributes">
+          <attribute name="string">☎ Điện thoại</attribute>
+          <attribute name="optional">show</attribute>
+          <attribute name="readonly">1</attribute>
+        </xpath>
         <xpath expr="//field[@name='street']" position="attributes">
           <attribute name="string">Địa chỉ</attribute>
           <attribute name="optional">show</attribute>

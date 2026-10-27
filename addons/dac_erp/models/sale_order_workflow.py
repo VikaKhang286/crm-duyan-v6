@@ -386,6 +386,20 @@ class SaleOrderWorkflow(models.Model):
             'tag': 'reload',
         }
 
+    def action_mark_delivery_failed(self):
+        """Mark a delivery-stage order as cancelled when delivery fails."""
+        for order in self:
+            if order.order_state_custom != 'delivery':
+                raise UserError(_("Chỉ có thể ghi nhận giao thất bại khi đơn đang ở bước Giao hàng."))
+            order.write({
+                'order_state_custom': 'cancel',
+            })
+
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'reload',
+        }
+
     def action_back_custom_step(self):
         """Quay lại tiến trình trước đó - reset cờ confirm khi về production để cho phép chỉnh sửa"""
         state_order = ['quotation', 'deposit', 'production', 'delivery', 'installation']
@@ -472,6 +486,23 @@ class SaleOrderWorkflow(models.Model):
             # Báo giá: chỉ khi đó mới dùng action chuyển bước cũ.
             order.action_next_step()
         return True
+
+    def action_advance_workflow_v6(self):
+        """Advance the active V6 order using the validation of its current step."""
+        self.ensure_one()
+        if self.workflow_review_state != self.order_state_custom:
+            raise UserError(_("Vui lòng trở về bước hiện tại trước khi chuyển bước."))
+
+        if self.order_state_custom == 'quotation':
+            return self.action_complete_quotation_and_proceed()
+        if self.order_state_custom == 'deposit':
+            return self.with_context(from_ui_button=True).action_proceed_to_production()
+        if self.order_state_custom == 'production':
+            return self.action_proceed_to_fulfillment()
+        if self.order_state_custom in ('delivery', 'installation'):
+            return self.action_confirm_info()
+
+        raise UserError(_("Đơn hàng không có bước tiếp theo."))
 
     def action_confirm_info(self):
         state_order = ['quotation', 'deposit', 'production', 'delivery', 'installation']

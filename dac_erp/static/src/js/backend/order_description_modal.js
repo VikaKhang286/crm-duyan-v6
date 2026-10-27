@@ -170,7 +170,7 @@ function appendImageCard(image, gallery, editor, interactive = true) {
     card.className = "dac-v6-description-image";
     card.dataset.name = image.name || "Ảnh đính kèm";
     card.dataset.src = image.src;
-    card.innerHTML = '<button type="button" class="dac-v6-description-image-content"><img alt=""/><b></b></button><a download>Tải ảnh</a>';
+    card.innerHTML = '<button type="button" class="dac-v6-description-image-content"><img alt=""/><b></b></button><div class="dac-v6-description-image-actions"><a download>Tải ảnh</a><button type="button" class="dac-v6-description-image-delete">Xoá hình</button></div>';
     card.querySelector("img").src = image.src;
     card.querySelector("img").alt = card.dataset.name;
     card.querySelector("b").textContent = card.dataset.name;
@@ -178,16 +178,37 @@ function appendImageCard(image, gallery, editor, interactive = true) {
     downloadLink.href = image.src;
     downloadLink.download = card.dataset.name;
     const imageButton = card.querySelector("button");
-    imageButton.title = interactive ? "Chèn ảnh tại vị trí con trỏ" : "Xem ảnh";
-    imageButton.addEventListener("click", () => {
-        if (interactive) {
-            editor.focus();
-            document.execCommand("insertImage", false, image.src);
-        } else {
-            openImageViewer(image);
-        }
-    });
+    imageButton.title = "Xem ảnh";
+    imageButton.addEventListener("click", () => openImageViewer(image));
+    const deleteButton = card.querySelector(".dac-v6-description-image-delete");
+    if (interactive) {
+        deleteButton.addEventListener("click", () => {
+            card.remove();
+            updateGalleryEmptyState(gallery);
+        });
+    } else {
+        deleteButton.remove();
+    }
     gallery.appendChild(card);
+}
+
+function insertInlineImage(editor, file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            editor.focus();
+            document.execCommand("insertImage", false, reader.result);
+            const images = editor.querySelectorAll("img");
+            const image = images[images.length - 1];
+            if (image) {
+                image.alt = file.name || "Ảnh trong mô tả";
+                image.dataset.inlineDescriptionImage = "1";
+            }
+            resolve();
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
 }
 
 function updateGalleryEmptyState(gallery) {
@@ -264,7 +285,7 @@ async function readStoredDescription(orderId) {
         const rows = await rpc("/web/dataset/call_kw/sale.order/read", {
             model: "sale.order",
             method: "read",
-            args: [[orderId], ["order_number", "order_title", "order_summary", "cart_design_description", "cart_sample_image", "cart_sample_image_filename"]],
+            args: [[orderId], ["order_number", "order_title", "order_summary", "order_description_html", "cart_design_description", "cart_sample_image", "cart_sample_image_filename"]],
             kwargs: { context: { bin_size: false } },
         });
         return rows[0] || null;
@@ -327,7 +348,7 @@ async function openDescriptionModal(block, forceReadOnly = false) {
           </div>
           <input class="dac-v6-description-title" placeholder="Tiêu đề đơn hàng"/>
           <div class="dac-v6-description-editor" contenteditable="true" role="textbox" aria-multiline="true"></div>
-          <div class="dac-v6-attachments-head"><h3>Ảnh đính kèm</h3><span>${readOnly ? "Bấm ảnh để xem, hoặc tải về" : "Đặt con trỏ trong mô tả rồi chọn ảnh để chèn nhãn"}</span></div>
+          <div class="dac-v6-attachments-head"><h3>Ảnh đính kèm</h3><span>Bấm ảnh để xem, hoặc tải về</span></div>
           <div class="dac-v6-description-gallery"></div>
         </main>
         <footer><span class="dac-v6-save-state">Đã lưu</span><div><button type="button" class="dac-v6-modal-cancel">Đóng</button><button type="button" class="dac-v6-modal-save">Lưu mô tả</button></div></footer>
@@ -339,7 +360,11 @@ async function openDescriptionModal(block, forceReadOnly = false) {
     const gallery = modal.querySelector(".dac-v6-description-gallery");
     let pendingImageLoad = Promise.resolve();
     title.value = stored?.order_title || titleInput?.value || "";
-    editor.textContent = stored?.order_summary || stored?.cart_design_description || summaryInput?.value || "";
+    if (stored?.order_description_html) {
+        editor.innerHTML = stored.order_description_html;
+    } else {
+        editor.textContent = stored?.order_summary || stored?.cart_design_description || summaryInput?.value || "";
+    }
     const sampleImage = block.closest(".o_form_view")?.querySelector('.o_field_widget[name="cart_sample_image"] img');
     const storedImageUrl = stored?.cart_sample_image && orderId
         ? `/web/image/sale.order/${orderId}/cart_sample_image?unique=${Date.now()}`
@@ -363,11 +388,23 @@ async function openDescriptionModal(block, forceReadOnly = false) {
     modal.querySelector(".dac-v6-modal-cancel").addEventListener("click", close);
     modal.addEventListener("click", (event) => { if (event.target === modal) close(); });
     if (!readOnly) {
+        let selectedInlineImage = null;
+        
+        editor.addEventListener("click", (event) => {
+            editor.querySelectorAll("img.dac-v6-inline-image-selected").forEach((image) => image.classList.remove("dac-v6-inline-image-selected"));
+            selectedInlineImage = event.target.closest?.("img") || null;
+            selectedInlineImage?.classList.add("dac-v6-inline-image-selected");
+        });
+        
         modal.querySelector(".dac-v6-bold").addEventListener("click", () => { editor.focus(); document.execCommand("bold"); });
         modal.querySelector('input[type="file"]').addEventListener("change", (event) => {
             if (!event.target.files.length) return;
-            gallery.replaceChildren();
-            pendingImageLoad = addImage([event.target.files[0]], gallery, editor).then(() => updateGalleryEmptyState(gallery));
+            const file = event.target.files[0];
+            pendingImageLoad = Promise.all([
+                insertInlineImage(editor, file),
+                addImage([file], gallery, editor),
+            ]).then(() => updateGalleryEmptyState(gallery));
+            event.target.value = "";
         });
         editor.addEventListener("paste", (event) => {
             const images = [...event.clipboardData.files].filter((file) => file.type.startsWith("image/"));
@@ -378,8 +415,7 @@ async function openDescriptionModal(block, forceReadOnly = false) {
             }
             if (images.length === 1) {
                 event.preventDefault();
-                gallery.replaceChildren();
-                pendingImageLoad = addImage(images, gallery, editor).then(() => updateGalleryEmptyState(gallery));
+                pendingImageLoad = insertInlineImage(editor, images[0]);
             }
         });
         modal.querySelector(".dac-v6-modal-save").addEventListener("click", async () => {
@@ -398,12 +434,16 @@ async function openDescriptionModal(block, forceReadOnly = false) {
                 const values = {
                     order_title: nextTitle,
                     order_summary: nextSummary,
+                    order_description_html: editor.innerHTML,
                     cart_design_description: nextSummary,
                 };
                 const composite = await imagesAsComposite(cards);
                 if (composite) {
                     values.cart_sample_image = composite;
                     values.cart_sample_image_filename = cards[0]?.dataset.name || "anh-dinh-kem.jpg";
+                } else if (stored?.cart_sample_image) {
+                    values.cart_sample_image = false;
+                    values.cart_sample_image_filename = false;
                 }
                 await saveDescription(orderId, values);
                 renderDescriptionPreview(block, nextTitle, nextSummary, cardCount);

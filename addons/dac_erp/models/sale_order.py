@@ -144,6 +144,9 @@ class SaleOrder(models.Model):
     # Tiêu đề và mô tả ngắn gọn do AI tóm tắt
     order_title = fields.Char(string='Tiêu đề đơn hàng', copy=False)
     order_summary = fields.Text(string='Mô tả ngắn gọn', copy=False)
+    order_description_html = fields.Html(
+        string='Nội dung mô tả đơn hàng', copy=False, sanitize=True,
+    )
     list_note = fields.Char(string='Ghi chú', tracking=True)
 
     # Trạng thái xác nhận
@@ -156,7 +159,7 @@ class SaleOrder(models.Model):
 
     # Đặt cọc
     has_deposit = fields.Boolean(string="Có đặt cọc?", default=True, tracking=True)
-    deposit_amount = fields.Float(string="Tiền cọc", default=0.0)
+    deposit_amount = fields.Float(string="Tiền cọc", default=150000.0)
 
     # Tiến trình sản xuất
     production_assigned_date = fields.Date(
@@ -767,6 +770,15 @@ class SaleOrder(models.Model):
     customer_address_manual = fields.Text(copy=True)
     customer_address_manual_set = fields.Boolean(default=False, copy=True)
     phone = fields.Char(string="Số điện thoại", related='partner_id.phone', store=True, readonly=False, tracking=True)
+    conversation_url_manual = fields.Char(
+        string="Link hội thoại",
+        help="Link hội thoại của khách hàng; khi bấm sẽ mở trong tab mới.",
+        tracking=True,
+    )
+    delivery_tracking_url = fields.Char(
+        string="Link in ấn",
+        tracking=True,
+    )
 
     @api.depends(
         'partner_id', 'partner_id.street',

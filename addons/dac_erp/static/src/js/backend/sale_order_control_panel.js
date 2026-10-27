@@ -1,6 +1,8 @@
 /** @odoo-module **/
 
 import { FormController } from "@web/views/form/form_controller";
+import { Many2XAutocomplete } from "@web/views/fields/relational_utils";
+import { SelectCreateDialog } from "@web/views/view_dialogs/select_create_dialog";
 import { patch } from "@web/core/utils/patch";
 import { onMounted, onPatched, onWillUnmount } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
@@ -11,6 +13,34 @@ const FLOATING_MENU_CLASS = "dac-title-actions-menu--floating";
 const STATE_CLASS_PREFIX = "dac-order-state-";
 const REVIEW_CLASS = "dac-workflow-review-mode";
 const SALE_ORDER_PHONE_SELECTOR = '.o_field_widget[name="phone"] input';
+let activeSaleOrderController = null;
+
+patch(Many2XAutocomplete.prototype, {
+  async loadOptionsSource(request) {
+    const options = await super.loadOptionsSource(request);
+    if (this.props.resModel !== "res.partner") {
+      return options;
+    }
+
+    const partnerOptions = options.filter((option) => Number.isInteger(option.value));
+    if (!partnerOptions.length) {
+      return options;
+    }
+
+    const partners = await this.orm.read(
+      "res.partner",
+      partnerOptions.map((option) => option.value),
+      ["phone", "mobile"]
+    );
+    const phoneById = new Map(
+      partners.map((partner) => [partner.id, partner.phone || partner.mobile || "Chưa có số điện thoại"])
+    );
+    for (const option of partnerOptions) {
+      option.label = `${option.label}   ☎ ${phoneById.get(option.value) || "Chưa có số điện thoại"}`;
+    }
+    return options;
+  },
+});
 
 function configureSaleOrderPhoneInput(input) {
   input.inputMode = "numeric";
@@ -28,6 +58,8 @@ document.addEventListener("focusin", (event) => {
   const input = event.target.closest?.(SALE_ORDER_PHONE_SELECTOR);
   if (input) {
     configureSaleOrderPhoneInput(input);
+    activeSaleOrderController?.bindCustomerPhoneAutocomplete(input);
+    activeSaleOrderController?.__dacPhoneAutocompleteLoad?.();
   }
 }, true);
 
@@ -56,6 +88,7 @@ document.addEventListener("input", (event) => {
     input.value = normalized;
     input.dispatchEvent(new Event("input", { bubbles: true }));
   }
+  activeSaleOrderController?.__dacPhoneAutocompleteSchedule?.();
 }, true);
 
 function isSaleOrderForm(controller) {
@@ -191,20 +224,31 @@ patch(FormController.prototype, {
     }
 
     this.notification = useService("notification");
+    this.orm = useService("orm");
+    this.dialog = useService("dialog");
+    activeSaleOrderController = this;
     this.__dacSaleControlPanelRetries = 0;
 
     onMounted(() => {
       this.mountSaleOrderControlPanel();
+      this.bindSaleOrderPageTitle();
+      this.syncSaleOrderPageTitle();
       this.syncSaleOrderDirtyState();
     });
 
     onPatched(() => {
       this.mountSaleOrderControlPanel();
+      this.syncSaleOrderPageTitle();
       this.syncSaleOrderDirtyState();
       this.syncSaleOrderEditControls();
     });
 
     onWillUnmount(() => {
+      if (activeSaleOrderController === this) {
+        activeSaleOrderController = null;
+      }
+      this.__dacTaskStatusSavePromptCleanup?.();
+      this.__dacSaleOrderPageTitleCleanup?.();
       this.cleanupSaleOrderControlPanel();
     });
   },
@@ -237,12 +281,42 @@ patch(FormController.prototype, {
     this.syncSaleOrderStateClass();
     this.syncWorkflowReviewMode();
     this.bindNewSaleOrderButton(sourceBar);
+    this.bindCustomerPhoneAutocomplete();
     this.bindSaleOrderEditControls(sourceBar);
+    this.bindTaskStatusSavePrompt();
     this.bindWorkflowReviewSteps(sourceBar);
     this.bindSaleOrderActionMenu();
+    this.syncWorkflowNextStep(sourceBar);
     this.syncInternalNoteBadge();
     this.syncSaleOrderDirtyState();
     this.syncSaleOrderEditControls();
+  },
+
+  syncSaleOrderPageTitle() {
+    const displayedTitle = document.querySelector(".dac-control-panel-title")?.textContent || "";
+    const orderCode = String(this.model?.root?.data?.order_number || displayedTitle.split("·")[0] || "").trim();
+    if (orderCode && document.title !== orderCode) {
+      document.title = orderCode;
+    }
+  },
+
+  bindSaleOrderPageTitle() {
+    if (this.__dacSaleOrderPageTitleCleanup) {
+      return;
+    }
+    const titleElement = document.querySelector("title");
+    if (!titleElement) {
+      return;
+    }
+    const observer = new MutationObserver(() => this.syncSaleOrderPageTitle());
+    observer.observe(titleElement, { childList: true, characterData: true, subtree: true });
+    const timers = [0, 80, 250, 600, 1200].map((delay) =>
+      window.setTimeout(() => this.syncSaleOrderPageTitle(), delay)
+    );
+    this.__dacSaleOrderPageTitleCleanup = () => {
+      observer.disconnect();
+      timers.forEach((timer) => window.clearTimeout(timer));
+    };
   },
 
   bindSaleOrderEditControls(sourceBar) {
@@ -270,10 +344,10 @@ patch(FormController.prototype, {
           await root.switchMode("edit");
         }
       } else if (root.isInEdition) {
-        const saved = await this.saveButtonClicked();
-        if (saved) {
-          await root.switchMode("readonly");
-        }
+        // Persist the current changes without closing edit mode.  The custom
+        // control panel is meant for consecutive updates to an order; forcing
+        // readonly here made users reload the page before they could continue.
+        await this.saveButtonClicked();
       }
       this.syncSaleOrderEditControls();
     };
@@ -281,6 +355,200 @@ patch(FormController.prototype, {
     sourceBar.addEventListener("click", onClick, true);
     this.__dacSaleOrderEditBar = sourceBar;
     this.__dacSaleOrderEditCleanup = () => sourceBar.removeEventListener("click", onClick, true);
+  },
+
+  bindTaskStatusSavePrompt() {
+    if (this.__dacTaskStatusSavePromptBound || !this.el) {
+      return;
+    }
+
+    const showSaveButton = () => {
+      window.setTimeout(async () => {
+        const root = this.model?.root;
+        if (!root || root.isInEdition || !this.canEdit) {
+          return;
+        }
+        await root.switchMode("edit");
+        this.syncSaleOrderEditControls();
+      }, 0);
+    };
+
+    const onChange = (event) => {
+      if (event.target.matches(".dac-box-document .dac-task-state-select select")) {
+        showSaveButton();
+      }
+    };
+    const onClick = (event) => {
+      if (event.target.closest(".dac-box-document button[name='action_set_card_state']")) {
+        showSaveButton();
+      }
+    };
+
+    this.el.addEventListener("change", onChange, true);
+    this.el.addEventListener("click", onClick, true);
+    this.__dacTaskStatusSavePromptBound = true;
+    this.__dacTaskStatusSavePromptCleanup = () => {
+      this.el?.removeEventListener("change", onChange, true);
+      this.el?.removeEventListener("click", onClick, true);
+    };
+  },
+
+  bindCustomerPhoneAutocomplete(targetInput = null) {
+    const input = targetInput || Array.from(
+      this.el?.querySelectorAll(SALE_ORDER_PHONE_SELECTOR) || []
+    ).find((candidate) => candidate.offsetParent !== null);
+    if (!input || this.__dacPhoneAutocompleteInput === input) {
+      return;
+    }
+    this.__dacPhoneAutocompleteCleanup?.();
+
+    const widget = input.closest('.o_field_widget[name="phone"]');
+    if (!widget) {
+      return;
+    }
+    widget.classList.add("dac-phone-autocomplete-anchor");
+    const menu = document.createElement("div");
+    menu.className = "dropdown-menu dac-phone-customer-dropdown";
+    widget.appendChild(menu);
+    let requestId = 0;
+    let timer;
+
+    const close = () => menu.classList.remove("show");
+    const appendDropdownActions = () => {
+      const searchMore = document.createElement("button");
+      searchMore.type = "button";
+      searchMore.className = "dropdown-item dac-phone-customer-action dac-phone-search-more";
+      searchMore.textContent = "Tìm kiếm thêm...";
+      searchMore.addEventListener("mousedown", (event) => event.preventDefault());
+      searchMore.addEventListener("click", () => {
+        close();
+        this.dialog.add(SelectCreateDialog, {
+          title: "Chọn khách hàng",
+          resModel: "res.partner",
+          multiSelect: false,
+          onSelected: async ([partnerId]) => {
+            const [partner] = await this.orm.read(
+              "res.partner",
+              [partnerId],
+              ["display_name", "phone", "mobile"]
+            );
+            if (!partner) {
+              return;
+            }
+            await this.model.root.update({
+              partner_id: [partner.id, partner.display_name],
+            });
+            if (!partner.phone && partner.mobile) {
+              const mobileDigits = partner.mobile.replace(/[^0-9]/g, "");
+              if (mobileDigits.length === 10) {
+                await this.model.root.update({ phone: mobileDigits });
+              }
+            }
+          },
+        });
+      });
+
+      const startTyping = document.createElement("button");
+      startTyping.type = "button";
+      startTyping.className = "dropdown-item dac-phone-customer-action dac-phone-start-typing";
+      startTyping.textContent = "Nhập thông tin...";
+      startTyping.addEventListener("mousedown", (event) => event.preventDefault());
+      startTyping.addEventListener("click", () => {
+        close();
+        input.focus();
+        input.select();
+      });
+
+      menu.append(searchMore, startTyping);
+    };
+    const load = async () => {
+      const currentRequest = ++requestId;
+      const query = input.value.trim();
+      const domain = query
+        ? ["|", ["phone", "ilike", query], ["mobile", "ilike", query]]
+        : [];
+      menu.innerHTML = '<div class="dropdown-item disabled">Đang tìm khách hàng...</div>';
+      menu.classList.add("show");
+      let partners;
+      try {
+        partners = await this.orm.searchRead(
+          "res.partner",
+          domain,
+          ["display_name", "phone", "mobile"],
+          { limit: 8 }
+        );
+      } catch (error) {
+        if (currentRequest === requestId) {
+          menu.innerHTML = '<div class="dropdown-item disabled">Không thể tải danh sách khách hàng</div>';
+        }
+        return;
+      }
+      if (currentRequest !== requestId || document.activeElement !== input) {
+        return;
+      }
+      menu.replaceChildren();
+      for (const partner of partners) {
+        const item = document.createElement("button");
+        item.type = "button";
+        item.className = "dropdown-item dac-phone-customer-option";
+        const phone = partner.phone || partner.mobile || "Chưa có số điện thoại";
+        item.textContent = `${partner.display_name}   ☎ ${phone}`;
+        item.addEventListener("mousedown", (event) => event.preventDefault());
+        item.addEventListener("click", async () => {
+          await this.model.root.update({
+            partner_id: [partner.id, partner.display_name],
+          });
+          if (!partner.phone && partner.mobile) {
+            const mobileDigits = partner.mobile.replace(/[^0-9]/g, "");
+            if (mobileDigits.length === 10) {
+              await this.model.root.update({ phone: mobileDigits });
+            }
+          }
+          close();
+        });
+        menu.appendChild(item);
+      }
+      if (!partners.length) {
+        const empty = document.createElement("div");
+        empty.className = "dropdown-item disabled";
+        empty.textContent = "Không tìm thấy khách hàng";
+        menu.appendChild(empty);
+      }
+      appendDropdownActions();
+    };
+    const scheduleLoad = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(load, 120);
+    };
+    const onMouseDown = () => {
+      if (document.activeElement !== input && input.value) {
+        window.requestAnimationFrame(() => input.select());
+      }
+    };
+    const onFocus = () => {
+      if (input.value) {
+        window.requestAnimationFrame(() => input.select());
+      }
+      load();
+    };
+    const onInput = () => scheduleLoad();
+    const onBlur = () => window.setTimeout(close, 150);
+    input.addEventListener("mousedown", onMouseDown);
+    input.addEventListener("focus", onFocus);
+    input.addEventListener("input", onInput);
+    input.addEventListener("blur", onBlur);
+
+    this.__dacPhoneAutocompleteInput = input;
+    this.__dacPhoneAutocompleteLoad = load;
+    this.__dacPhoneAutocompleteSchedule = scheduleLoad;
+    this.__dacPhoneAutocompleteCleanup = () => {
+      window.clearTimeout(timer);
+      input.removeEventListener("mousedown", onMouseDown);
+      input.removeEventListener("focus", onFocus);
+      input.removeEventListener("input", onInput);
+      input.removeEventListener("blur", onBlur);
+      menu.remove();
+    };
   },
 
   syncSaleOrderEditControls() {
@@ -320,8 +588,40 @@ patch(FormController.prototype, {
     badge.textContent = count;
   },
 
+  syncWorkflowNextStep(sourceBar) {
+    const target = sourceBar.querySelector(".dac-v6-control-next-step");
+    if (!target) {
+      return;
+    }
+    const selector = [
+      ".dac-v6-quotation-next-step",
+      ".dac-v6-design-next-step",
+      ".dac-v6-production-next-step",
+      ".dac-v6-delivery-next-step",
+      ".dac-v6-installation-next-step",
+      ".dac-v6-delivery-stage-footer",
+    ].join(",");
+    const renderedBlocks = Array.from(document.querySelectorAll(selector)).filter(
+      (block) => !target.contains(block)
+    );
+    if (renderedBlocks.length) {
+      for (const block of renderedBlocks) {
+        const message = block.querySelector(":scope > div");
+        if (message) {
+          const messageText = message.innerText.replace(/\s+/g, " ").trim();
+          message.classList.add("dac-v6-next-step-info");
+          message.title = messageText;
+          message.setAttribute("aria-label", messageText);
+          message.setAttribute("role", "note");
+        }
+      }
+      target.replaceChildren(...renderedBlocks);
+    }
+  },
+
   bindNewSaleOrderButton(sourceBar) {
-    if (this.__dacNewOrderBar === sourceBar) {
+    const eventRoot = this.el || sourceBar;
+    if (this.__dacNewOrderBar === eventRoot) {
       return;
     }
     this.__dacNewOrderCleanup?.();
@@ -343,9 +643,9 @@ patch(FormController.prototype, {
         newTab.location.replace("/odoo/cart-sales/new");
       }
     };
-    sourceBar.addEventListener("click", onClick, true);
-    this.__dacNewOrderBar = sourceBar;
-    this.__dacNewOrderCleanup = () => sourceBar.removeEventListener("click", onClick, true);
+    eventRoot.addEventListener("click", onClick, true);
+    this.__dacNewOrderBar = eventRoot;
+    this.__dacNewOrderCleanup = () => eventRoot.removeEventListener("click", onClick, true);
   },
 
   bindWorkflowReviewSteps(sourceBar) {
@@ -474,6 +774,11 @@ patch(FormController.prototype, {
     this.__dacNewOrderCleanup?.();
     this.__dacNewOrderCleanup = null;
     this.__dacNewOrderBar = null;
+    this.__dacPhoneAutocompleteCleanup?.();
+    this.__dacPhoneAutocompleteCleanup = null;
+    this.__dacPhoneAutocompleteInput = null;
+    this.__dacPhoneAutocompleteLoad = null;
+    this.__dacPhoneAutocompleteSchedule = null;
     this.__dacWorkflowReviewCleanup?.();
     this.__dacWorkflowReviewCleanup = null;
     this.__dacWorkflowReviewBar = null;

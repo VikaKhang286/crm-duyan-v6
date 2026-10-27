@@ -17,7 +17,7 @@
                     </group>
 
                     <footer>
-                        <button name="action_confirm" type="object" string="Xác nhận thanh toán" class="btn-primary" invisible="not journal_id or not payment_date"/>
+                        <button name="action_confirm" type="object" string="Xác nhận thanh toán" class="btn-primary"/>
                     </footer>
                 </form>
             </field>

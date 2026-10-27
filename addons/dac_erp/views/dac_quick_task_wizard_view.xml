@@ -27,8 +27,7 @@
                         <button name="action_create_task"
                                 type="object"
                                 string="Tạo Task"
-                                class="btn-primary"
-                                invisible="not name"/>
+                                class="btn-primary"/>
                         <button string="Huỷ" class="btn-secondary" special="cancel"/>
                     </footer>
                 </form>

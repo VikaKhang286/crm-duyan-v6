@@ -30,7 +30,8 @@ class DepositConfirmWizard(models.TransientModel):
                 res['partner_name'] = order.partner_id.name or ''
                 res['currency_id'] = order.currency_id.id
                 res['amount_total_order'] = order.remaining_amount_display
-                res['deposit_amount'] = order.deposit_amount or order.remaining_amount_display or order.amount_total
+                # Khoản cọc đề xuất khi mở popup thanh toán mới.
+                res['deposit_amount'] = 150000.0
         if 'journal_id' in fields_list and not res.get('journal_id'):
             bank_journal = self.env['account.journal'].search([
                 ('type', '=', 'bank'),

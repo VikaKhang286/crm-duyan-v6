@@ -332,6 +332,149 @@
   }
 }
 
+/* Compact sale-order header controls and customer lookup additions. */
+.o_web_client .dac-order-back-btn,
+.o_web_client .dac-new-order-btn {
+  display: inline-flex !important;
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  padding: 0 !important;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px !important;
+}
+
+.o_web_client .dac-order-back-btn {
+  flex: 0 0 36px;
+  color: #596579 !important;
+}
+
+.dac-sale-form .dac-v6-customer-row.dac-v6-phone-row {
+  grid-template-columns: 30px minmax(0, 1fr);
+}
+
+.dac-sale-form .dac-phone-autocomplete-anchor {
+  position: relative;
+}
+
+.dac-sale-form .dac-phone-customer-dropdown {
+  top: calc(100% + 4px);
+  right: 0;
+  left: 0;
+  z-index: 1060;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.dac-sale-form .dac-phone-customer-option {
+  overflow: hidden;
+  padding: 8px 12px;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dac-sale-form .dac-phone-customer-action {
+  width: 100%;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 0;
+  background: #fff;
+  color: #374151;
+  font-size: 13px;
+  text-align: left;
+}
+
+.dac-sale-form .dac-phone-search-more {
+  position: sticky;
+  bottom: 34px;
+  z-index: 2;
+  border-top: 1px solid #e5e7eb;
+}
+
+.dac-sale-form .dac-phone-start-typing {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+}
+
+.dac-sale-form .dac-phone-customer-action:hover,
+.dac-sale-form .dac-phone-customer-action:focus {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.dac-sale-form .dac-v6-customer-contact-row {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.dac-sale-form .dac-v6-customer-contact-row > .dac-v6-customer-row.dac-v6-address-row {
+  grid-column: auto;
+}
+
+@media (max-width: 767.98px) {
+  .dac-sale-form .dac-v6-customer-contact-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.dac-sale-form .dac-v6-conversation-link-row .o_field_url > a {
+  overflow: hidden;
+  color: #2563eb;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (min-width: 1101px) {
+  .o_web_client .o_control_panel.dac-sale-order-control-panel-active .dac-control-panel-bar {
+    grid-template-columns: minmax(360px, 1fr) minmax(420px, 540px) minmax(180px, .7fr) !important;
+    grid-template-areas: "title progress pancake" "tools tools tools" !important;
+  }
+
+  .o_web_client .o_control_panel.dac-sale-order-control-panel-active .dac-control-panel-main {
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+  }
+
+  .o_web_client .o_control_panel.dac-sale-order-control-panel-active .dac-control-panel-progress {
+    justify-self: center;
+    width: 100%;
+    min-height: 68px;
+    padding: 9px 10px;
+    border-left: 0;
+  }
+
+  .o_web_client .o_control_panel.dac-sale-order-control-panel-active .dac-control-panel-progress .o_arrow_button {
+    min-height: 36px !important;
+    padding: 5px 4px !important;
+    font-size: 11px !important;
+  }
+
+  .o_web_client .o_control_panel.dac-sale-order-control-panel-active .dac-control-panel-pancake {
+    grid-area: pancake;
+    justify-self: end;
+    margin-right: 16px;
+  }
+}
+
+@media (max-width: 1100px) and (min-width: 768px) {
+  .o_web_client .dac-control-panel-bar {
+    grid-template-areas: "title" "progress" "pancake" "tools" !important;
+  }
+
+  .o_web_client .dac-control-panel-pancake {
+    grid-area: pancake;
+    margin: 0 16px 10px;
+  }
+}
+
 /* The review banner is deliberately interactive, even though the historical
    form contents behind it are read-only. Keep this at the end of the file so
    it wins over all responsive and readonly overrides. */
@@ -1097,6 +1240,23 @@
   font-weight: 850;
 }
 
+.dac-sale-form .dac-v6-products-title-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dac-sale-form .dac-v6-products-title-actions .dac-print-quotation-btn {
+  min-height: 32px;
+  padding: 5px 11px !important;
+  border-color: #dfe4eb !important;
+  border-radius: 8px !important;
+  background: #fff !important;
+  color: #596579 !important;
+  font-size: 11px !important;
+  font-weight: 750 !important;
+}
+
 .dac-sale-form .dac-v6-line-count {
   display: inline-flex;
   align-items: center;
@@ -1150,8 +1310,12 @@
 
 .dac-sale-form .dac-v6-side-notebook>.o_notebook_headers .nav {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   width: 100%;
+}
+
+.dac-sale-form .dac-v6-right-column>.dac-v6-detail-panel {
+  min-width: 0;
 }
 
 .dac-sale-form .dac-v6-side-notebook>.o_notebook_headers .nav-link {
@@ -1845,6 +2009,50 @@
   background: transparent;
 }
 
+.dac-sale-form .dac-v6-right-column {
+  display: grid;
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0;
+  align-content: start;
+  gap: 14px;
+}
+
+.dac-sale-form .dac-v6-right-column>.dac-v6-order-description {
+  margin: 0;
+}
+
+.dac-sale-form .dac-v6-right-column>.dac-box-internal {
+  min-width: 0;
+  min-height: 0 !important;
+  margin-bottom: 0;
+  padding: 0 !important;
+  border: 1px solid #e4e7ed !important;
+  border-radius: 10px !important;
+  background: #f8f9fb !important;
+  box-shadow: none !important;
+}
+
+.dac-sale-form .dac-v6-right-column>.dac-box-internal .dac-v6-business-title {
+  margin: 0;
+  padding: 12px 13px 4px;
+  color: #313946;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.dac-sale-form .dac-v6-right-column>.dac-box-internal .dac-v6-business-title i {
+  color: #8c96a5;
+}
+
+.dac-sale-form .dac-v6-right-column>.dac-box-internal .dac-v6-metric-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+  padding: 0 13px;
+  border: 0;
+  background: transparent;
+}
+
 .dac-sale-form .dac-v6-customer-owner>h4 {
   margin: 0 0 7px;
   color: #313946;
@@ -2034,6 +2242,23 @@
   display: inline;
   color: inherit;
   font: inherit;
+}
+
+.dac-v6-delivery-stage-body .dac-v6-delivery-link {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dac-v6-delivery-stage-body .dac-v6-delivery-link .o_field_widget {
+  flex: 1;
+  min-width: 0;
+}
+
+.dac-v6-delivery-stage-body .dac-v6-delivery-link input {
+  width: 100%;
+  color: #4f46e5;
+  font-size: 12px;
 }
 
 .dac-v6-delivery-stage-footer, .dac-v6-completed-stage-footer {
@@ -2346,6 +2571,16 @@
   vertical-align: middle;
 }
 
+.dac-v6-description-editor img.dac-v6-inline-image-selected {
+  outline: 3px solid #f0b400;
+  outline-offset: 2px;
+}
+
+.dac-v6-delete-inline-image:disabled {
+  cursor: not-allowed;
+  opacity: .45;
+}
+
 .dac-v6-attachments-head {
   display: flex;
   align-items: center;
@@ -2417,13 +2652,29 @@
   white-space: nowrap;
 }
 
-.dac-v6-description-image>a {
+.dac-v6-description-image-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 0 8px 9px;
+}
+
+.dac-v6-description-image-actions>a,
+.dac-v6-description-image-delete {
   display: inline-block;
   font-size: 13px;
   color: #967000 !important;
-  margin: 0 0 9px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
   text-decoration: none;
   cursor: pointer;
+}
+
+.dac-v6-description-image-delete {
+  color: #c24141 !important;
 }
 
 .dac-v6-image-viewer-backdrop {
@@ -2638,10 +2889,21 @@
   z-index: 1060;
 }
 
+/* Keep the compact task list scrollable, but let the state picker escape its
+   short (one/two-card) kanban viewport while it is open. */
+.dac-sale-form .dac-box-document>.dac-box-tasks:has(.dac-task-state-menu .dropdown-menu.show),
+.dac-sale-form .dac-box-document>.dac-box-tasks:has(.dac-task-state-menu .dropdown-menu.show)>.o_field_widget,
+.dac-sale-form .dac-box-document>.dac-box-tasks:has(.dac-task-state-menu .dropdown-menu.show) .o_kanban_view,
+.dac-sale-form .dac-box-document>.dac-box-tasks:has(.dac-task-state-menu .dropdown-menu.show) .o_kanban_renderer {
+  max-height: none !important;
+  overflow: visible !important;
+}
+
 .dac-sale-form .dac-box-document .dac-task-card-inner {
   min-height: 100%;
   padding: 10px 12px !important;
   border-radius: 8px !important;
+  border: 1px solid #d5dce5;
   border-left: 3px solid #d5dce5;
   background: #fafbfc !important;
 }
@@ -3026,6 +3288,83 @@
   background-color: var(--dac-order-primary) !important;
   color: #4d3900 !important;
   border-color: var(--dac-order-primary) !important;
+}
+
+.o_web_client .dac-control-panel-tools .dac-v6-control-next-step {
+  order: 100;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  min-width: 0;
+  margin-left: auto;
+}
+
+.o_web_client .dac-control-panel-tools .dac-v6-control-next-step>div {
+  position: relative;
+  display: flex;
+  width: auto;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.o_web_client .dac-control-panel-tools .dac-v6-control-next-step .dac-v6-next-step-info {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  z-index: 2;
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid #e5c34a;
+  border-radius: 50%;
+  background: #fff8d9;
+  color: #806000;
+  cursor: help;
+  font-size: 0;
+}
+
+.o_web_client .dac-control-panel-tools .dac-v6-control-next-step .dac-v6-next-step-info::before {
+  content: "i";
+  font-family: Georgia, serif;
+  font-size: 11px;
+  font-style: italic;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.o_web_client .dac-control-panel-tools .dac-v6-control-next-step .dac-v6-next-step-info>* {
+  display: none !important;
+}
+
+.o_web_client .dac-control-panel-tools .dac-v6-control-next-step :is(.dac-v6-design-next-step--blocked, .dac-v6-production-next-step--blocked) .dac-v6-next-step-info {
+  border-color: #ef6b80;
+  background: #fff0f2;
+  color: #b4233c;
+}
+
+.o_web_client .dac-control-panel-tools .dac-v6-control-next-step .btn {
+  min-width: 0;
+  min-height: 38px;
+  padding: 8px 14px !important;
+}
+
+.o_web_client .dac-control-panel-tools .dac-v6-installation-next-step {
+  display: flex;
+}
+
+.o_web_client .dac-control-panel-tools .dac-v6-installation-next-step>div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .dac-control-panel-tools .dac-save-btn.dac-save-btn-dirty::after {
@@ -3464,7 +3803,9 @@
 }
 
 .o_kanban_renderer.o_kanban_ungrouped .o_kanban_record:not(.o_legacy_kanban) {
-  flex-grow: 0 !important;
+  flex-grow: 1 !important;
+  padding: 0 !important;
+  border: 0 !important;
 }
 
 .dac-task-card-inner {
@@ -4114,8 +4455,8 @@
   .o_web_client .dac-control-panel-bar {
     display: grid !important;
     padding: 0 !important;
-    grid-template-columns: minmax(220px, .72fr) minmax(520px, 1.55fr) !important;
-    grid-template-areas: "title progress" "tools tools" !important;
+    grid-template-columns: minmax(320px, 1fr) minmax(420px, 540px) minmax(180px, .7fr) !important;
+    grid-template-areas: "title progress pancake" "tools tools tools" !important;
     gap: 0 !important;
     white-space: normal !important;
   }
@@ -4123,15 +4464,33 @@
   .o_web_client .dac-control-panel-main {
     grid-area: title;
     min-height: 78px;
-    padding: 17px 18px;
+    padding: 18px 0px 18px 18px;
   }
 
   .o_web_client .dac-control-panel-main {
     display: flex;
-    flex-direction: column;
-    align-items: flex-start;
+    flex-direction: row;
+    align-items: center;
     justify-content: center;
     gap: 10px;
+  }
+
+  .o_web_client .dac-control-panel-heading-group {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .o_web_client .dac-control-panel-title-group {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+  }
+
+  .o_web_client .dac-control-panel-heading-group .dac-control-panel-title {
+    margin: 0;
   }
 
   .o_web_client .dac-control-panel-title::after {
@@ -4140,7 +4499,7 @@
 
   .o_web_client .dac-v6-order-status-badges {
     display: flex;
-    flex-wrap: wrap;
+    width: 100%;
     align-items: center;
     gap: 8px;
   }
@@ -4189,11 +4548,23 @@
 
   .o_web_client .dac-control-panel-progress {
     grid-area: progress;
-    min-height: 78px;
-    padding: 11px 16px;
-    border-left: 1px solid #eef0f4;
+    min-height: 68px;
+    padding: 9px 10px;
+    border-left: 0;
     display: flex;
     align-items: center;
+  }
+
+  .o_web_client .dac-control-panel-progress .o_arrow_button {
+    min-height: 36px !important;
+    padding: 5px 4px !important;
+    font-size: 11px !important;
+  }
+
+  .o_web_client .dac-control-panel-pancake {
+    grid-area: pancake;
+    justify-self: end;
+    margin-right: 16px;
   }
 
   .o_web_client .dac-control-panel-progress .o_statusbar_status {
@@ -4292,7 +4663,12 @@
 @media (max-width: 1100px) and (min-width: 768px) {
   .o_web_client .dac-control-panel-bar {
     grid-template-columns: 1fr !important;
-    grid-template-areas: "title" "progress" "tools" !important;
+    grid-template-areas: "title" "progress" "pancake" "tools" !important;
+  }
+
+  .o_web_client .dac-control-panel-pancake {
+    grid-area: pancake;
+    margin: 0 16px 10px;
   }
 
   .o_web_client .dac-sale-form .dac-core-info-row>.d-flex {
