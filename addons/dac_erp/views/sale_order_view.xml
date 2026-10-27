@@ -299,8 +299,8 @@
                                             <field name="discount" string="CK %" invisible="display_type" column_invisible="parent.is_design_user or parent.is_production_user" optional="hide"/>
                                             <field name="tax_id" string="Thuế" widget="many2many_tags" invisible="display_type" column_invisible="parent.order_type == 'cart' or parent.is_design_user or parent.is_production_user" optional="hide"/>
                                             <field name="price_subtotal" string="Thành tiền" readonly="1" invisible="display_type" column_invisible="parent.is_design_user or parent.is_production_user"/>
-                                            <field name="company_id" invisible="1" optional="hide"/>
-                                            <field name="currency_id" invisible="1" optional="hide"/>
+                                            <field name="company_id" column_invisible="True"/>
+                                            <field name="currency_id" column_invisible="True"/>
                                         </list>
                                     </field>
                                 </div>

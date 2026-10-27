@@ -172,8 +172,8 @@
                                         <field name="product_uom_qty" string="Số lượng" invisible="display_type" readonly="parent.state == 'cancel'"/>
                                         <field name="price_unit" string="Đơn giá" widget="integer" invisible="display_type" column_invisible="parent.is_design_user or parent.is_production_user" readonly="parent.state == 'cancel'"/>
                                         <field name="price_subtotal" string="Thành tiền" readonly="1" invisible="display_type" column_invisible="parent.is_design_user or parent.is_production_user"/>
-                                        <field name="company_id" invisible="1"/>
-                                        <field name="currency_id" invisible="1"/>
+                                        <field name="company_id" column_invisible="True"/>
+                                        <field name="currency_id" column_invisible="True"/>
                                     </list>
                                 </field>
                             </div>
@@ -302,7 +302,7 @@
                 <xpath expr="//div[hasclass('dac-box-document')]/h5" position="after">
                     <div class="dac-v6-task-flow-panel" invisible="workflow_review_state != 'deposit'">
                         <field name="design_task_display_ids" nolabel="1">
-                            <kanban create="false" delete="false" quick_create="false" limit="100">
+                            <kanban create="false" delete="true" quick_create="false" limit="100">
                                 <field name="name"/>
                                 <field name="state"/>
                                 <field name="quick_state"/>
@@ -329,7 +329,7 @@
                     </div>
                     <div class="dac-v6-task-flow-panel" invisible="workflow_review_state != 'production'">
                         <field name="production_task_display_ids" nolabel="1">
-                            <kanban create="false" delete="false" quick_create="false" limit="100">
+                            <kanban create="false" delete="true" quick_create="false" limit="100">
                                 <field name="name"/>
                                 <field name="state"/>
                                 <field name="quick_state"/>
@@ -381,7 +381,7 @@
                            domain="[('assigned_user_id', '=', uid)]"
                            invisible="not is_design_user or workflow_review_state != 'deposit'"
                            groups="dac_erp.group_dac_erp_design">
-                        <kanban create="false" delete="false" quick_create="false" limit="100" class="dac-design-my-tasks">
+                        <kanban create="false" delete="true" quick_create="false" limit="100" class="dac-design-my-tasks">
                             <field name="name"/>
                             <field name="priority"/>
                             <field name="state"/>
@@ -421,7 +421,7 @@
                     <field name="design_task_display_ids" nolabel="1"
                            invisible="is_design_user or workflow_review_state != 'deposit'"
                            groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager,dac_erp.group_dac_erp_production,base.group_system">
-                        <kanban create="false" delete="false" quick_create="false" limit="100">
+                        <kanban create="false" delete="true" quick_create="false" limit="100">
                             <field name="name"/>
                             <field name="priority"/>
                             <field name="state"/>
@@ -462,7 +462,7 @@
                         </kanban>
                     </field>
                     <field name="production_task_display_ids" nolabel="1" invisible="workflow_review_state != 'production'">
-                        <kanban create="false" delete="false" quick_create="false" limit="100">
+                        <kanban create="false" delete="true" quick_create="false" limit="100">
                             <field name="name"/>
                             <field name="priority"/>
                             <field name="state"/>
