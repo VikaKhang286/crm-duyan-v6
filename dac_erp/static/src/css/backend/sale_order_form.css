@@ -439,7 +439,7 @@
 
   .o_web_client .o_control_panel.dac-sale-order-control-panel-active .dac-control-panel-top-row {
     display: grid !important;
-    grid-template-columns: max-content minmax(420px, 540px) minmax(0, 1fr) !important;
+    grid-template-columns: minmax(0, 1fr) minmax(420px, 540px) minmax(0, 0.75fr) !important;
     grid-template-areas: "title progress primary" !important;
   }
 
@@ -4496,7 +4496,7 @@
 
   .o_web_client .dac-control-panel-top-row {
     display: grid !important;
-    grid-template-columns: max-content minmax(420px, 540px) minmax(0, 1fr) !important;
+    grid-template-columns: minmax(0, 1fr) minmax(420px, 540px) minmax(0, 1fr) !important;
     grid-template-areas: "title progress primary" !important;
     width: 100%;
   }
@@ -4513,8 +4513,8 @@
     align-items: center;
     justify-content: center;
     gap: 10px;
-    min-width: max-content;
-    white-space: nowrap;
+    min-width: 0;
+    white-space: normal;
   }
 
   .o_web_client .dac-control-panel-heading-group {
@@ -4529,7 +4529,7 @@
     display: flex;
     min-width: 0;
     align-items: center;
-    white-space: nowrap;
+    white-space: normal;
   }
 
   .o_web_client .dac-control-panel-heading-group .dac-control-panel-title {
