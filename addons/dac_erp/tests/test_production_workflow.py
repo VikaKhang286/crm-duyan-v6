@@ -49,6 +49,14 @@ class TestProductionWorkflow(TransactionCase):
             fields.Date.context_today(self.order),
         )
 
+    def test_empty_internal_note_is_allowed(self):
+        previous_count = len(self.order.message_ids)
+        action = self.order.action_post_internal_note()
+
+        self.assertEqual(action.get('tag'), 'dac_soft_reload_sale_order')
+        self.assertEqual(len(self.order.message_ids), previous_count + 1)
+        self.assertFalse(self.order.internal_note_draft)
+
     def test_production_deadline_wizard_uses_default_days(self):
         self.env['ir.config_parameter'].sudo().set_param('dac_erp.production_default_deadline_days', '5')
         self.order.production_deadline = False
@@ -60,11 +68,13 @@ class TestProductionWorkflow(TransactionCase):
 
         action = wizard.action_use_default_deadline()
 
-        self.assertEqual(action.get('res_model'), 'no.deposit.confirm.wizard')
+        self.assertTrue(action)
         self.assertEqual(
             self.order.production_deadline,
             fields.Date.context_today(self.order) + timedelta(days=5),
         )
+        self.assertEqual(self.order.order_state_custom, 'production')
+        self.assertTrue(self.order.is_production_confirmed)
 
     def test_no_deposit_wizard_confirm(self):
         self.order.production_deadline = '2030-12-31'

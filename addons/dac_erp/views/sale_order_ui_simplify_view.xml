@@ -573,19 +573,19 @@
                         <button name="action_complete_quotation_and_proceed" string="Chốt báo giá" type="object" class="btn btn-warning" groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager,base.group_system"/>
                     </div>
                     <xpath expr="//div[hasclass('dac-box-tasks')]" position="move"/>
-                    <div class="dac-v6-design-next-step dac-v6-design-next-step--blocked" invisible="is_design_user or workflow_review_state != 'deposit' or design_tasks_complete">
+                    <div class="dac-v6-design-next-step dac-v6-design-next-step--blocked" invisible="1">
                         <div><b>Bước tiếp theo: Sản xuất</b><span>Chưa thể chuyển: Thiết kế chưa hoàn tất (<field name="design_task_progress_percent" nolabel="1" readonly="1"/>%). Hoàn tất công việc thiết kế rồi bấm tiếp tục lại.</span></div>
                         <button name="dac_disabled_design_transition" string="Bắt đầu sản xuất" type="button" class="btn btn-danger" disabled="1"/>
                     </div>
-                    <div class="dac-v6-design-next-step dac-v6-design-next-step--blocked" invisible="is_design_user or workflow_review_state != 'deposit' or not design_tasks_complete or (design_done and is_deposit_confirmed)">
+                    <div class="dac-v6-design-next-step dac-v6-design-next-step--blocked" invisible="1">
                         <div><b>Bước tiếp theo: Sản xuất</b><span>Chưa thể chuyển: Cần duyệt thiết kế và ghi nhận cọc trước khi sản xuất.</span></div>
                         <button name="dac_disabled_design_approval_deposit" string="Bắt đầu sản xuất" type="button" class="btn btn-danger" disabled="1"/>
                     </div>
-                    <div class="dac-v6-design-next-step" invisible="is_design_user or workflow_review_state != 'deposit' or not design_tasks_complete or not design_done or not is_deposit_confirmed">
+                    <div class="dac-v6-design-next-step" invisible="is_design_user or workflow_review_state != 'deposit'">
                         <div><b>Bước tiếp theo: Sản xuất</b><span>Bấm tiếp tục để chuyển đơn sang bước kế tiếp.</span></div>
                         <button name="action_proceed_to_production" string="Bắt đầu sản xuất" type="object" class="btn btn-warning" context="{'from_ui_button': True}" groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager,base.group_system"/>
                     </div>
-                    <div class="dac-v6-production-next-step dac-v6-production-next-step--blocked" invisible="is_production_user or workflow_review_state != 'production' or production_tasks_complete">
+                    <div class="dac-v6-production-next-step dac-v6-production-next-step--blocked" invisible="is_production_user or workflow_review_state != 'production' or fulfillment_method == 'delivery' or production_tasks_complete">
                         <div>
                             <b invisible="fulfillment_method != 'delivery'">Bước tiếp theo: Giao hàng</b>
                             <b invisible="fulfillment_method != 'installation'">Bước tiếp theo: Thi công</b>
@@ -594,7 +594,7 @@
                         <button name="dac_disabled_production_delivery" string="Bắt đầu giao hàng" type="button" class="btn btn-danger" disabled="1" invisible="fulfillment_method != 'delivery'"/>
                         <button name="dac_disabled_production_installation" string="Bắt đầu thi công" type="button" class="btn btn-danger" disabled="1" invisible="fulfillment_method != 'installation'"/>
                     </div>
-                    <div class="dac-v6-production-next-step" invisible="is_production_user or workflow_review_state != 'production' or not production_tasks_complete">
+                    <div class="dac-v6-production-next-step" invisible="is_production_user or workflow_review_state != 'production' or (fulfillment_method != 'delivery' and not production_tasks_complete)">
                         <div>
                             <b invisible="fulfillment_method != 'delivery'">Bước tiếp theo: Giao hàng</b>
                             <b invisible="fulfillment_method != 'installation'">Bước tiếp theo: Thi công</b>

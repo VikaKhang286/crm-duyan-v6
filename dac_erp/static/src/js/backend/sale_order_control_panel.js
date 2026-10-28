@@ -6,6 +6,7 @@ import { SelectCreateDialog } from "@web/views/view_dialogs/select_create_dialog
 import { patch } from "@web/core/utils/patch";
 import { onMounted, onPatched, onWillUnmount } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
+import { registry } from "@web/core/registry";
 
 const SLOT_CLASS = "dac-sale-order-control-panel-slot";
 const ACTIVE_CLASS = "dac-sale-order-control-panel-active";
@@ -14,6 +15,10 @@ const STATE_CLASS_PREFIX = "dac-order-state-";
 const REVIEW_CLASS = "dac-workflow-review-mode";
 const SALE_ORDER_PHONE_SELECTOR = '.o_field_widget[name="phone"] input';
 let activeSaleOrderController = null;
+
+registry.category("actions").add("dac_soft_reload_sale_order", async () => {
+  await activeSaleOrderController?.model?.root?.load();
+});
 
 patch(Many2XAutocomplete.prototype, {
   async loadOptionsSource(request) {

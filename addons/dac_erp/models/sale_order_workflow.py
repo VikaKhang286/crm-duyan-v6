@@ -261,43 +261,11 @@ class SaleOrderWorkflow(models.Model):
         if self.order_state_custom != 'deposit':
             raise UserError("Chỉ có thể tiến hành sản xuất từ trạng thái đặt cọc!")
 
-        if self.design_task_count and self.design_task_done_count < self.design_task_count:
-            percent = round((self.design_task_done_count / self.design_task_count) * 100)
-            raise UserError(_(
-                "Chưa thể chuyển: Thiết kế chưa hoàn tất (%(percent)s%%). "
-                "Hoàn tất công việc thiết kế rồi bấm tiếp tục lại.",
-                percent=percent,
-            ))
-
         if not self.production_deadline:
             return self._open_production_deadline_wizard()
 
-        if not self.has_deposit:
-            self._mark_production_started()
-            return True
-
-        deposit_invoices = self.env['account.move'].search([
-            ('move_type', '=', 'out_invoice'),
-            ('invoice_origin', '=', self.name),
-            ('dac_deposit_invoice', '=', True)
-        ])
-
-        if deposit_invoices:
-            paid_invoices = deposit_invoices.filtered(lambda inv: inv.payment_state == 'paid')
-            if not paid_invoices or len(paid_invoices) < len(deposit_invoices):
-                raise UserError("Có hóa đơn đặt cọc chưa được thanh toán! Vui lòng thanh toán hóa đơn cọc trước khi tiến hành sản xuất.")
-
-            self._mark_production_started()
-            return True
-
-        return {
-            'name': 'Xác nhận đơn không cọc',
-            'type': 'ir.actions.act_window',
-            'res_model': 'no.deposit.confirm.wizard',
-            'view_mode': 'form',
-            'target': 'new',
-            'context': {'active_id': self.id},
-        }
+        self._mark_production_started()
+        return True
 
     def _confirm_delivery_step(self, delivery_address=None, customer_pickup=False):
         self.ensure_one()
@@ -349,14 +317,12 @@ class SaleOrderWorkflow(models.Model):
     def action_post_internal_note(self):
         self.ensure_one()
         note = (self.internal_note_draft or '').strip()
-        if not note:
-            raise UserError('Vui lòng nhập nội dung trao đổi nội bộ.')
         self.message_post(
             body=Markup('<div class="dac-internal-note-message">{}</div>').format(note),
             subtype_xmlid='mail.mt_note',
         )
         self.internal_note_draft = False
-        return {'type': 'ir.actions.client', 'tag': 'reload'}
+        return {'type': 'ir.actions.client', 'tag': 'dac_soft_reload_sale_order'}
 
     def action_cancel_order(self):
         """Hủy đơn hàng - chỉ cho phép ở trạng thái báo giá và chưa có hóa đơn cọc"""
@@ -580,14 +546,6 @@ class SaleOrderWorkflow(models.Model):
         for order in self:
             if order.order_state_custom != 'production':
                 raise UserError(_("Chỉ có thể tiến hành giao hàng từ trạng thái sản xuất!"))
-            if order.production_task_count and order.production_task_done_count < order.production_task_count:
-                percent = round((order.production_task_done_count / order.production_task_count) * 100)
-                raise UserError(_(
-                    "Chưa thể chuyển: Sản xuất chưa hoàn tất (%(percent)s%%). "
-                    "Hoàn tất công việc sản xuất rồi bấm tiếp tục lại.",
-                    percent=percent,
-                ))
-
             # Đã xác nhận sản xuất (được set khi bấm "Tiến hành sản xuất")
             if not order.is_production_confirmed:
                 raise UserError(_("Vui lòng xác nhận sản xuất trước khi tiến hành giao hàng!"))
