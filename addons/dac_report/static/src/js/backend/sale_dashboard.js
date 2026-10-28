@@ -218,15 +218,15 @@ class DacSaleDashboard extends Component {
   }
 
   openOrders() {
-    return this.action.doAction('dac_erp.dac_sale_order_custom_action');
+    return this.action.doAction('dac_erp.dac_sale_order_custom_action', { clearBreadcrumbs: true });
   }
 
   openCartOrders() {
-    return this.action.doAction('dac_erp.dac_sale_order_cart_action');
+    return this.action.doAction('dac_erp.dac_sale_order_cart_action', { clearBreadcrumbs: true });
   }
 
   createOrder() {
-    return this.action.doAction({ type: 'ir.actions.act_window', res_model: 'sale.order', target: 'current', views: [[false, 'form']] });
+    return this.action.doAction({ type: 'ir.actions.act_window', res_model: 'sale.order', target: 'current', views: [[false, 'form']] }, { clearBreadcrumbs: true });
   }
 
   //--------------------------------------------------------------------
@@ -346,7 +346,7 @@ class DacSaleDashboard extends Component {
       res_id: resId,
       target: "current",
       views: [[false, "form"]],
-    });
+    }, { clearBreadcrumbs: true });
   }
 
   // Xử lý click vào receivables - có thể là hóa đơn hoặc đơn hàng
@@ -400,11 +400,11 @@ class DacSaleDashboard extends Component {
       res_id: id,
       views: [[false, "form"]],
       target: "current",
-    });
+    }, { clearBreadcrumbs: true });
   }
 
   openConversationQueue() {
-    return this.action.doAction("CRM_DAC.action_page_fm_conversation_queue");
+    return this.action.doAction("CRM_DAC.action_page_fm_conversation_queue", { clearBreadcrumbs: true });
   }
 
   //--------------------------------------------------------------------

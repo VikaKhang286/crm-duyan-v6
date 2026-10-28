@@ -60,6 +60,7 @@ export class CartOrdersListController extends ListController {
         onMounted(async () => {
             this.mountCartOrdersHero();
             this.bindQuickSaleRows();
+            await this.initializeStageFilter();
             await this.loadCartStats();
         });
         onPatched(() => {
@@ -416,6 +417,19 @@ export class CartOrdersListController extends ListController {
             searchModel.blockNotification = false;
         }
         await searchModel._notify();
+    }
+
+    async initializeStageFilter() {
+        const context = this.props?.context || this.model?.root?.context || {};
+        const stage = context.dac_initial_stage;
+        const allowedStages = new Set(["quotation", "deposit", "production", "delivery", "completed", "cancel"]);
+        const select = this.rootRef?.el?.querySelector(".dac-cart-stage-select");
+        if (!select || !allowedStages.has(stage) || select.dataset.initializedStage === stage) return;
+        select.dataset.initializedStage = stage;
+        select.value = stage;
+        const domain = [["order_state_custom", "=", stage]];
+        if (stage === "quotation") domain.push(["is_zero_amount", "=", false]);
+        await this.applyToolbarFilter("stage", domain, select.selectedOptions[0]?.textContent || "Giai đoạn");
     }
 
     async loadSaleOptions(toolbar) {

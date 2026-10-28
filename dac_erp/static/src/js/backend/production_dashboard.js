@@ -193,7 +193,7 @@ class ProductionDashboard extends Component {
       target: "current",
       views: [[false, "list"], [false, "form"]],
       domain: [["order_state_custom", "=", "production"]],
-    });
+    }, { clearBreadcrumbs: true });
   }
   get overdueDesignCount() {
     return this.designTasks.filter((t) => t.is_overdue).length;
@@ -237,7 +237,7 @@ class ProductionDashboard extends Component {
         res_id: task.id,
         target: "current",
         views: [[false, "form"]],
-      });
+      }, { clearBreadcrumbs: true });
     }
   }
 

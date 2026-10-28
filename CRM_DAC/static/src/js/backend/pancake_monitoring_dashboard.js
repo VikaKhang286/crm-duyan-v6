@@ -36,15 +36,15 @@ export class PancakeMonitoringDashboard extends Component {
   }
 
   openLogs() {
-    return this.action.doAction("CRM_DAC.action_pancake_message_sync_logs");
+    return this.action.doAction("CRM_DAC.action_pancake_message_sync_logs", { clearBreadcrumbs: true });
   }
 
   openJobs() {
-    return this.action.doAction("CRM_DAC.action_pancake_message_sync_jobs");
+    return this.action.doAction("CRM_DAC.action_pancake_message_sync_jobs", { clearBreadcrumbs: true });
   }
 
   scanToday() {
-    return this.action.doAction("CRM_DAC.action_pancake_sync_dashboard");
+    return this.action.doAction("CRM_DAC.action_pancake_sync_dashboard", { clearBreadcrumbs: true });
   }
 
   async syncAll() {

@@ -23,7 +23,7 @@ export class DacCreateOrderListController extends ListController {
     async _doServerAction(method) {
         const action = await this.orm.call("sale.order", method, [[]]);
         if (action) {
-            this.action.doAction(action);
+            this.action.doAction(action, { clearBreadcrumbs: true });
         }
     }
 
@@ -34,7 +34,7 @@ export class DacCreateOrderListController extends ListController {
             res_model: "sale.order",
             views: [[false, "form"]],
             target: "current",
-        });
+        }, { clearBreadcrumbs: true });
     }
 
     onCreatePancake() {

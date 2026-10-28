@@ -13,7 +13,7 @@ export class SaleOrderNoteEditableListController extends ListController {
   }
 
   createRecord() {
-    return this.action.doAction("dac_erp.action_new_cart_sale_order");
+    return this.action.doAction("dac_erp.action_new_cart_sale_order", { clearBreadcrumbs: true });
   }
 }
 

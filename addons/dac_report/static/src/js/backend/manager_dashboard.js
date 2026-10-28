@@ -613,41 +613,19 @@ export class ManagerDashboard extends Component {
   }
 
   openCartOrders() {
-    return this.action.doAction("dac_erp.dac_sale_order_cart_action");
+    return this.action.doAction("dac_erp.dac_sale_order_cart_action", { clearBreadcrumbs: true });
   }
 
+  openOrders() {
+    return this.action.doAction('dac_erp.dac_sale_order_custom_action', { clearBreadcrumbs: true });
+  }
   /**
    * Mở danh sách đơn hàng theo trạng thái
    */
   async openOrdersByState(state) {
-    // Lấy khoảng thời gian hiện tại từ dashboard
-    const { dateFrom, dateTo } = this.getDateRange();
-
-    // Domain với cả trạng thái VÀ khoảng thời gian
-    const domain = [
-      ["order_state_custom", "=", state],
-      ["date", ">=", dateFrom],
-      ["date", "<=", dateTo],
-    ];
-    
-    // 🆕 Lọc bỏ đơn 0đ (cơ hội) khi xem Báo giá
-    if (state === "quotation") {
-      domain.push(["is_zero_amount", "=", false]);
-    }
-
-    // Tạo text hiển thị khoảng thời gian
-    const periodText = this.getPeriodTextForTitle();
-
-    this.action.doAction({
-      type: "ir.actions.act_window",
-      name: `Đơn hàng - ${this.getStateName(state)} (${periodText})`,
-      res_model: "sale.order",
-      views: [
-        [false, "list"],
-        [false, "form"],
-      ],
-      domain: domain,
-      target: "current",
+    return this.action.doAction("dac_erp.dac_sale_order_custom_action", {
+      clearBreadcrumbs: true,
+      additionalContext: { dac_initial_stage: state },
     });
   }
 

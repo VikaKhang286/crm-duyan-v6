@@ -186,7 +186,7 @@ class DesignDashboard extends Component {
         res_id: task.id,
         target: "current",
         views: [[false, "form"]],
-      });
+      }, { clearBreadcrumbs: true });
     }
   }
 
@@ -204,7 +204,7 @@ class DesignDashboard extends Component {
   }
 
   openDesignCalendar() {
-    return this.action.doAction("dac_erp.action_dac_task_calendar_design");
+    return this.action.doAction("dac_erp.action_dac_task_calendar_design", { clearBreadcrumbs: true });
   }
 
   openCreateDesignTask() {
@@ -215,7 +215,7 @@ class DesignDashboard extends Component {
       target: "new",
       views: [[false, "form"]],
       context: { default_task_type: "design" },
-    });
+    }, { clearBreadcrumbs: true });
   }
 
   // ==== viewport helpers ====

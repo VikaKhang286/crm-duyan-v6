@@ -89,6 +89,7 @@ export class FinanceDashboard extends Component {
   openReceivables() {
     return this.action.doAction(
       "dac_erp.dac_account_move_custom_action_manager",
+      { clearBreadcrumbs: true },
     );
   }
   openInvoice(id) {
@@ -99,7 +100,7 @@ export class FinanceDashboard extends Component {
       res_id: id,
       views: [[false, "form"]],
       target: "current",
-    });
+    }, { clearBreadcrumbs: true });
   }
   createReceipt() {
     return this.action.doAction({
@@ -112,7 +113,7 @@ export class FinanceDashboard extends Component {
         default_payment_type: "inbound",
         default_partner_type: "customer",
       },
-    });
+    }, { clearBreadcrumbs: true });
   }
   recordPayment() {
     this.openReceivables();

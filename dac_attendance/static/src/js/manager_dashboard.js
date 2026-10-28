@@ -218,7 +218,7 @@ export class ManagerDashboard extends Component {
     // ── Reports ───────────────────────────────────────────────────────────────
 
     openReports() {
-        this.action.doAction("dac_attendance.action_dac_attendance_report");
+        this.action.doAction("dac_attendance.action_dac_attendance_report", { clearBreadcrumbs: true });
     }
 }
 
