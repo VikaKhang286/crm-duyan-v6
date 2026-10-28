@@ -183,48 +183,50 @@
 
                             <!-- Cột 1: Khách hàng + Chi tiết Chứng từ (xếp dọc) -->
                             <div class="d-flex flex-md-row flex-column gap-3">
-                                <div class="col-md-6 col-12 dac-box-card dac-box-client">
-                                    <h5 class="dac-box-title dac-title-client">
-                                        <i class="fa fa-user-circle me-2"/>Khách hàng
-                                    </h5>
-                                    <field name="partner_vip_class" invisible="1"/>
-                                    <group class="dac-v6-customer-anchor">
-                                        <div class="dac-v6-customer-strip">
-                                            <div class="dac-v6-customer-fields-grid">
-                                                <div class="dac-v6-customer-row" title="Tên khách hàng">
-                                                    <span class="dac-v6-customer-icon"><i class="fa fa-user"/><span class="visually-hidden">Tên khách hàng</span></span>
-                                                    <span class="dac-v6-customer-value">
-                                                        <field name="partner_id" nolabel="1" placeholder="Chọn khách hàng" groups="dac_erp.group_dac_erp_design,dac_erp.group_dac_erp_production" options="{'no_create_edit': True}" context="{'show_address': False, 'show_vat': False, 'dac_show_phone': True, 'list_view_ref': 'dac_erp.dac_customer_select_list'}" readonly="1"/>
-                                                        <field name="partner_id" nolabel="1" placeholder="Chọn khách hàng" groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager" options="{'no_create_edit': True}" context="{'show_address': False, 'show_vat': False, 'dac_show_phone': True, 'list_view_ref': 'dac_erp.dac_customer_select_list'}"/>
-                                                        <span class="dac-v6-customer-placeholder" invisible="partner_id">Chọn khách hàng</span>
-                                                    </span>
-                                                </div>
-                                                <div class="dac-v6-customer-row dac-v6-phone-row" title="Điện thoại">
-                                                    <span class="dac-v6-customer-icon"><i class="fa fa-phone"/><span class="visually-hidden">Điện thoại</span></span>
-                                                    <span class="dac-v6-customer-value"><field name="phone" nolabel="1" placeholder="Nhập số điện thoại" readonly="is_design_user or is_production_user"/></span>
-                                                </div>
-
-                                                <div class="dac-v6-customer-contact-row">
-                                                    <div class="dac-v6-customer-row dac-v6-address-row" title="Địa chỉ giao hàng">
-                                                        <span class="dac-v6-customer-icon"><i class="fa fa-map-marker"/><span class="visually-hidden">Địa chỉ giao hàng</span></span>
-                                                        <span class="dac-v6-customer-value"><field name="customer_address" nolabel="1" placeholder="Nhập địa chỉ giao hàng" readonly="is_design_user or is_production_user"/></span>
-                                                    </div>
-                                                    <div class="dac-v6-customer-row dac-v6-conversation-link-row"
-                                                         title="Link hội thoại">
-                                                        <span class="dac-v6-customer-icon"><i class="fa fa-link"/><span class="visually-hidden">Link hội thoại</span></span>
+                                <div class="col-md-6 col-12 d-flex w-100">
+                                    <div class="dac-box-card dac-box-client">
+                                        <h5 class="dac-box-title dac-title-client">
+                                            <i class="fa fa-user-circle me-2"/>Khách hàng
+                                        </h5>
+                                        <field name="partner_vip_class" invisible="1"/>
+                                        <group class="dac-v6-customer-anchor">
+                                            <div class="dac-v6-customer-strip">
+                                                <div class="dac-v6-customer-fields-grid">
+                                                    <div class="dac-v6-customer-row" title="Tên khách hàng">
+                                                        <span class="dac-v6-customer-icon"><i class="fa fa-user"/><span class="visually-hidden">Tên khách hàng</span></span>
                                                         <span class="dac-v6-customer-value">
-                                                            <field name="conversation_url_manual"
-                                                                   nolabel="1"
-                                                                   widget="url"
-                                                                   placeholder="Nhập Link hội thoại"
-                                                                   options="{'target': '_blank'}"
-                                                                   readonly="is_design_user or is_production_user"/>
+                                                            <field name="partner_id" nolabel="1" placeholder="Chọn khách hàng" groups="dac_erp.group_dac_erp_design,dac_erp.group_dac_erp_production" options="{'no_create_edit': True}" context="{'show_address': False, 'show_vat': False, 'dac_show_phone': True, 'list_view_ref': 'dac_erp.dac_customer_select_list'}" readonly="1"/>
+                                                            <field name="partner_id" nolabel="1" placeholder="Chọn khách hàng" groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager" options="{'no_create_edit': True}" context="{'show_address': False, 'show_vat': False, 'dac_show_phone': True, 'list_view_ref': 'dac_erp.dac_customer_select_list'}"/>
+                                                            <span class="dac-v6-customer-placeholder" invisible="partner_id">Chọn khách hàng</span>
                                                         </span>
+                                                    </div>
+                                                    <div class="dac-v6-customer-row dac-v6-phone-row" title="Điện thoại">
+                                                        <span class="dac-v6-customer-icon"><i class="fa fa-phone"/><span class="visually-hidden">Điện thoại</span></span>
+                                                        <span class="dac-v6-customer-value"><field name="phone" nolabel="1" placeholder="Nhập số điện thoại" readonly="is_design_user or is_production_user"/></span>
+                                                    </div>
+
+                                                    <div class="dac-v6-customer-contact-row">
+                                                        <div class="dac-v6-customer-row dac-v6-address-row" title="Địa chỉ giao hàng">
+                                                            <span class="dac-v6-customer-icon"><i class="fa fa-map-marker"/><span class="visually-hidden">Địa chỉ giao hàng</span></span>
+                                                            <span class="dac-v6-customer-value"><field name="customer_address" nolabel="1" placeholder="Nhập địa chỉ giao hàng" readonly="is_design_user or is_production_user"/></span>
+                                                        </div>
+                                                        <div class="dac-v6-customer-row dac-v6-conversation-link-row"
+                                                            title="Link hội thoại">
+                                                            <span class="dac-v6-customer-icon"><i class="fa fa-link"/><span class="visually-hidden">Link hội thoại</span></span>
+                                                            <span class="dac-v6-customer-value">
+                                                                <field name="conversation_url_manual"
+                                                                    nolabel="1"
+                                                                    widget="url"
+                                                                    placeholder="Nhập Link hội thoại"
+                                                                    options="{'target': '_blank'}"
+                                                                    readonly="is_design_user or is_production_user"/>
+                                                            </span>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    </group>
+                                        </group>
+                                    </div>
                                 </div>
                                 <div class="col-md-6 col-12 dac-v6-right-column">
                                 <div class="dac-box-card dac-box-document" invisible="order_state_custom not in ['deposit', 'production']">
@@ -649,7 +651,7 @@
                         <div class="container-fluid mt-3 row">
                         <!-- Cột 2: Nghiệp vụ - Nội bộ (Phụ trách | Thiết kế | Sản xuất) -->
                                 <div class="col-12 mb-3">
-                                    <div class="dac-box-card dac-box-internal h-100">
+                                    <div class="dac-box-card dac-box-internal h-100 d-flex flex-column">
                                         <div class="dac-v6-metric-list order-metrics">
                                             <div class="dac-v6-metric-row">
                                                 <span class="dac-v6-metric-icon" title="Sale phụ trách">

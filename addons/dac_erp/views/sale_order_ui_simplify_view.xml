@@ -532,8 +532,8 @@
                     <xpath expr="//div[hasclass('dac-box-internal')]" position="move"/>
                 </xpath>
                 <xpath expr="//div[hasclass('dac-box-internal')]/div[hasclass('dac-v6-metric-list')]" position="before">
-                    <h5 class="dac-v6-business-title">
-                        <i class="fa fa-briefcase me-2"/>Nghiệp vụ
+                    <h5 class="dac-box-title dac-title-document d-flex justify-content-between align-items-center">
+                        <span><i class="fa fa-briefcase me-2"/>Nghiệp vụ</span>
                     </h5>
                 </xpath>
 
