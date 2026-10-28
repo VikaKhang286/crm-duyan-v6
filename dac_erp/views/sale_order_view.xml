@@ -229,11 +229,11 @@
                                     </div>
                                 </div>
                                 <div class="col-md-6 col-12 dac-v6-right-column">
-                                <div class="dac-box-card dac-box-document" invisible="order_state_custom not in ['deposit', 'production']">
+                                <div class="dac-box-card dac-box-document" invisible="workflow_review_state not in ['deposit', 'production']">
                                     <h5 class="dac-box-title dac-title-document d-flex justify-content-between align-items-center">
-                                        <span invisible="is_design_user and order_state_custom == 'deposit'"><i class="fa fa-calendar-check-o me-2" invisible="order_state_custom in ['deposit', 'production']"/><i class="fa fa-pencil me-2" invisible="order_state_custom != 'deposit'"/><i class="fa fa-industry me-2" invisible="order_state_custom != 'production'"/><span invisible="order_state_custom in ['deposit', 'production']">Báo giá &amp; lịch hẹn</span><span invisible="order_state_custom != 'deposit'">Task Thiết kế</span><span invisible="order_state_custom != 'production'">Task Sản xuất</span></span>
-                                        <span invisible="not is_design_user or order_state_custom != 'deposit'">Task của tôi</span>
-                                        <small class="dac-design-role-label" invisible="not is_design_user or order_state_custom != 'deposit'">Thiết kế</small>
+                                        <span invisible="is_design_user and workflow_review_state == 'deposit'"><i class="fa fa-calendar-check-o me-2" invisible="workflow_review_state in ['deposit', 'production']"/><i class="fa fa-pencil me-2" invisible="workflow_review_state != 'deposit'"/><i class="fa fa-industry me-2" invisible="workflow_review_state != 'production'"/><span invisible="workflow_review_state in ['deposit', 'production']">Báo giá &amp; lịch hẹn</span><span invisible="workflow_review_state != 'deposit'">Task Thiết kế</span><span invisible="workflow_review_state != 'production'">Task Sản xuất</span></span>
+                                        <span invisible="not is_design_user or workflow_review_state != 'deposit'">Task của tôi</span>
+                                        <small class="dac-design-role-label" invisible="not is_design_user or workflow_review_state != 'deposit'">Thiết kế</small>
                                         <button name="action_quick_create_task" type="object"
                                                 class="btn btn-sm btn-outline-primary dac-task-add-btn ms-auto"
                                                 invisible="is_design_user or is_production_user"

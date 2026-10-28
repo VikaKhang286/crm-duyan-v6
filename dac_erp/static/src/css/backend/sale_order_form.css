@@ -1375,6 +1375,7 @@
   flex-direction: column;
   gap: 6px;
   margin-bottom: 14px;
+  margin-top: 14px;
 }
 
 .dac-sale-form .dac-v6-side-title strong {
