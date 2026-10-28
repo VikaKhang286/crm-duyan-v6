@@ -433,8 +433,14 @@
 
 @media (min-width: 1101px) {
   .o_web_client .o_control_panel.dac-sale-order-control-panel-active .dac-control-panel-bar {
-    grid-template-columns: minmax(360px, 1fr) minmax(420px, 540px) minmax(180px, .7fr) !important;
-    grid-template-areas: "title progress pancake" "tools tools tools" !important;
+    display: flex !important;
+    flex-direction: column;
+  }
+
+  .o_web_client .o_control_panel.dac-sale-order-control-panel-active .dac-control-panel-top-row {
+    display: grid !important;
+    grid-template-columns: max-content minmax(420px, 540px) minmax(0, 1fr) !important;
+    grid-template-areas: "title progress primary" !important;
   }
 
   .o_web_client .o_control_panel.dac-sale-order-control-panel-active .dac-control-panel-main {
@@ -1244,6 +1250,29 @@
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.dac-sale-form .dac-v6-products-head .dac-action-bar-flags {
+  display: flex;
+  flex: 1 1 auto;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.dac-sale-form .dac-v6-products-head .dac-toggle-field {
+  min-height: 32px;
+  padding: 4px 9px;
+  border-color: #e3e7ed;
+  border-radius: 8px;
+  background: #fff;
+  color: #5e6878;
+  font-size: 11px;
 }
 
 .dac-sale-form .dac-v6-products-title-actions .dac-print-quotation-btn {
@@ -3271,7 +3300,8 @@
   gap: 6px;
 }
 
-.o_web_client .dac-control-panel-tools .dac-save-btn {
+.o_web_client .dac-control-panel-tools .dac-save-btn,
+.o_web_client .dac-control-panel-primary-actions .dac-save-btn {
   position: relative;
   background: #ffffff !important;
   background-image: none !important;
@@ -3282,7 +3312,10 @@
 
 .o_web_client .dac-control-panel-tools .dac-save-btn:hover,
 .o_web_client .dac-control-panel-tools .dac-save-btn:focus,
-.o_web_client .dac-control-panel-tools .dac-save-btn:active {
+.o_web_client .dac-control-panel-tools .dac-save-btn:active,
+.o_web_client .dac-control-panel-primary-actions .dac-save-btn:hover,
+.o_web_client .dac-control-panel-primary-actions .dac-save-btn:focus,
+.o_web_client .dac-control-panel-primary-actions .dac-save-btn:active {
   background: var(--dac-order-primary) !important;
   background-image: none !important;
   background-color: var(--dac-order-primary) !important;
@@ -3367,7 +3400,8 @@
   gap: 4px;
 }
 
-.dac-control-panel-tools .dac-save-btn.dac-save-btn-dirty::after {
+.dac-control-panel-tools .dac-save-btn.dac-save-btn-dirty::after,
+.dac-control-panel-primary-actions .dac-save-btn.dac-save-btn-dirty::after {
   content: '';
   position: absolute;
   top: -5px;
@@ -4453,12 +4487,18 @@
 /* Final cascade guards for the v6 order workspace. */
 @media (min-width: 768px) {
   .o_web_client .dac-control-panel-bar {
-    display: grid !important;
+    display: flex !important;
+    flex-direction: column;
     padding: 0 !important;
-    grid-template-columns: minmax(320px, 1fr) minmax(420px, 540px) minmax(180px, .7fr) !important;
-    grid-template-areas: "title progress pancake" "tools tools tools" !important;
     gap: 0 !important;
     white-space: normal !important;
+  }
+
+  .o_web_client .dac-control-panel-top-row {
+    display: grid !important;
+    grid-template-columns: max-content minmax(420px, 540px) minmax(0, 1fr) !important;
+    grid-template-areas: "title progress primary" !important;
+    width: 100%;
   }
 
   .o_web_client .dac-control-panel-main {
@@ -4473,6 +4513,8 @@
     align-items: center;
     justify-content: center;
     gap: 10px;
+    min-width: max-content;
+    white-space: nowrap;
   }
 
   .o_web_client .dac-control-panel-heading-group {
@@ -4487,6 +4529,7 @@
     display: flex;
     min-width: 0;
     align-items: center;
+    white-space: nowrap;
   }
 
   .o_web_client .dac-control-panel-heading-group .dac-control-panel-title {
@@ -4565,6 +4608,23 @@
     grid-area: pancake;
     justify-self: end;
     margin-right: 16px;
+  }
+
+  .o_web_client .dac-control-panel-primary-actions {
+    grid-area: primary;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 9px 18px 9px 8px;
+  }
+
+  .o_web_client .dac-control-panel-primary-actions .dac-save-btn {
+    position: relative;
+    min-height: 36px;
+    padding: 6px 13px;
+    background: #ffffff !important;
+    border-color: #cfd8e5 !important;
   }
 
   .o_web_client .dac-control-panel-progress .o_statusbar_status {
@@ -4661,9 +4721,14 @@
 }
 
 @media (max-width: 1100px) and (min-width: 768px) {
-  .o_web_client .dac-control-panel-bar {
+  .o_web_client .dac-control-panel-top-row {
     grid-template-columns: 1fr !important;
-    grid-template-areas: "title" "progress" "pancake" "tools" !important;
+    grid-template-areas: "title" "progress" "primary" !important;
+  }
+
+  .o_web_client .dac-control-panel-primary-actions {
+    justify-content: flex-end;
+    padding: 0 16px 10px;
   }
 
   .o_web_client .dac-control-panel-pancake {

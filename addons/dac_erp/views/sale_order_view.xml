@@ -21,6 +21,7 @@
                 <form string="Báo giá" class="dac-sale-form" edit="true" create="true">
                     <header>
                         <div class="dac-control-panel-bar">
+                            <div class="dac-control-panel-top-row">
                             <div class="dac-control-panel-main">
                                 <div class="dac-control-panel-heading-group">
                                     <div class="dac-control-panel-title-group">
@@ -77,30 +78,44 @@
                                     </span>
                                 </div>
                             </div>
-                            <div class="dac-control-panel-pancake"
-                                 invisible="conversation_count == 0"
-                                 groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager,base.group_system">
-                                <div class="dac-control-panel-pancake-label">
-                                    <i class="fa fa-comments" title="Pancake"></i>
-                                    <span>Tin nhắn Pancake</span>
-                                    <span class="dac-control-panel-pancake-count">
-                                        <field name="conversation_count" readonly="1"/>
-                                    </span>
-                                </div>
-                                <div class="dac-control-panel-pancake-links">
-                                    <field name="conversation_buttons_html" nolabel="1" readonly="1"/>
-                                </div>
+                            <div class="dac-control-panel-primary-actions">
+                                <button name="action_save_custom"
+                                        string="Lưu"
+                                        type="button"
+                                        class="btn btn-outline-primary dac-save-btn"/>
+                                <button name="dac_new_order" type="button"
+                                        class="btn btn-outline-primary dac-new-order-btn"
+                                        title="Đơn mới"
+                                        aria-label="Đơn mới"
+                                        groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager,base.group_system">
+                                    <i class="fa fa-plus"/>
+                                </button>
+                            </div>
                             </div>
                             <div class="dac-control-panel-tools">
+                                <!-- Compatibility anchor for inherited V6 views during module upgrade. -->
+                                <button name="dac_new_order" type="button"
+                                        class="btn dac-new-order-btn"
+                                        invisible="1"/>
+                                <div class="dac-control-panel-pancake"
+                                     invisible="conversation_count == 0"
+                                     groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager,base.group_system">
+                                    <div class="dac-control-panel-pancake-label">
+                                        <i class="fa fa-comments" title="Pancake"></i>
+                                        <span>Tin nhắn Pancake</span>
+                                        <span class="dac-control-panel-pancake-count">
+                                            <field name="conversation_count" readonly="1"/>
+                                        </span>
+                                    </div>
+                                    <div class="dac-control-panel-pancake-links">
+                                        <field name="conversation_buttons_html" nolabel="1" readonly="1"/>
+                                    </div>
+                                </div>
                                 <button name="dac_print_quotation"
                                         string="In báo giá"
                                         type="button"
                                         class="btn btn-outline-secondary dac-print-quotation-btn"
                                         invisible="not id"/>
-                                <button name="action_save_custom"
-                                        string="Lưu"
-                                        type="button"
-                                        class="btn btn-outline-primary dac-save-btn"/>
                                 <button name="action_confirm_info"
                                         string="Xác nhận báo giá"
                                         type="object"
@@ -150,13 +165,6 @@
                                         class="btn btn-success"
                                         invisible="1"
                                         groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager"/>
-                                <button name="dac_new_order" type="button"
-                                        class="btn btn-outline-primary dac-new-order-btn"
-                                        title="Đơn mới"
-                                        aria-label="Đơn mới"
-                                        groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager,base.group_system">
-                                    <i class="fa fa-plus"/>
-                                </button>
                             </div>
                         </div>
                     </header>

@@ -120,8 +120,8 @@
                         </span>
                     </div>
                 </xpath>
-                <xpath expr="//div[hasclass('dac-control-panel-tools')]" position="inside">
-                    <xpath expr="//div[hasclass('dac-action-bar-flags')]" position="move"/>
+                <xpath expr="//div[hasclass('dac-action-bar-flags')]" position="attributes">
+                    <attribute name="invisible">1</attribute>
                 </xpath>
                 <xpath expr="//div[hasclass('dac-core-info-row')]" position="before">
                     <div class="dac-workflow-review-banner" invisible="workflow_review_state == order_state_custom">
@@ -149,6 +149,16 @@
                                             type="button"
                                             class="btn btn-outline-secondary dac-print-quotation-btn"
                                             invisible="not id"/>
+                                </div>
+                                <div class="dac-action-bar-flags" invisible="order_state_custom == 'quotation'">
+                                    <div class="dac-toggle-field">
+                                        <field name="is_priority" string="Ưu tiên" widget="boolean_toggle" readonly="is_design_user or is_production_user or order_state_custom in ['delivery', 'installation', 'completed', 'cancel']"/>
+                                        <span>Ưu tiên</span>
+                                    </div>
+                                    <div class="dac-toggle-field">
+                                        <field name="is_priority_today" string="Trong ngày" widget="boolean_toggle" readonly="is_design_user or is_production_user or not is_priority or order_state_custom in ['delivery', 'installation', 'completed', 'cancel']"/>
+                                        <span>Trong ngày</span>
+                                    </div>
                                 </div>
                                 <span class="dac-v6-line-count"><i class="fa fa-circle"/><field name="product_line_count" nolabel="1" readonly="1"/> dòng</span>
                             </div>
@@ -600,7 +610,7 @@
                     </div>
                 </xpath>
 
-                <xpath expr="//div[hasclass('dac-control-panel-tools')]/button[hasclass('dac-new-order-btn')]" position="after">
+                <xpath expr="//div[hasclass('dac-control-panel-tools')]" position="inside">
                     <div class="dac-v6-control-next-step"/>
                 </xpath>
 
