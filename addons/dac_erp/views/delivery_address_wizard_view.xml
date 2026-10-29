@@ -18,16 +18,21 @@
                                placeholder="Nhập địa chỉ giao hàng..."/>
                     </group>
 
-                    <footer>
+                    <footer class="d-flex flex-row align-items-center gap-2">
+                        <button name="action_mark_customer_pickup"
+                                type="object"
+                                string="Khách đến nhận hàng"
+                                class="btn-secondary"/>
                         <button name="action_confirm_delivery"
                                 type="object"
                                 string="Tiến hành giao hàng"
                                 class="btn-primary"
                                 invisible="not has_delivery_address"/>
-                        <button name="action_mark_customer_pickup"
+                        <button name="action_confirm_delivery"
                                 type="object"
-                                string="Khách đến nhận hàng"
-                                class="btn-secondary"
+                                string="Tiến hành giao hàng"
+                                class="btn-primary"
+                                disabled="1"
                                 invisible="has_delivery_address"/>
                     </footer>
                 </form>
