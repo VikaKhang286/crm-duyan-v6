@@ -27,7 +27,7 @@
                         <group>
                             <group>
                                 <field name="amount_untaxed_original" readonly="1" widget="monetary" string="Thành tiền"/>
-                                <field name="amount_tax" readonly="1" widget="monetary" string="Thuế" invisible="order_type == 'cart'"/>
+                                <field name="amount_tax" readonly="1" widget="monetary" string="Thuế" invisible="1"/>
                                 <field name="amount_total" readonly="1" widget="monetary" string="Tổng giá trị"/>
                             </group>
                             <group>
@@ -198,7 +198,7 @@
                             <div class="dac-summary-container" groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager,dac_erp.group_dac_erp_design,dac_erp.group_dac_erp_production" invisible="(is_design_user and workflow_review_state != 'deposit') or (is_production_user and workflow_review_state != 'production')">
                                 <field name="currency_id" invisible="1"/>
                                 <div class="dac-summary-row"><span class="dac-summary-label">Tạm tính</span><span class="dac-summary-value"><field name="amount_untaxed_original" readonly="1" widget="monetary" nolabel="1"/></span></div>
-                                <div class="dac-summary-row" invisible="order_type == 'cart'"><span class="dac-summary-label">Thuế</span><span class="dac-summary-value"><field name="amount_tax" readonly="1" widget="monetary" nolabel="1"/></span></div>
+                                <div class="dac-summary-row" invisible="1"><span class="dac-summary-label">Thuế</span><span class="dac-summary-value"><field name="amount_tax" readonly="1" widget="monetary" nolabel="1"/></span></div>
                                 <div class="dac-summary-row" invisible="1"><span class="dac-summary-label">Khuyến mãi/Giảm giá</span><span class="dac-summary-value"><field name="promotion_amount" widget="monetary" nolabel="1" readonly="is_design_user or is_production_user"/></span></div>
                                 <div class="dac-summary-row"><span class="dac-summary-label">Phí vận chuyển</span><span class="dac-summary-value"><field name="shipping_fee" widget="monetary" nolabel="1" readonly="is_design_user or is_production_user"/></span></div>
                                 <div class="dac-summary-row"><span class="dac-summary-label">Tổng</span><span class="dac-summary-value dac-summary-value--large"><field name="amount_total" readonly="1" widget="monetary" nolabel="1"/></span></div>
@@ -227,7 +227,6 @@
                                         <div><span>Tổng giá trị</span><b><field name="amount_total" nolabel="1" readonly="1" widget="monetary"/></b></div>
                                         <div><span>Đã thu</span><b><field name="total_collected_display" nolabel="1" readonly="1" widget="monetary"/></b></div>
                                         <div><span>Còn thu / COD</span><b><field name="outstanding_amount_display" nolabel="1" readonly="1" widget="monetary"/></b></div>
-                                        <div invisible="not delivery_tracking_url"><span>Link in ấn</span><b><field name="delivery_tracking_url" nolabel="1" readonly="1" widget="url" options="{'target': '_blank'}"/></b></div>
                                     </div>
                                     <div class="dac-v6-delivery-panel" invisible="workflow_review_state != 'delivery'">
                                         <field name="shipping_method" widget="radio" options="{'horizontal': true}" nolabel="1"/>
@@ -246,25 +245,16 @@
                                         <field name="shipping_status" nolabel="1" invisible="1"/>
                                         <label for="shipping_cod" string="Số tiền thu hộ (COD)" invisible="shipping_method != 'carrier'"/>
                                         <field name="shipping_cod" nolabel="1" widget="monetary" invisible="shipping_method != 'carrier'"/>
-                                        <label for="delivery_tracking_url" string="Link in ấn" invisible="shipping_method != 'carrier'"/>
-                                        <field name="delivery_tracking_url"
-                                               nolabel="1"
-                                               widget="url"
-                                               placeholder="Nhập link"
-                                               options="{'target': '_blank'}"
-                                               invisible="shipping_method != 'carrier'"/>
                                         <label for="bus_carrier_name" string="Chành xe / nhà xe" invisible="shipping_method != 'bus'"/>
-                                        <field name="bus_carrier_name" nolabel="1" placeholder="Tên chành xe" invisible="shipping_method != 'bus'"/>
+                                        <field name="bus_carrier_name" nolabel="1" widget="text" placeholder="Tên chành xe" invisible="shipping_method != 'bus'"/>
                                         <label for="bus_shipping_info" string="Thông tin gửi hàng" invisible="shipping_method != 'bus'"/>
-                                        <field name="bus_shipping_info" nolabel="1" placeholder="Số xe / số điện thoại / biên nhận" invisible="shipping_method != 'bus'"/>
+                                        <field name="bus_shipping_info" nolabel="1" widget="text" placeholder="Số xe / số điện thoại / biên nhận" invisible="shipping_method != 'bus'"/>
                                         <label for="bus_shipping_status" string="Trạng thái giao hàng" invisible="1"/>
                                         <field name="bus_shipping_status" nolabel="1" invisible="1"/>
-                                        <div class="dac-v6-delivery-message dac-v6-delivery-message--waiting" invisible="shipping_method != 'carrier' or shipping_status != 'waiting'">Đơn hàng đang chờ giao cho đơn vị vận chuyển.</div>
                                         <div class="dac-v6-delivery-message dac-v6-delivery-message--shipping" invisible="shipping_method != 'carrier' or shipping_status != 'shipping'">Đơn đang được vận chuyển. Tiền COD vẫn được theo dõi tại bước Giao hàng.</div>
                                         <div class="dac-v6-delivery-message dac-v6-delivery-message--failed" invisible="shipping_method != 'carrier' or shipping_status != 'failed'">Giao chưa thành công: giữ đơn ở bước Giao hàng để Sale tiếp tục xử lý và hẹn giao lại.</div>
                                         <div class="dac-v6-delivery-message dac-v6-delivery-message--delivered" invisible="shipping_method != 'carrier' or shipping_status != 'delivered'">Giao thành công: đơn đủ trạng thái để chuyển sang Hoàn thành.</div>
                                         <div class="dac-v6-delivery-message dac-v6-delivery-message--returned" invisible="shipping_method != 'carrier' or shipping_status != 'returned'">Đơn bị trả hàng: giữ tại bước Giao hàng và yêu cầu xử lý lại hàng hóa / công nợ trước khi tiếp tục.</div>
-                                        <div class="dac-v6-delivery-message dac-v6-delivery-message--waiting" invisible="shipping_method != 'bus' or bus_shipping_status != 'waiting'">Thông tin thanh toán sẽ được hệ thống kiểm tra khi bạn bấm <b>Bắt đầu giao hàng.</b></div>
                                         <div class="dac-v6-delivery-message dac-v6-delivery-message--shipping" invisible="shipping_method != 'bus' or bus_shipping_status != 'shipping'">Hàng đang được chành xe vận chuyển. Tiếp tục theo dõi thông tin nhà xe và biên nhận.</div>
                                         <div class="dac-v6-delivery-message dac-v6-delivery-message--failed" invisible="shipping_method != 'bus' or bus_shipping_status != 'failed'">Gửi chưa thành công: giữ đơn ở bước Giao hàng để Sale liên hệ chành xe và xử lý lại.</div>
                                         <div class="dac-v6-delivery-message dac-v6-delivery-message--delivered" invisible="shipping_method != 'bus' or bus_shipping_status != 'delivered'">Giao thành công: đơn đủ trạng thái để chuyển sang Hoàn thành.</div>
@@ -288,7 +278,7 @@
                                         <p class="dac-v6-tab-subtitle">Trong đơn hàng</p>
                                         <field name="internal_notes_html" widget="html" nolabel="1" readonly="1"/>
                                         <label for="internal_note_draft" string="Ghi chú cho nhóm"/>
-                                        <field name="internal_note_draft" string="Ghi chú cho nhóm" widget="text" nolabel="1" placeholder="Nhập trao đổi cho Sale, Thiết kế, Xưởng..."/>
+                                        <field name="internal_note_draft" string="Ghi chú cho nhóm" widget="text" nolabel="1" placeholder="Nhập trao đổi cho Sale, Thiết kế, Sản xuất..."/>
                                         <div class="dac-v6-internal-send">
                                             <button name="action_post_internal_note" string="Gửi nội bộ" type="object" class="btn btn-warning"/>
                                         </div>
@@ -307,6 +297,15 @@
 
                 <!-- Bố cục chi tiết đơn theo prototype: gom thông tin vào đúng hai card đầu. -->
                 <xpath expr="//div[hasclass('dac-box-document')]/h5" position="after">
+                    <div class="dac-v6-print-link-field" invisible="workflow_review_state not in ['deposit', 'production']">
+                        <label for="cart_design_link" string="Link in ấn"/>
+                        <field name="cart_design_link"
+                               nolabel="1"
+                               widget="url"
+                               placeholder="Dán link in ấn..."
+                               readonly="workflow_review_state == 'production'"
+                               options="{'target': '_blank'}"/>
+                    </div>
                     <div class="dac-v6-task-flow-panel" invisible="workflow_review_state != 'deposit'">
                         <field name="design_task_display_ids" nolabel="1">
                             <kanban create="false" delete="true" quick_create="false" limit="100">

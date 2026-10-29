@@ -225,13 +225,13 @@
 
   .dac-sale-form .dac-core-info-row .o_form_label {
     color: #8a93a2;
-    font-size: 10px;
+    font-size: 13px;
     font-weight: 650;
   }
 
   .dac-sale-form .dac-core-info-row .o_field_widget {
     color: #2e3643;
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 700;
   }
 
@@ -2935,6 +2935,23 @@
 
 .dac-sale-form .dac-box-document>.dac-box-tasks {
   margin-top: 0;
+}
+
+.dac-sale-form .dac-v6-print-link-field {
+  display: flex;
+  gap: 7px;
+  margin: 0 0 14px;
+}
+
+.dac-sale-form .dac-v6-print-link-field label {
+  color: #475569;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  width: 20% !important;
+}
+
+.dac-sale-form .dac-v6-print-link-field .o_field_widget {
+  width: 80%;
 }
 
 .dac-sale-form .dac-box-document>.dac-box-tasks .o_kanban_renderer.o_kanban_ungrouped {

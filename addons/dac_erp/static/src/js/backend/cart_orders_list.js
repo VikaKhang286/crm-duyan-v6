@@ -2,6 +2,7 @@
 
 import { registry } from "@web/core/registry";
 import { ListController } from "@web/views/list/list_controller";
+import { ListRenderer } from "@web/views/list/list_renderer";
 import { listView } from "@web/views/list/list_view";
 import { onMounted, onPatched, onWillUnmount } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
@@ -96,6 +97,7 @@ export class CartOrdersListController extends ListController {
             row.dataset.quickSaleBound = "true";
             row.classList.add("dac-quick-sale-row");
             row.addEventListener("click", (event) => {
+                if (event.target.closest('td[name="list_note"]')) return;
                 if (event.target.closest("a,button,input,select,textarea,.o-checkbox,.o_field_x2many")) return;
                 event.preventDefault();
                 event.stopPropagation();
@@ -511,7 +513,28 @@ export class CartOrdersListController extends ListController {
     }
 }
 
+export class CartOrdersListRenderer extends ListRenderer {
+    isInlineEditable(record) {
+        // This custom list is also rendered in a no-open workspace where
+        // Odoo does not pass the XML `editable` flag down to the renderer.
+        // Keep inline edition available; onCellClicked below restricts entry
+        // to the list_note cell only.
+        return true;
+    }
+
+    async onCellClicked(record, column, ev) {
+        if (column.type === "field" && column.name === "list_note") {
+            return super.onCellClicked(record, column, ev);
+        }
+        if (ev.target.special_click) {
+            return;
+        }
+        return this.props.openRecord(record);
+    }
+}
+
 registry.category("views").add("dac_cart_orders_list", {
     ...listView,
     Controller: CartOrdersListController,
+    Renderer: CartOrdersListRenderer,
 });

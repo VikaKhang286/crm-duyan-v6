@@ -28,11 +28,12 @@ class SaleOrderLine(models.Model):
         },
     }
 
-    @api.depends('product_id', 'company_id', 'order_id.order_type')
+    @api.depends('product_id', 'company_id')
     def _compute_tax_id(self):
-        cart_lines = self.filtered(lambda line: line.order_id.order_type == 'cart')
-        cart_lines.tax_id = False
-        super(SaleOrderLine, self - cart_lines)._compute_tax_id()
+        # DAC does not apply tax on either general or cart sale orders.
+        # Keep this at line level so totals, invoices and API-created lines
+        # consistently remain tax-free.
+        self.tax_id = False
 
     @api.model
     def _is_cart_order_from_context(self):
@@ -266,6 +267,7 @@ class SaleOrderLine(models.Model):
     def create(self, vals_list):
         uom_unit = self.env.ref('uom.product_uom_unit', raise_if_not_found=False)
         for vals in vals_list:
+            vals['tax_id'] = [(5, 0, 0)]
             # Đảm bảo name không bị rỗng nếu là ghi chú/section
             if vals.get('display_type') and not vals.get('name'):
                 vals['name'] = 'Đầu mục' if vals['display_type'] == 'line_section' else 'Ghi chú'
@@ -283,6 +285,7 @@ class SaleOrderLine(models.Model):
         return lines
 
     def write(self, vals):
+        vals['tax_id'] = [(5, 0, 0)]
         # Ngăn việc xóa display_type
         if 'display_type' in vals and not vals['display_type']:
             current_display_type = self.display_type
