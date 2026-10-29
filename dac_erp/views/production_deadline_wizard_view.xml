@@ -22,6 +22,12 @@
                                 string="Tiến hành sản xuất"
                                 class="btn-primary"
                                 invisible="not production_deadline"/>
+                        <button name="dac_disabled_confirm_production"
+                                type="button"
+                                string="Tiến hành sản xuất"
+                                class="btn-primary"
+                                disabled="1"
+                                invisible="production_deadline"/>
                         <button name="action_use_default_deadline"
                                 type="object"
                                 string="Mặc định"

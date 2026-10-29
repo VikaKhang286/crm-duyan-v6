@@ -604,7 +604,6 @@ patch(FormController.prototype, {
       ".dac-v6-production-next-step",
       ".dac-v6-delivery-next-step",
       ".dac-v6-installation-next-step",
-      ".dac-v6-delivery-stage-footer",
     ].join(",");
     const renderedBlocks = Array.from(document.querySelectorAll(selector)).filter(
       (block) => !target.contains(block)

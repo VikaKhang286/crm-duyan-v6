@@ -149,15 +149,23 @@
                                             type="button"
                                             class="btn btn-outline-secondary dac-print-quotation-btn"
                                             invisible="not id"/>
+                                    <button name="action_open_deposit_payment"
+                                            string="Đặt cọc"
+                                            type="object"
+                                            class="btn btn-outline-secondary dac-v6-record-payment-btn"
+                                            groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_full_stack,dac_erp.group_dac_erp_manager"
+                                            invisible="workflow_review_state == 'quotation'"/>
                                 </div>
-                                <div class="dac-action-bar-flags" invisible="order_state_custom == 'quotation'">
-                                    <div class="dac-toggle-field">
-                                        <field name="is_priority" string="Ưu tiên" widget="boolean_toggle" readonly="is_design_user or is_production_user or order_state_custom in ['delivery', 'installation', 'completed', 'cancel']"/>
-                                        <span>Ưu tiên</span>
-                                    </div>
-                                    <div class="dac-toggle-field">
-                                        <field name="is_priority_today" string="Trong ngày" widget="boolean_toggle" readonly="is_design_user or is_production_user or not is_priority or order_state_custom in ['delivery', 'installation', 'completed', 'cancel']"/>
-                                        <span>Trong ngày</span>
+                                <div class="dac-v6-products-options">
+                                    <div class="dac-action-bar-flags" invisible="order_state_custom == 'quotation'">
+                                        <div class="dac-toggle-field">
+                                            <field name="is_priority" string="Ưu tiên" widget="boolean_toggle" readonly="is_design_user or is_production_user or order_state_custom in ['delivery', 'installation', 'completed', 'cancel']"/>
+                                            <span>Ưu tiên</span>
+                                        </div>
+                                        <div class="dac-toggle-field">
+                                            <field name="is_priority_today" string="Trong ngày" widget="boolean_toggle" readonly="is_design_user or is_production_user or not is_priority or order_state_custom in ['delivery', 'installation', 'completed', 'cancel']"/>
+                                            <span>Trong ngày</span>
+                                        </div>
                                     </div>
                                 </div>
                                 <span class="dac-v6-line-count"><i class="fa fa-circle"/><field name="product_line_count" nolabel="1" readonly="1"/> dòng</span>
@@ -197,22 +205,23 @@
                                 <div class="dac-summary-row" invisible="deposit_paid_display == 0"><span class="dac-summary-label">Cọc / Đã thanh toán</span><span class="dac-summary-value dac-summary-value--deposit"><field name="deposit_paid_display" readonly="1" widget="monetary" nolabel="1"/></span></div>
                                 <div class="dac-summary-row dac-summary-row--remaining" invisible="order_state_custom in ['cancel', 'completed']"><span class="dac-summary-label dac-summary-label--highlight">Còn thanh toán</span><span class="dac-summary-value--highlight"><field name="remaining_amount_display" readonly="1" widget="monetary" nolabel="1"/></span></div>
                                 <div class="dac-summary-row dac-summary-row--remaining" invisible="order_state_custom != 'completed'"><span class="dac-summary-label dac-summary-label--highlight">Còn thanh toán</span><span class="dac-summary-value--highlight"><field name="outstanding_amount_display" readonly="1" widget="monetary" nolabel="1"/></span></div>
-                                <button name="action_open_deposit_payment"
-                                        string="Đặt cọc"
-                                        type="object"
-                                        class="btn btn-outline-secondary dac-v6-record-payment-btn"
-                                        groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_full_stack,dac_erp.group_dac_erp_manager"
-                                        invisible="order_state_custom == 'cancel'"/>
                             </div>
                         </section>
                         <aside class="dac-v6-sticky-rail">
                             <div class="dac-box-card dac-v6-detail-panel" invisible="workflow_review_state in ['quotation', 'deposit', 'production']">
                                     <div class="dac-v6-side-title">
+                                        <strong invisible="workflow_review_state != 'quotation'">Báo giá</strong>
+                                        <strong invisible="workflow_review_state != 'deposit'">Thiết kế &amp; đặt cọc</strong>
+                                        <strong invisible="workflow_review_state != 'production'">Sản xuất</strong>
                                         <strong invisible="workflow_review_state != 'delivery'">Giao hàng &amp; Thu hộ</strong>
                                         <strong invisible="workflow_review_state != 'installation'">Thi công &amp; Lắp đặt</strong>
                                         <strong invisible="workflow_review_state != 'completed'">Kết quả đơn hàng</strong>
                                     </div>
-                                    
+
+                                    <div class="dac-v6-side-details" invisible="workflow_review_state != 'quotation'">
+                                        <div><span>Tạm tính</span><b><field name="amount_untaxed_original" nolabel="1" readonly="1" widget="monetary"/></b></div>
+                                        <div><span>Giá trị báo giá</span><b><field name="amount_total" nolabel="1" readonly="1" widget="monetary"/></b></div>
+                                    </div>
                                     <div class="dac-v6-side-details dac-v6-completed-details" invisible="workflow_review_state != 'completed'">
                                         <div><span>Giao nhận</span><b>Đã giao thành công</b></div>
                                         <div><span>Tổng giá trị</span><b><field name="amount_total" nolabel="1" readonly="1" widget="monetary"/></b></div>
@@ -220,18 +229,6 @@
                                         <div><span>Còn thu / COD</span><b><field name="outstanding_amount_display" nolabel="1" readonly="1" widget="monetary"/></b></div>
                                         <div invisible="not delivery_tracking_url"><span>Link in ấn</span><b><field name="delivery_tracking_url" nolabel="1" readonly="1" widget="url" options="{'target': '_blank'}"/></b></div>
                                     </div>
-                                    <div class="dac-v6-design-actions" invisible="workflow_review_state != 'deposit'">
-                                        <button name="action_open_design_handover" string="Xem thiết kế" type="object" class="btn btn-outline-secondary"/>
-                                        <button name="action_open_deposit_payment" string="Ghi nhận cọc" type="object" class="btn btn-outline-secondary" groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager,base.group_system"/>
-                                    </div>
-                                    <p class="dac-v6-side-help" invisible="workflow_review_state != 'deposit'">Duyệt thiết kế và xác nhận cọc trước khi sản xuất.</p>
-                                    <div class="dac-v6-side-link" invisible="workflow_review_state != 'production' or not design_link">
-                                        <field name="design_link" widget="url" nolabel="1" readonly="1" text="Xem bản vẽ"/>
-                                    </div>
-                                    <div class="dac-v6-design-actions" invisible="workflow_review_state != 'production'">
-                                        <button name="action_open_design_handover" string="Xem thiết kế" type="object" class="btn btn-outline-secondary"/>
-                                    </div>
-                                    <p class="dac-v6-side-help" invisible="workflow_review_state != 'production'">Sản xuất theo nội dung, chất liệu và kích thước trong bảng sản phẩm.</p>
                                     <div class="dac-v6-delivery-panel" invisible="workflow_review_state != 'delivery'">
                                         <field name="shipping_method" widget="radio" options="{'horizontal': true}" nolabel="1"/>
                                         <div class="dac-v6-delivery-field-label" invisible="shipping_method != 'carrier'">
@@ -537,15 +534,21 @@
                     </h5>
                 </xpath>
 
-                <xpath expr="//div[hasclass('dac-box-document')]" position="after">
+                <xpath expr="//div[hasclass('dac-box-internal')]" position="after">
                     <xpath expr="//div[hasclass('dac-v6-detail-panel')]" position="move"/>
+                </xpath>
+                <xpath expr="//div[hasclass('dac-box-client')]/.." position="attributes">
+                    <attribute name="class" add="flex-column gap-3" separator=" "/>
+                </xpath>
+                <xpath expr="//div[hasclass('dac-box-client')]" position="after">
+                    <xpath expr="//div[hasclass('dac-summary-container')]" position="move"/>
                 </xpath>
 
                 <!-- Workflow cards stay outside dac-box-document so their next-step
                      actions remain available when that document card is hidden. -->
                 <xpath expr="//div[hasclass('dac-box-document')]" position="after">
-                    <div class="dac-v6-workflow-panels">
-                    <div class="dac-v6-delivery-stage-card" invisible="1">
+                    <div class="dac-v6-workflow-panels d-none">
+                    <div class="dac-v6-delivery-stage-card">
                         <div class="dac-v6-delivery-stage-head">
                             <h3>Giao hàng &amp; thu hộ</h3>
                             <span>4 / 5</span>
@@ -611,7 +614,7 @@
                 </xpath>
 
                 <xpath expr="//div[hasclass('dac-control-panel-tools')]" position="inside">
-                    <div class="dac-v6-control-next-step"/>
+                    <div class="dac-v6-control-next-step"><span class="d-none"/></div>
                 </xpath>
 
                 <!-- The product card above replaces the legacy content that used to

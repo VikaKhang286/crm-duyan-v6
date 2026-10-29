@@ -30,16 +30,22 @@ class SaleOrderCompute(models.Model):
 
     @api.depends('message_ids.body', 'message_ids.date', 'message_ids.author_id', 'message_ids.tracking_value_ids')
     def _compute_sidebar_activity(self):
+        def _message_text(message):
+            return re.sub(r'<[^>]+>', '', unescape(message.body or '')).strip()
+
         for order in self:
             messages = order.message_ids.sorted(key=lambda message: message.date or fields.Datetime.now(), reverse=True)
             internal_messages = messages.filtered(
-                lambda message: 'dac-internal-note-message' in (message.body or '')
+                lambda message: (
+                    'dac-internal-note-message' in (message.body or '')
+                    and bool(_message_text(message))
+                )
             )
             order.internal_note_count = len(internal_messages)
 
             note_cards = []
             for message in internal_messages[:20]:
-                body = re.sub(r'<[^>]+>', '', unescape(message.body or '')).strip()
+                body = _message_text(message)
                 author = message.author_id.name or 'Nội bộ'
                 time_label = fields.Datetime.context_timestamp(order, message.date).strftime('%d/%m/%Y %H:%M') if message.date else ''
                 note_cards.append(

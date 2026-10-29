@@ -458,22 +458,19 @@ class SaleOrder(models.Model):
         ], limit=1)
 
     def _prepare_default_cart_line(self, product):
-        dimension = self.env.ref('dac_erp.cart_dimension_80x40', raise_if_not_found=False)
         values = {
             'product_id': product.id,
             'name': product.get_product_multiline_description_sale(),
             'product_uom': product.uom_id.id,
             'product_uom_qty': 1.0,
-            'material': 'hiflex_silver',
-            'cart_dimension_id': dimension.id if dimension else False,
+            'material': False,
+            'cart_dimension_id': False,
+            'length': 0.0,
+            'width': 0.0,
+            'height': 0.0,
+            'price_unit': 0.0,
             'sequence': min(self.order_line.mapped('sequence') or [10]) - 1,
         }
-        line = self.env['sale.order.line'].new(values)
-        line._onchange_cart_dimension()
-        values.update({'length': line.length, 'width': line.width, 'height': line.height})
-        price = line._get_cart_unit_price()
-        if price is not False:
-            values['price_unit'] = price
         return values
 
     def read(self, fields=None, load='_classic_read'):

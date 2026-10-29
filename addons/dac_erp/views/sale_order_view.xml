@@ -183,7 +183,7 @@
 
                             <!-- Cột 1: Khách hàng + Chi tiết Chứng từ (xếp dọc) -->
                             <div class="d-flex flex-md-row flex-column gap-3">
-                                <div class="col-md-6 col-12 d-flex w-100">
+                                <div class="col-md-6 col-12 d-flex w-100 flex-column justify-content-between">
                                     <div class="dac-box-card dac-box-client">
                                         <h5 class="dac-box-title dac-title-client">
                                             <i class="fa fa-user-circle me-2"/>Khách hàng
@@ -651,7 +651,7 @@
                         <div class="container-fluid mt-3 row">
                         <!-- Cột 2: Nghiệp vụ - Nội bộ (Phụ trách | Thiết kế | Sản xuất) -->
                                 <div class="col-12 mb-3">
-                                    <div class="dac-box-card dac-box-internal h-100 d-flex flex-column">
+                                    <div class="dac-box-card dac-box-internal d-flex flex-column">
                                         <div class="dac-v6-metric-list order-metrics">
                                             <div class="dac-v6-metric-row">
                                                 <span class="dac-v6-metric-icon" title="Sale phụ trách">
@@ -678,8 +678,8 @@
                                                 </span>
                                             </div>
                                             <div class="dac-v6-metric-row">
-                                                <span class="dac-v6-metric-icon" title="Deadline">
-                                                    <i class="fa fa-clock-o"/><span class="visually-hidden">Deadline</span>
+                                                <span class="dac-v6-metric-icon" title="Ngày giao hàng">
+                                                    <i class="fa fa-clock-o"/><span class="visually-hidden">Ngày giao hàng</span>
                                                 </span>
                                                 <span class="dac-v6-metric-value">
                                                     <field name="delivery_date" nolabel="1" placeholder="Chọn ngày giao hàng" readonly="is_design_user or is_production_user"/>

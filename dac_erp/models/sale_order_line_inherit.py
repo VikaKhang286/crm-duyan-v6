@@ -43,13 +43,11 @@ class SaleOrderLine(models.Model):
 
     @api.model
     def _default_cart_material(self):
-        return 'hiflex_silver' if self._is_cart_order_from_context() else False
+        return False
 
     @api.model
     def _default_cart_dimension(self):
-        if not self._is_cart_order_from_context():
-            return False
-        return self.env.ref('dac_erp.cart_dimension_80x40', raise_if_not_found=False)
+        return False
     
     description = fields.Text(string='Nội dung')
     material = fields.Selection(
@@ -135,6 +133,12 @@ class SaleOrderLine(models.Model):
     def _onchange_cart_material_or_dimension(self):
         """Tự điền giá xe và phụ thu biến thể khi người dùng chọn dữ liệu."""
         for line in self:
+            if line.order_id.order_type == 'cart' and (
+                not line.material_id or not line.cart_dimension_id
+            ):
+                line.price_unit = 0.0
+                line.accessory_price_applied = 0.0
+                continue
             price = line._get_cart_unit_price()
             if price is not False:
                 line.price_unit = price + sum(line.accessory_ids.mapped('price'))

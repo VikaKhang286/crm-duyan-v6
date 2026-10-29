@@ -171,11 +171,10 @@ class TestCartPricing(TransactionCase):
         values = defaults['order_line'][0][2]
         self.assertEqual(values['product_id'], product.id)
         self.assertEqual(values['product_uom_qty'], 1)
-        self.assertEqual(values['material'], 'hiflex_silver')
-        self.assertEqual((values['length'], values['width']), (80, 38))
-        self.assertEqual(values['price_unit'], 950000 + sum(
-            product.product_template_attribute_value_ids.mapped('price_extra')
-        ))
+        self.assertFalse(values['material'])
+        self.assertFalse(values['cart_dimension_id'])
+        self.assertEqual((values['length'], values['width']), (0, 0))
+        self.assertEqual(values['price_unit'], 0)
 
     def test_switching_to_cart_preserves_lines_without_duplicate(self):
         product = self._default_cart_product()
@@ -202,16 +201,13 @@ class TestCartPricing(TransactionCase):
         ).default_get(['order_type', 'order_line'])
         self.assertFalse(defaults.get('order_line'))
 
-    def test_cart_line_defaults_to_hiflex_and_80x38(self):
+    def test_cart_line_material_and_dimension_defaults_are_empty(self):
         defaults = self.env['sale.order.line'].with_context(
             default_order_type='cart',
         ).default_get(['material', 'cart_dimension_id'])
 
-        self.assertEqual(defaults['material'], 'hiflex_silver')
-        self.assertEqual(
-            defaults['cart_dimension_id'],
-            self.env.ref('dac_erp.cart_dimension_80x40').id,
-        )
+        self.assertFalse(defaults.get('material'))
+        self.assertFalse(defaults.get('cart_dimension_id'))
 
     def test_duplicate_dimensions_are_merged_without_losing_line_links(self):
         canonical = self.env.ref('dac_erp.cart_dimension_80x40')

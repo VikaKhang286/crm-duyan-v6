@@ -206,9 +206,8 @@
   }
 
   .dac-sale-form .dac-core-info-row .dac-box-title {
-    min-height: 47px;
     margin: 0 -16px 12px !important;
-    padding: 0 16px;
+    padding: 10px 16px;
     border-bottom: 1px solid #e9ecf1;
     color: #252c38 !important;
     font-size: 13px !important;
@@ -1252,9 +1251,19 @@
   gap: 10px;
 }
 
+.dac-sale-form .dac-v6-products-options {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+  margin-left: auto;
+  order: 1;
+}
+
 .dac-sale-form .dac-v6-products-head .dac-action-bar-flags {
   display: flex;
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   justify-content: flex-end;
   align-items: center;
   gap: 8px;
@@ -1263,6 +1272,7 @@
   padding: 0;
   border: 0;
   background: transparent;
+  order: 2;
 }
 
 .dac-sale-form .dac-v6-products-head .dac-toggle-field {
@@ -1273,6 +1283,21 @@
   background: #fff;
   color: #5e6878;
   font-size: 11px;
+}
+
+.dac-sale-form .dac-v6-products-head .dac-v6-record-payment-btn {
+  flex: 0 0 auto;
+  min-height: 32px;
+  margin: 0;
+  padding: 5px 11px !important;
+  border-color: #e1b51a !important;
+  border-radius: 8px !important;
+  background: #ffc20e !important;
+  color: #2e2500 !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  white-space: nowrap;
+  order: 1;
 }
 
 .dac-sale-form .dac-v6-products-title-actions .dac-print-quotation-btn {
@@ -1296,6 +1321,8 @@
   color: #2875dd;
   font-size: 11px;
   font-weight: 800;
+  flex: 0 0 auto;
+  order: 2;
 }
 
 .dac-sale-form .dac-v6-line-count .fa {
@@ -1347,6 +1374,17 @@
   min-width: 0;
 }
 
+.dac-sale-form .dac-box-client + .dac-v6-detail-panel {
+  width: 100%;
+  min-width: 0;
+}
+
+.dac-sale-form .dac-box-client + .dac-summary-container {
+  width: 100%;
+  max-width: none;
+  margin: 0 !important;
+}
+
 .dac-sale-form .dac-v6-side-notebook>.o_notebook_headers .nav-link {
   width: 100%;
   padding: 14px 6px 12px;
@@ -1374,8 +1412,8 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin-bottom: 14px;
-  margin-top: 14px;
+  margin-bottom: 10px;
+  margin-top: 10px;
 }
 
 .dac-sale-form .dac-v6-side-title strong {
@@ -2042,7 +2080,8 @@
 }
 
 .dac-sale-form .dac-v6-right-column {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   width: 100% !important;
   max-width: none !important;
   min-width: 0;

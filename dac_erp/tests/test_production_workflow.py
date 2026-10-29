@@ -51,10 +51,12 @@ class TestProductionWorkflow(TransactionCase):
 
     def test_empty_internal_note_is_allowed(self):
         previous_count = len(self.order.message_ids)
+        previous_visible_count = self.order.internal_note_count
         action = self.order.action_post_internal_note()
 
         self.assertEqual(action.get('tag'), 'dac_soft_reload_sale_order')
         self.assertEqual(len(self.order.message_ids), previous_count + 1)
+        self.assertEqual(self.order.internal_note_count, previous_visible_count)
         self.assertFalse(self.order.internal_note_draft)
 
     def test_production_deadline_wizard_uses_default_days(self):
