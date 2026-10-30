@@ -853,7 +853,7 @@
                            readonly="not is_priority or order_state_custom in ['delivery', 'installation', 'completed', 'cancel']"/>
                     <field name="production_deadline" string="Ngày hoàn tất sản xuất"
                            readonly="order_state_custom not in ['quotation', 'deposit']"/>
-                    <field name="list_note" string="Ghi chú" optional="show"/>
+                    <field name="list_note" string="Ghi chú" widget="text" optional="show"/>
                 </list>
             </field>
         </record>
@@ -900,7 +900,7 @@
                            readonly="not is_priority or order_state_custom in ['delivery', 'installation', 'completed', 'cancel']"/>
                     <field name="production_deadline" string="Ngày hoàn tất sản xuất"
                            readonly="order_state_custom not in ['quotation', 'deposit']"/>
-                    <field name="list_note" string="Ghi chú" optional="show"/>
+                    <field name="list_note" string="Ghi chú" widget="text" optional="show"/>
                 </list>
             </field>
         </record>
@@ -962,7 +962,7 @@
                     <field name="production_deadline" string="Deadline" readonly="1" decoration-danger="is_production_overdue"/>
                     <field name="amount_total" string="Tổng tiền" sum="Total" widget="monetary" readonly="1"/>
                     <field name="total_collected_display" string="Đã thu" widget="monetary" readonly="1"/>
-                    <field name="list_note" string="Ghi chú" optional="show"/>
+                    <field name="list_note" string="Ghi chú" widget="text" optional="show"/>
                 </list>
             </field>
         </record>
@@ -994,6 +994,8 @@
                     <filter string="Cơ hội" name="opportunity" domain="[('is_zero_amount', '=', True)]"/>
                     <filter string="Báo giá" name="quotation" domain="[('order_state_custom', '=', 'quotation'), ('is_zero_amount', '=', False)]"/>
                     <filter string="Thiết kế / Cọc" name="deposit" domain="[('order_state_custom', '=', 'deposit')]"/>
+                    <filter string="Chưa nhận cọc" name="deposit_reminder_unpaid"
+                            domain="[('id', 'in', context.get('deposit_reminder_order_ids', []))]"/>
                     <filter string="Sản xuất" name="production" domain="[('order_state_custom', '=', 'production')]"/>
                     <filter string="Thi công - lắp đặt" name="installation" domain="[('order_state_custom','=','installation')]"/>
                     <filter string="Giao hàng" name="delivery" domain="[('order_state_custom', '=', 'delivery')]"/>
@@ -1064,7 +1066,7 @@
                            decoration-warning="order_state_select in ('production', 'installation', 'delivery')"
                            decoration-success="order_state_select == 'completed'"
                            decoration-danger="order_state_select == 'cancel'"/>
-                    <field name="list_note" string="Ghi chú" optional="show"/>
+                    <field name="list_note" string="Ghi chú" widget="text" optional="show"/>
                 </field>
             </field>
         </record>

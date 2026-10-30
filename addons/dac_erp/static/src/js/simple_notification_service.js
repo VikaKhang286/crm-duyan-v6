@@ -36,8 +36,28 @@ function depositReminderOrderCode(order) {
 }
 
 const depositReminderNotificationService = {
-    dependencies: ["bus_service", "notification", "orm"],
-    start(env, { bus_service, notification: notificationService, orm }) {
+    dependencies: ["action", "bus_service", "notification", "orm"],
+    start(env, { action, bus_service, notification: notificationService, orm }) {
+        let currentUnpaidOrderIds = [];
+        document.addEventListener("click", (event) => {
+            const notification = event.target.closest(
+                ".dac_deposit_reminder_notification"
+            );
+            if (!notification || event.target.closest("button")) {
+                return;
+            }
+            const orderIds = [...currentUnpaidOrderIds];
+            if (!orderIds.length) {
+                return;
+            }
+            void action.doAction("dac_erp.dac_sale_order_custom_action", {
+                additionalContext: {
+                    deposit_reminder_order_ids: orderIds,
+                    search_default_deposit_reminder_unpaid: 1,
+                },
+            });
+            notification.querySelector(".o_notification_close")?.click();
+        });
 
         bus_service.subscribe(
             "simple_notification",
@@ -104,11 +124,14 @@ const depositReminderNotificationService = {
 
                     const labels = unpaidOrders.map(depositReminderOrderCode);
                     let message = `Chưa nhận cọc: ${labels.join(", ")}`;
+                    const unpaidOrderIds = unpaidOrders.map((order) => order.id);
+                    currentUnpaidOrderIds = unpaidOrderIds;
                     notificationService.add(message, {
                         title: `Nhắc thu tiền cọc (${unpaidOrders.length} đơn)`,
                         type: "warning",
                         sticky: false,
                         autocloseDelay: 20_000,
+                        className: "dac_deposit_reminder_notification",
                     });
                     
                 } catch (error) {

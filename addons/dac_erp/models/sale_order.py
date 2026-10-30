@@ -147,7 +147,7 @@ class SaleOrder(models.Model):
     order_description_html = fields.Html(
         string='Nội dung mô tả đơn hàng', copy=False, sanitize=True,
     )
-    list_note = fields.Char(string='Ghi chú', tracking=True)
+    list_note = fields.Text(string='Ghi chú', tracking=True)
 
     # Trạng thái xác nhận
     is_quotation_confirmed = fields.Boolean(string="Đã xác nhận báo giá", default=False)
