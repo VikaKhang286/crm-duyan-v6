@@ -67,6 +67,7 @@ export class CartOrdersListController extends ListController {
         onPatched(() => {
             this.mountCartOrdersHero();
             this.bindQuickSaleRows();
+            this.refreshDepositReminderClearButton(this.rootRef?.el);
         });
         onWillUnmount(() => this.removeCartOrdersHero());
     }
@@ -223,6 +224,8 @@ export class CartOrdersListController extends ListController {
                     </select>
                     <select class="dac-cart-sale-select" aria-label="Sale"><option value="">Tất cả Sale</option></select>
                     <button type="button" class="dac-cart-toolbar-filter">Bộ lọc</button>
+                    <button type="button" class="dac-cart-toolbar-filter-clear"
+                            title="Tắt bộ lọc Chưa nhận cọc" aria-label="Tắt bộ lọc Chưa nhận cọc" hidden>×</button>
                     <div class="${BULK_ACTIONS_CLASS}" hidden>
                         <button type="button" class="dac-cart-bulk-actions-toggle" aria-expanded="false" aria-haspopup="true">
                             <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
@@ -254,6 +257,10 @@ export class CartOrdersListController extends ListController {
             toolbar.querySelector(".dac-cart-toolbar-filter")?.addEventListener("click", () => {
                 root.querySelector(".o_control_panel .o_searchview_dropdown_toggler")?.click();
             });
+            toolbar.querySelector(".dac-cart-toolbar-filter-clear")?.addEventListener(
+                "click",
+                () => this.clearDepositReminderFilter()
+            );
             toolbar.querySelector(".dac-cart-bulk-actions-toggle")?.addEventListener("click", () => {
                 this.openNativeCartActions(root, toolbar.querySelector(".dac-cart-bulk-actions-toggle"));
             });
@@ -275,7 +282,30 @@ export class CartOrdersListController extends ListController {
         } else if (toolbar.nextElementSibling !== renderer) {
             renderer.before(toolbar);
         }
+        this.refreshDepositReminderClearButton(root);
         this.refreshCartBulkActions(root);
+    }
+
+    getDepositReminderFilter() {
+        return this.env.searchModel
+            .getSearchItems(
+                (item) => item.type === "filter" && item.name === "deposit_reminder_unpaid"
+            )
+            .find((item) => item.isActive);
+    }
+
+    refreshDepositReminderClearButton(root) {
+        const button = root?.querySelector(".dac-cart-toolbar-filter-clear");
+        if (button) {
+            button.hidden = !this.getDepositReminderFilter();
+        }
+    }
+
+    clearDepositReminderFilter() {
+        const filter = this.getDepositReminderFilter();
+        if (filter) {
+            this.env.searchModel.toggleSearchItem(filter.id);
+        }
     }
 
     getSelectedCartOrders(root) {

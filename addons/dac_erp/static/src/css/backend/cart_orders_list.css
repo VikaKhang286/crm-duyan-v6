@@ -64,6 +64,20 @@
 .dac-cart-stage-select { flex-basis: 148px !important; width: 148px !important; }
 .dac-cart-sale-select { flex-basis: 110px !important; width: 110px !important; }
 .dac-cart-toolbar-filter { min-width: 0; }
+.dac-cart-toolbar-filter-clear {
+    width: 28px;
+    height: 28px;
+    margin-left: -8px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: #eef2f7;
+    color: #68758a;
+    font-size: 18px;
+    line-height: 28px;
+    cursor: pointer;
+}
+.dac-cart-toolbar-filter-clear:hover { background: #dfe6ef; color: #26364d; }
 .dac-cart-bulk-actions { position: relative; flex: 0 0 auto; }
 .dac-cart-bulk-actions-toggle { display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 13px; border: 1px solid #e6b800; border-radius: 10px; background: #ffc20e; color: #292d35; font-weight: 750; white-space: nowrap; }
 .dac-cart-bulk-actions-toggle:hover { border-color: #e3ad00; background: #f3b900; }
