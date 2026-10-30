@@ -488,14 +488,9 @@ export class CartOrdersListController extends ListController {
     }
 
     openNewCartOrder() {
-        const root = this.rootRef?.el;
-        const nativeNewButton = root?.querySelector(".o_list_button_add");
-        if (nativeNewButton) {
-            nativeNewButton.click();
-            return;
-        }
-        const headerButton = root?.querySelector('button[name*="action_open_new_sale_order_url"]');
-        headerButton?.click();
+        return this.action.doAction("dac_erp.action_new_cart_sale_order", {
+            clearBreadcrumbs: true,
+        });
     }
 
     removeCartOrdersHero() {

@@ -56,3 +56,4 @@ from . import dac_work_task_access_log
 from . import material
 
 from . import sale_order_deposit_sync
+from . import sale_order_deposit_reminder
