@@ -3,8 +3,15 @@
 import { registry } from "@web/core/registry";
 import { user } from "@web/core/user";
 
-const DEPOSIT_POLL_INTERVAL = 60_000;
+const DEPOSIT_POLL_INTERVAL = 60 * 60_000;
 const DEPOSIT_POLL_LOCK_KEY = "dac.deposit_reminder.last_poll";
+const DEPOSIT_REMINDER_START_HOUR = 7;
+const DEPOSIT_REMINDER_END_HOUR = 16;
+
+function isWithinDepositReminderHours() {
+    const currentHour = new Date().getHours();
+    return currentHour >= DEPOSIT_REMINDER_START_HOUR && currentHour < DEPOSIT_REMINDER_END_HOUR;
+}
 
 function claimDepositPollingSlot(lockKey) {
     const now = Date.now();
@@ -96,6 +103,9 @@ const depositReminderNotificationService = {
             const lockKey = `${DEPOSIT_POLL_LOCK_KEY}.${user.userId}`;
 
             const pollMissingDeposits = async () => {
+                if (!isWithinDepositReminderHours()) {
+                    return;
+                }
                 if (!claimDepositPollingSlot(lockKey)) {
                     return;
                 }
