@@ -166,7 +166,7 @@
                 t-on-click="() => this.onDacSidebarMenuSelection(menu)">
             <span t-if="level &lt;= 1" t-attf-class="dac_v6_section_icon fa {{ dacSidebarMenuIcon(menu) }}" aria-hidden="true"/>
             <span t-else="" class="dac_v6_section_dot"/>
-            <span t-esc="dacMenuName(menu)"/>
+            <span class="dac_v6_section_title" t-esc="dacMenuName(menu)"/>
         </button>
         <div t-else="" t-attf-class="dac_v6_section_group level-{{ level }}">
             <button t-if="level === 1"
@@ -175,7 +175,7 @@
                     t-att-aria-expanded="!isDacMenuGroupCollapsed(menu)"
                     t-on-click="(event) => toggleDacMenuGroup(menu, event)">
                 <span t-attf-class="fa {{ dacSidebarMenuIcon(menu) }}" aria-hidden="true"/>
-                <span t-esc="dacMenuName(menu)"/>
+                <span class="dac_v6_section_title" t-esc="dacMenuName(menu)"/>
                 <span class="caret">›</span>
             </button>
             <div t-else="" class="dac_v6_section_group_title" t-esc="dacMenuName(menu)"/>

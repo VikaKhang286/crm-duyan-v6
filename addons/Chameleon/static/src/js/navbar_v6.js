@@ -19,7 +19,6 @@ const DAC_ROLE_LABELS = {
 const DAC_ACTIVE_SIDEBAR_MENU_STORAGE_KEY = "dac_v6_active_sidebar_xmlid";
 const DAC_ATTENDANCE_APP_XMLID = "dac_attendance.menu_dac_attendance_root";
 const ODOO_ATTENDANCE_APP_XMLID = "hr_attendance.menu_hr_attendance_root";
-const DAC_MANAGER_ATTENDANCE_GROUP_ID = "dac-manager-odoo-attendance-group";
 const DAC_ATTENDANCE_DASHBOARD_MENU_XMLID = "dac_attendance.menu_dac_attendance_employee_dashboard";
 const DAC_ATTENDANCE_DASHBOARD_ACTION_XMLID = "dac_attendance.dac_attendance_employee_dashboard_action";
 const DAC_ATTENDANCE_MANAGER_MENU_XMLID = "dac_attendance.menu_dac_attendance_manager_dashboard";
@@ -272,22 +271,9 @@ patch(NavBar.prototype, {
             ? this.currentAppSections
             : (dacAttendanceApp?.childrenTree || []))
             .filter((menu) => this.isDacMenuVisible(menu));
-        const odooAttendanceApp = this.dacMenuByXmlid(ODOO_ATTENDANCE_APP_XMLID);
-        const attendanceSections = (this.currentApp?.xmlid === ODOO_ATTENDANCE_APP_XMLID
-            ? this.currentAppSections
-            : (odooAttendanceApp?.childrenTree || []))
-            .filter((menu) => this.isDacMenuVisible(menu));
-        if (!attendanceSections.length) return sections;
-
-        return [
-            ...sections,
-            {
-                id: DAC_MANAGER_ATTENDANCE_GROUP_ID,
-                xmlid: DAC_MANAGER_ATTENDANCE_GROUP_ID,
-                name: "Chấm công",
-                childrenTree: attendanceSections,
-            },
-        ];
+        // DAC already provides the attendance menus it needs. Do not append
+        // Odoo's original menu tree, which duplicates those entries below.
+        return sections;
     },
 
     dacVisibleMenuChildren(menu) {
