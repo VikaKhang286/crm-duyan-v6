@@ -1,19 +1,27 @@
 # Triển khai Trợ lý DAC lên production — 02/11/2026
 
-Đã cài `dac_zalo_assistant` **18.0.2.0.0** trên `production_crm` của
+Đã cài `dac_zalo_assistant` **18.0.2.1.0** trên `production_crm` của
 `https://crm.duyan.vn`, theo yêu cầu triển khai của chủ hệ thống. Mã ứng dụng
-được triển khai từ commit `b12d15187b275c5e8a56a57e723cf24a71d063d0`.
+được triển khai từ commit `b12d15187b275c5e8a56a57e723cf24a71d063d0`, sau đó
+nâng cấp icon từ commit `a61cb166ac2f8b2e304eff2302ede23f34ea0919`.
 
-Odoo dừng lúc 11:51:35 và khởi động lại lúc 11:52:40, giờ Việt Nam.
-Cấu hình bridge hoàn tất lúc 11:53:51. Tài khoản Zalo thật chưa đăng nhập;
-chưa gửi tin hoặc gọi nhà cung cấp AI thật.
+Odoo dừng lúc 11:51:35 và khởi động lại lúc 11:52:40, giờ Việt Nam để cài
+addon. Lúc 13:50 có lần dừng ngắn để nâng cấp icon. Cấu hình bridge hoàn tất
+lúc 11:53:51. Tài khoản Zalo thật chưa đăng nhập; chưa gửi tin hoặc gọi nhà
+cung cấp AI thật.
+
+Theo yêu cầu tiếp theo, menu đã được nâng cấp với icon chatbot. Phiên quét QR
+đã khởi tạo lúc 13:51 giờ Việt Nam; QR đang hiển thị trong Odoo và được gửi
+cho chủ hệ thống để quét. Trạng thái cuối lúc xác minh là `waiting_qr`.
 
 ## Cách bắt đầu dùng
 
-1. Tải lại Odoo, vào **Trợ lý Zalo → Cấu hình** bằng tài khoản quản trị.
-2. Bấm **Đăng nhập Zalo bằng QR**, sau đó **Lấy QR / cập nhật kết nối**.
-   Quét và xác nhận bằng điện thoại đang đăng nhập tài khoản “tro ly DAC”.
-   Cập nhật lại trạng thái để lưu UID trợ lý.
+1. QR hiện đã được tạo và đang hoạt động. Quét QR đã gửi trong cuộc trò
+   chuyện, bằng điện thoại đang đăng nhập tài khoản “tro ly DAC”. Nếu hết
+   hạn, admin vào **Trợ lý Zalo → Cấu hình** rồi bấm **Lấy QR / cập nhật
+   kết nối** để tạo mã mới.
+2. Xác nhận đăng nhập trên điện thoại. Admin bấm **Lấy QR / cập nhật kết
+   nối** lần nữa để lưu UID trợ lý và xác nhận trạng thái đã kết nối.
 3. Mỗi nhân viên vào **Xác thực với trợ lý**, tạo mã rồi gửi lệnh
    `/xac-thuc DAC-...` cho tài khoản trợ lý. Chỉ nhân viên đã liên kết mới
    nhận được thông báo; không phát lại xác nhận của các đơn tạo trước đó.
@@ -28,7 +36,8 @@ nhân viên nào liên kết tại thời điểm xác minh.
 
 ## Môi trường và bản sao lưu
 
-- Addon thực chạy: `/srv/odoo-deploy/addons/dac_zalo_assistant`.
+- Addon thực chạy: `/srv/odoo-deploy/addons/dac_zalo_assistant`, phiên bản
+  `18.0.2.1.0`; menu trỏ tới `static/description/icon.png`.
 - Odoo: container `odoo-production`, image hiện hữu được giữ nguyên.
 - Bridge: container `dac-zalo-bridge`, image `dac-zalo-bridge:b12d151`.
 - Network: `bee-odoo-isolated`; không publish cổng bridge ra host/Internet.
@@ -58,6 +67,13 @@ có 4.017 đơn hàng và 70 task. Không tạo đơn hoặc nhân viên thử t
   gọi `/status` có xác thực thành công. Không có cổng host được mở.
 - Callback công khai `/dac_zalo/bridge/events` thiếu khóa trả 401.
 - Hai cron active, chu kỳ một phút; đã chạy lúc 11:55:46 giờ Việt Nam.
+- Sau nâng cấp icon và khởi tạo QR, cấu hình production trả về icon menu
+  20.058 byte, QR đang lưu 16.801 byte, bridge `waiting_qr`, hai cron active,
+  health check vẫn `pass`.
+- Sao lưu riêng trước nâng cấp icon:
+  `/srv/odoo-deploy/backups/zalo-icon-a61cb16-20261102/production_crm.dump`,
+  catalog đã kiểm tra; file cũ của các thành phần addon được thay trong lần
+  nâng cấp được lưu tại cùng thư mục.
 - Mẫu tài khoản thực thuộc Sale/Design/Production/Manager: thấy menu, mở
   được view tùy chọn, chỉ tìm thấy preference của mình; đọc khóa bridge/AI
   bị từ chối. View admin có đầy đủ các nhóm thông báo.
