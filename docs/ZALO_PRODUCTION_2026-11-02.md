@@ -14,6 +14,25 @@ Theo yêu cầu tiếp theo, menu đã được nâng cấp với icon chatbot. 
 đã khởi tạo lúc 13:51 giờ Việt Nam; QR đang hiển thị trong Odoo và được gửi
 cho chủ hệ thống để quét. Trạng thái cuối lúc xác minh là `waiting_qr`.
 
+## Cập nhật giao diện admin — 02/11/2026 16:10
+
+Đã nâng addon lên **18.0.2.3.0** để sửa giao diện Cấu hình Trợ lý Zalo:
+
+- Admin mở app sẽ vào Cấu hình; nhân viên vẫn vào mục xác thực của họ.
+- Cấu hình chia thành các tab Kết nối, Trợ lý AI và Thông báo.
+- QR xếp thành khung riêng bên dưới trạng thái, hướng dẫn không còn nằm cạnh ảnh.
+- Thanh trạng thái rút về nhãn gọn, tránh tràn vùng nội dung.
+- Khi bấm tạo QR, Odoo đợi bridge cập nhật trạng thái để ảnh xuất hiện ngay.
+
+Database được sao lưu và kiểm tra catalog trước nâng cấp tại:
+`/srv/odoo-deploy/backups/zalo-ui-fix-18.0.2.3.0-20261102-160855/production_crm.dump`
+(70.270.246 byte). Hai file addon trước khi thay cũng nằm trong thư mục backup.
+Bản triển khai và log: `/srv/odoo-deploy/releases/zalo-ui-6b9b3e3-20261102-fix`.
+
+Sau nâng cấp, Odoo và trang HTTPS trả 200, QR vẫn hiển thị; ba tab đã được mở
+kiểm tra trên trình duyệt. Phần mobile còn độ tràn ngang 4 px từ app shell Odoo.
+Mã QR đang chờ quét; chưa xác nhận đăng nhập Zalo.
+
 ## Cách bắt đầu dùng
 
 1. QR hiện đã được tạo và đang hoạt động. Quét QR đã gửi trong cuộc trò
@@ -37,7 +56,7 @@ nhân viên nào liên kết tại thời điểm xác minh.
 ## Môi trường và bản sao lưu
 
 - Addon thực chạy: `/srv/odoo-deploy/addons/dac_zalo_assistant`, phiên bản
-  `18.0.2.1.0`; menu trỏ tới `static/description/icon.png`.
+  `18.0.2.3.0`; menu trỏ tới `static/description/icon.png`.
 - Odoo: container `odoo-production`, image hiện hữu được giữ nguyên.
 - Bridge: container `dac-zalo-bridge`, image `dac-zalo-bridge:b12d151`.
 - Network: `bee-odoo-isolated`; không publish cổng bridge ra host/Internet.

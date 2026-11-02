@@ -4,8 +4,8 @@ Addon `dac_zalo_assistant` và dịch vụ `services/zalo-bridge` tạo kênh ch
 giữa nhân viên và tài khoản cá nhân “tro ly DAC”. Phần này phát triển riêng,
 không sửa workflow đơn hàng hoặc addon của dev khác.
 
-Production đã cài bản 18.0.2.1.0 ngày 02/11/2026, menu có icon chatbot,
-bridge đang chạy và QR đăng nhập đã được tạo. Chi tiết môi trường, sao lưu,
+Production đang chạy bản 18.0.2.3.0 ngày 02/11/2026. Giao diện admin có ba tab
+Kết nối, Trợ lý AI và Thông báo; QR được hiển thị ngay sau khi tạo. Chi tiết môi trường, sao lưu,
 QR và kiểm tra:
 [ZALO_PRODUCTION_2026-11-02.md](ZALO_PRODUCTION_2026-11-02.md).
 
