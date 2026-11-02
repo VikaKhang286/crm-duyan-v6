@@ -36,7 +36,7 @@ Mã QR đang chờ quét; chưa xác nhận đăng nhập Zalo.
 
 ## Hồ sơ Zalo, QR và tự kiểm tra kết nối — 02/11/2026
 
-Bản **18.0.2.5.0** bổ sung:
+Bản **18.0.2.6.0** bổ sung:
 
 - Sửa tràn ngang của sheet Cấu hình trên vùng nội dung hẹp và mobile.
 - Đưa nút **Tạo lại mã QR** xuống ngay dưới ảnh QR. Làm mới phiên sẽ ngắt phiên cũ trước; thao tác có hộp xác nhận.
@@ -67,7 +67,7 @@ nhân viên nào liên kết tại thời điểm xác minh.
 ## Môi trường và bản sao lưu
 
 - Addon thực chạy: `/srv/odoo-deploy/addons/dac_zalo_assistant`, phiên bản
-  `18.0.2.5.0`; menu trỏ tới `static/description/icon.png`.
+  `18.0.2.6.0`; menu trỏ tới `static/description/icon.png`.
 - Odoo: container `odoo-production`, image hiện hữu được giữ nguyên.
 - Bridge: container `dac-zalo-bridge`, image `dac-zalo-bridge:b12d151`.
 - Network: `bee-odoo-isolated`; không publish cổng bridge ra host/Internet.
