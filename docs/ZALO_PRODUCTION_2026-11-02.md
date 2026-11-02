@@ -33,6 +33,17 @@ Sau nâng cấp, Odoo và trang HTTPS trả 200, QR vẫn hiển thị; ba tab �
 kiểm tra trên trình duyệt. Phần mobile còn độ tràn ngang 4 px từ app shell Odoo.
 Mã QR đang chờ quét; chưa xác nhận đăng nhập Zalo.
 
+
+## Hồ sơ Zalo, QR và tự kiểm tra kết nối — 02/11/2026
+
+Bản **18.0.2.4.0** bổ sung:
+
+- Sửa tràn ngang của sheet Cấu hình trên vùng nội dung hẹp và mobile.
+- Đưa nút **Tạo lại mã QR** xuống ngay dưới ảnh QR. Làm mới phiên sẽ ngắt phiên cũ trước; thao tác có hộp xác nhận.
+- Sau khi đăng nhập, bridge lấy tên và avatar hồ sơ Zalo, Odoo hiển thị cạnh UID và trạng thái.
+- Mỗi phút kiểm tra trạng thái bridge/Zalo; nếu mất kết nối, cập nhật trạng thái và tạo việc cần làm cho admin để quét QR lại.
+- Lỗi gửi tin cũng kích hoạt kiểm tra trạng thái; nếu không kết nối, lỗi hiển thị hướng dẫn quét lại. Tin chưa chắc đã gửi không tự gửi lại để tránh trùng.
+
 ## Cách bắt đầu dùng
 
 1. QR hiện đã được tạo và đang hoạt động. Quét QR đã gửi trong cuộc trò
@@ -56,7 +67,7 @@ nhân viên nào liên kết tại thời điểm xác minh.
 ## Môi trường và bản sao lưu
 
 - Addon thực chạy: `/srv/odoo-deploy/addons/dac_zalo_assistant`, phiên bản
-  `18.0.2.3.0`; menu trỏ tới `static/description/icon.png`.
+  `18.0.2.4.0`; menu trỏ tới `static/description/icon.png`.
 - Odoo: container `odoo-production`, image hiện hữu được giữ nguyên.
 - Bridge: container `dac-zalo-bridge`, image `dac-zalo-bridge:b12d151`.
 - Network: `bee-odoo-isolated`; không publish cổng bridge ra host/Internet.

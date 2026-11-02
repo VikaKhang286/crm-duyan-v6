@@ -3,9 +3,8 @@
         <field name="name">dac.zalo.config.form</field>
         <field name="model">dac.zalo.config</field>
         <field name="arch" type="xml">
-            <form string="Trợ lý Zalo" create="0" delete="0">
+            <form string="Trợ lý Zalo" class="dac_zalo_config_form" create="0" delete="0">
                 <header>
-                    <button name="action_login" type="object" string="Tạo / làm mới mã QR" class="btn-primary" groups="base.group_system"/>
                     <button name="action_refresh" type="object" string="Cập nhật trạng thái" groups="base.group_system"/>
                     <button name="action_disconnect" type="object" string="Ngắt kết nối" groups="base.group_system" confirm="Ngừng trợ lý và xóa phiên đăng nhập lưu ở dịch vụ Zalo?"/>
                     <field name="connection_state"/>
@@ -19,22 +18,38 @@
                         <page name="connection" string="Kết nối">
                             <div class="alert alert-info" role="status">
                                 <strong>Đăng nhập bot Zalo</strong>
-                                <div>Bấm “Tạo / làm mới mã QR”, quét bằng tài khoản “tro ly DAC” trên điện thoại, rồi xác nhận trên điện thoại.</div>
+                                <div>Quét mã bằng tài khoản “tro ly DAC” trên điện thoại, rồi xác nhận đăng nhập.</div>
                             </div>
+                            <div class="alert alert-warning" role="alert" invisible="connection_state not in ('disconnected', 'error')">
+                                <strong>Tài khoản Zalo chưa kết nối.</strong>
+                                <div>Admin hãy bấm “Cập nhật trạng thái”. Nếu mất phiên đăng nhập, tạo mã QR mới bên dưới và quét lại.</div>
+                            </div>
+                            <div class="alert alert-success" role="status" invisible="connection_state != 'connected'">
+                                <strong>Đã kết nối tài khoản Zalo</strong>
+                                <span invisible="not assistant_name">: <field name="assistant_name" nolabel="1"/></span>
+                            </div>
+                            <group string="Tài khoản Zalo" col="2" groups="base.group_system" invisible="not assistant_uid">
+                                <field name="assistant_avatar" widget="image" nolabel="1"
+                                       options="{'size': [88, 88]}" class="oe_avatar"/>
+                                <field name="assistant_name" readonly="1"/>
+                                <field name="assistant_uid" readonly="1"/>
+                            </group>
                             <group string="Trạng thái" col="2">
                                 <field name="active" widget="boolean_toggle"/>
-                                <field name="assistant_uid" readonly="1"/>
                                 <field name="last_checked_at" readonly="1"/>
                             </group>
                             <group string="Quét mã QR" col="1" groups="base.group_system">
                                 <field name="qr_image" widget="image" nolabel="1"
                                        options="{'size': [260, 260]}" invisible="not qr_image"/>
-                                <div class="text-muted" invisible="qr_image">
-                                    Chưa có mã QR. Bấm “Tạo / làm mới mã QR” phía trên.
+                                <div class="text-muted" invisible="qr_image or connection_state == 'connected'">
+                                    Chưa có mã QR. Bấm nút bên dưới để tạo mã đăng nhập.
                                 </div>
                                 <div class="text-muted" invisible="not qr_image">
                                     Dùng ứng dụng Zalo trên điện thoại của tài khoản “tro ly DAC” để quét mã.
                                 </div>
+                                <button name="action_login" type="object" string="Tạo lại mã QR"
+                                        class="btn-primary" groups="base.group_system"
+                                        confirm="Thao tác này sẽ làm mới phiên đăng nhập Zalo hiện tại. Tiếp tục?"/>
                             </group>
                             <group string="Kết nối dịch vụ" groups="base.group_system" col="2">
                                 <field name="bridge_url"/>

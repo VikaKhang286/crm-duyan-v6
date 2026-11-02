@@ -36,6 +36,8 @@ class ZaloConfig(models.Model):
     bridge_url = fields.Char(string='Địa chỉ dịch vụ Zalo', default='http://zalo-bridge:8095', required=True, groups='base.group_system')
     bridge_token = fields.Char(string='Khóa kết nối', copy=False, groups='base.group_system')
     assistant_uid = fields.Char(string='Mã Zalo trợ lý', readonly=True, copy=False)
+    assistant_name = fields.Char(string='Tên tài khoản Zalo', readonly=True, copy=False, groups='base.group_system')
+    assistant_avatar = fields.Image(string='Ảnh đại diện Zalo', readonly=True, copy=False, groups='base.group_system', max_width=256, max_height=256)
     connection_state = fields.Selection([
         ('disconnected', 'Chưa kết nối'), ('waiting_qr', 'Chờ quét QR'),
         ('scanned', 'Chờ xác nhận trên điện thoại'), ('connected', 'Đã kết nối'),
@@ -84,13 +86,72 @@ class ZaloConfig(models.Model):
                 json=payload, timeout=(10, 30), allow_redirects=False,
             )
             if response.status_code >= 300:
-                raise UserError(_('Bridge chưa xử lý được yêu cầu (HTTP %s).') % response.status_code)
+                error_code = ''
+                try:
+                    error_code = str(response.json().get('error') or '')
+                except (ValueError, AttributeError):
+                    pass
+                message = _('Bridge chưa xử lý được yêu cầu (HTTP %s).') % response.status_code
+                if error_code == 'login_in_progress':
+                    message = _('Phiên tạo mã cũ đang đóng. Hãy bấm “Cập nhật trạng thái” rồi thử tạo lại mã QR.')
+                raise UserError(message)
             result = response.json()
             if not isinstance(result, dict):
                 raise ValueError('Invalid bridge response')
             return result
+        except UserError as error:
+            if path != '/status':
+                status = self._probe_bridge_status_after_error()
+                if status and status.get('state') != 'connected':
+                    raise UserError(self._reconnect_message(status.get('state'))) from None
+            raise error
         except (requests.exceptions.RequestException, ValueError):
-            raise UserError(_('Không kết nối được dịch vụ Zalo; kiểm tra địa chỉ và trạng thái dịch vụ.')) from None
+            if path != '/status':
+                status = self._probe_bridge_status_after_error()
+                if status and status.get('state') != 'connected':
+                    raise UserError(self._reconnect_message(status.get('state'))) from None
+            raise UserError(_('Không kết nối được bridge Zalo. Hãy bấm “Cập nhật trạng thái”; nếu tài khoản đã mất phiên, tạo mã QR và quét lại.')) from None
+
+    @api.model
+    def _reconnect_message(self, state):
+        if state == 'disconnected':
+            return _('Tài khoản trợ lý Zalo đã mất kết nối. Admin cần vào Trợ lý Zalo → Cấu hình, bấm “Tạo lại mã QR” và quét lại bằng tài khoản “tro ly DAC”.')
+        return _('Kết nối tài khoản Zalo chưa sẵn sàng. Admin hãy bấm “Cập nhật trạng thái”; nếu phiên đã hết, tạo mã QR và quét lại bằng tài khoản “tro ly DAC”.')
+
+    def _apply_bridge_status(self, status):
+        self.ensure_one()
+        uid = str(status.get('account_id') or '')
+        state = status.get('state', 'error')
+        if state not in dict(self._fields['connection_state'].selection):
+            state = 'error'
+        if uid and self.assistant_uid and uid != self.assistant_uid:
+            state = 'error'
+            uid = ''
+        values = {
+            'connection_state': state,
+            'assistant_uid': uid or self.assistant_uid,
+            'assistant_name': str(status.get('account_name') or self.assistant_name or '')[:160] or False,
+            'assistant_avatar': status.get('account_avatar') or (self.assistant_avatar if state != 'disconnected' else False),
+            'qr_image': status.get('qr_image') if state == 'waiting_qr' else False,
+            'last_checked_at': fields.Datetime.now(),
+        }
+        self.sudo().write(values)
+        return state
+
+    def _probe_bridge_status_after_error(self):
+        self.ensure_one()
+        try:
+            response = requests.get(self.bridge_url.rstrip('/') + '/status',
+                headers={'Authorization': 'Bearer ' + self.bridge_token}, timeout=(5, 10), allow_redirects=False)
+            response.raise_for_status()
+            status = response.json()
+            if not isinstance(status, dict):
+                raise ValueError('Invalid status')
+            status = dict(status, state=self._apply_bridge_status(status))
+            return status
+        except (requests.exceptions.RequestException, ValueError):
+            self.sudo().write({'connection_state': 'error', 'qr_image': False, 'last_checked_at': fields.Datetime.now()})
+            return None
 
     def action_login(self):
         self._require_admin()
@@ -107,25 +168,47 @@ class ZaloConfig(models.Model):
     def action_refresh(self):
         self._require_admin()
         status = self._bridge_request('/status')
-        uid = str(status.get('account_id') or '')
-        if uid and self.assistant_uid and uid != self.assistant_uid:
-            raise UserError(_('Tài khoản Zalo không khớp tài khoản trợ lý đã liên kết.'))
-        state = status.get('state', 'error')
-        if state not in dict(self._fields['connection_state'].selection):
-            state = 'error'
-        self.write({
-            'connection_state': state,
-            'assistant_uid': uid or self.assistant_uid,
-            'qr_image': status.get('qr_image') if state == 'waiting_qr' else False,
-            'last_checked_at': fields.Datetime.now(),
-        })
+        self._apply_bridge_status(status)
         return {'type': 'ir.actions.client', 'tag': 'reload'}
 
     def action_disconnect(self):
         self._require_admin()
         self._bridge_request('/logout', {})
-        self.write({'connection_state': 'disconnected', 'qr_image': False})
+        self.write({'connection_state': 'disconnected', 'assistant_uid': False, 'assistant_name': False,
+            'assistant_avatar': False, 'qr_image': False, 'last_checked_at': fields.Datetime.now()})
         return True
+
+    @api.model
+    def _cron_check_connection(self):
+        config = self._config().sudo()
+        if not config.active:
+            return
+        try:
+            status = config._bridge_request('/status')
+            state = config._apply_bridge_status(status)
+            problem = state in ('disconnected', 'error')
+            detail = config._reconnect_message(state) if problem else ''
+        except UserError as error:
+            config.write({'connection_state': 'error', 'qr_image': False, 'last_checked_at': fields.Datetime.now()})
+            problem = True
+            detail = str(error)
+        model_id = self.env['ir.model']._get_id('dac.zalo.config')
+        summary = '[Zalo] connection'
+        activities = self.env['mail.activity'].sudo().search([
+            ('res_model_id', '=', model_id), ('res_id', '=', config.id), ('summary', '=', summary)])
+        if problem:
+            admins = self.env.ref('base.group_system').sudo().users.filtered(lambda user: user.active)
+            todo_type = self.env.ref('mail.mail_activity_data_todo')
+            for admin in admins:
+                if not activities.filtered(lambda activity: activity.user_id == admin):
+                    self.env['mail.activity'].sudo().create({
+                        'res_model_id': model_id, 'res_id': config.id, 'user_id': admin.id,
+                        'activity_type_id': todo_type.id, 'summary': summary,
+                        'note': detail or config._reconnect_message(config.connection_state),
+                        'date_deadline': fields.Date.context_today(config),
+                    })
+        else:
+            activities.unlink()
 
     def _ask_ai(self, messages):
         self.ensure_one()
@@ -407,7 +490,12 @@ class ZaloMessage(models.Model):
                 'error_message': str(error)[:200], 'next_attempt_at': fields.Datetime.now() + timedelta(minutes=2 ** attempts)})
             return
         if result.get('delivery') == 'uncertain':
-            self.write({'state': 'uncertain', 'error_message': 'Bridge chưa xác nhận gửi; kiểm tra Zalo trước khi gửi lại.'})
+            status = config._probe_bridge_status_after_error()
+            if status and status.get('state') != 'connected':
+                error_message = config._reconnect_message(status.get('state'))
+            else:
+                error_message = 'Bridge chưa xác nhận gửi; đã kiểm tra trạng thái Zalo. Không gửi lại tự động để tránh trùng tin.'
+            self.write({'state': 'uncertain', 'error_message': error_message})
         elif result.get('delivery') == 'sent':
             # A self-listener echo can arrive before the HTTP send response is committed.
             echoes = self.search([('conversation_id', '=', self.conversation_id.id), ('direction', '=', 'out'),

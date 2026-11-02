@@ -1,0 +1,47 @@
+/* Keep the configuration sheet inside the app area, even beside the wide DAC rail. */
+html body.o_web_client:has(.o_form_view.dac_zalo_config_form) {
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
+.o_form_view.dac_zalo_config_form {
+    min-width: 0 !important;
+    max-width: 100% !important;
+}
+
+.o_form_view.dac_zalo_config_form .o_form_sheet_bg {
+    box-sizing: border-box !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+}
+
+.o_form_view.dac_zalo_config_form .o_form_sheet {
+    box-sizing: border-box !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+}
+
+.o_form_view.dac_zalo_config_form .o_group,
+.o_form_view.dac_zalo_config_form .o_field_widget {
+    min-width: 0 !important;
+    max-width: 100%;
+}
+
+@media (max-width: 991.98px) {
+    html body.o_web_client:has(.o_form_view.dac_zalo_config_form) {
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+    }
+
+    .o_form_view.dac_zalo_config_form .o_form_sheet_bg {
+        padding-inline: 8px !important;
+    }
+
+    .o_form_view.dac_zalo_config_form .o_form_sheet {
+        padding-inline: 12px !important;
+    }
+}

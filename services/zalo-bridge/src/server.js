@@ -26,12 +26,12 @@ const server = createServer(async (req, res) => {
     let text = ''; let bytes = 0;
     for await (const chunk of req) { bytes += chunk.length; if (bytes > 1024 * 1024) return respond(413, { error: 'payload_too_large' }); text += chunk; }
     const body = JSON.parse(text || '{}');
-    if (req.url === '/login') { bridge.startLogin(); return respond(202, bridge.status()); }
+    if (req.url === '/login') { await bridge.restartLogin(); return respond(202, bridge.status()); }
     if (req.url === '/logout') { await bridge.logout(); return respond(200, bridge.status()); }
     if (req.url === '/send') return respond(200, await bridge.send(body));
     return respond(404, { error: 'not_found' });
   } catch (error) {
-    const known = ['invalid_payload', 'wrong_account', 'not_connected', 'request_id_conflict'];
+    const known = ['invalid_payload', 'wrong_account', 'not_connected', 'request_id_conflict', 'login_in_progress'];
     respond(error instanceof SyntaxError ? 400 : 409, { error: known.includes(error.message) ? error.message : 'request_failed' });
   }
 });

@@ -1,6 +1,6 @@
 {
     'name': 'Trợ lý DAC qua Zalo',
-    'version': '18.0.2.3.0',
+    'version': '18.0.2.4.0',
     'category': '1. Duy An ERP',
     'summary': 'Hội thoại, thông báo nghiệp vụ Zalo và AI tương thích OpenAI',
     'license': 'LGPL-3',
@@ -13,6 +13,11 @@
         'views/assistant_views.xml',
         'views/notification_views.xml',
     ],
+    'assets': {
+        'web.assets_backend': [
+            'dac_zalo_assistant/static/src/scss/zalo_config.scss',
+        ],
+    },
     'application': True,
     'installable': True,
 }
