@@ -21,7 +21,7 @@
                 <!-- Header -->
                 <div class="o_dac_emp_header">
                     <div class="o_dac_emp_heading">
-                        <div class="o_dac_emp_crumb">DAC Chấm công <span>/</span> Nhân viên</div>
+                        <div class="o_dac_emp_crumb">Chấm công <span>/</span> Nhân viên</div>
                         <h1>Dashboard Chấm công</h1>
                         <p>Xin chào, <strong t-esc="state.data.employee_name"/> · <span t-esc="todayLabel"/></p>
                     </div>

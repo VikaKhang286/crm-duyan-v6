@@ -75,7 +75,7 @@ class ResUsersDac(models.Model):
     def create(self, vals_list):
         users = super().create(vals_list)
         dashboard = self.env.ref(
-            'dac_attendance.dac_attendance_manager_dashboard_action',
+            'dac_attendance.dac_attendance_employee_dashboard_action',
             raise_if_not_found=False,
         )
         if dashboard:
@@ -87,7 +87,7 @@ class ResUsersDac(models.Model):
     @api.model
     def _dac_assign_no_role_home_action(self):
         dashboard = self.env.ref(
-            'dac_attendance.dac_attendance_manager_dashboard_action',
+            'dac_attendance.dac_attendance_employee_dashboard_action',
             raise_if_not_found=False,
         )
         if not dashboard:
@@ -182,3 +182,29 @@ class ResUsersDac(models.Model):
         """Thợ thiết kế/sản xuất thuần — không phải manager/sale/admin."""
         return (self._dac_is_design() or self._dac_is_production()) and \
             not (self._dac_is_manager() or self._dac_is_sale() or self._dac_is_admin())
+
+
+class IrHttpDacHomeAction(models.AbstractModel):
+    _inherit = 'ir.http'
+
+    @api.model
+    def session_info(self):
+        """Route no-role employees to their attendance dashboard.
+
+        Keep the stored ``res.users.action_id`` untouched.  Odoo's web client
+        consumes ``home_action_id`` from this response when opening ``/odoo/``.
+        """
+        info = super().session_info()
+        user = self.env.user
+        if (
+            user._is_internal()
+            and not user.dac_role
+            and not user.has_group('hr_attendance.group_hr_attendance_manager')
+        ):
+            dashboard = self.env.ref(
+                'dac_attendance.dac_attendance_employee_dashboard_action',
+                raise_if_not_found=False,
+            )
+            if dashboard:
+                info['home_action_id'] = dashboard.id
+        return info

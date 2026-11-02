@@ -64,8 +64,8 @@
                         </div>
 
                         <div class="dac_v6_section_panel" aria-label="Chức năng">
-                            <div class="dac_v6_section_heading" t-if="currentApp">
-                                <strong t-esc="dacMenuName(currentApp)"/>
+                            <div class="dac_v6_section_heading" t-if="dacSidebarCurrentApp">
+                                <strong t-esc="dacMenuName(dacSidebarCurrentApp)"/>
                             </div>
                             <div class="dac_v6_section_list">
                                 <t t-foreach="dacVisibleCurrentAppSections" t-as="section" t-key="section.id">
