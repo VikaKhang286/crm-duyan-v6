@@ -1,0 +1,14 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_config_system,Zalo config system,model_dac_zalo_config,base.group_system,1,1,1,0
+access_config_manager,Zalo config manager,model_dac_zalo_config,dac_erp.group_dac_erp_manager,1,0,0,0
+access_binding_system,Zalo binding system,model_dac_zalo_binding,base.group_system,1,1,1,1
+access_binding_manager,Zalo binding manager,model_dac_zalo_binding,dac_erp.group_dac_erp_manager,1,0,0,0
+access_binding_user,Zalo binding user,model_dac_zalo_binding,base.group_user,1,0,0,0
+access_conversation_system,Zalo conversation system,model_dac_zalo_conversation,base.group_system,1,1,1,0
+access_conversation_manager,Zalo conversation manager,model_dac_zalo_conversation,dac_erp.group_dac_erp_manager,1,0,0,0
+access_conversation_user,Zalo conversation user,model_dac_zalo_conversation,base.group_user,1,0,0,0
+access_message_system,Zalo message system,model_dac_zalo_message,base.group_system,1,1,1,0
+access_message_manager,Zalo message manager,model_dac_zalo_message,dac_erp.group_dac_erp_manager,1,0,0,0
+access_message_user,Zalo message user,model_dac_zalo_message,base.group_user,1,0,0,0
+access_link_user,Zalo linking wizard,model_dac_zalo_link_wizard,base.group_user,1,1,1,1
+access_compose_user,Zalo compose wizard,model_dac_zalo_compose_wizard,base.group_user,1,1,1,1
