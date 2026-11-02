@@ -423,7 +423,11 @@ class HrAttendanceWithGeolocation(models.Model):
                 return {'success': False, 'message': 'Không tìm thấy nhân viên cho user hiện tại'}
 
             # Check if already checked in
-            open_att = self.search([
+            # The standard employee attendance group is read-only.  Elevate
+            # only this lookup and the write below, while keeping the domain
+            # locked to the employee linked to the current user.
+            Attendance = self.sudo()
+            open_att = Attendance.search([
                 ('employee_id', '=', employee.id),
                 ('check_out', '=', False),
             ], limit=1)
@@ -498,7 +502,7 @@ class HrAttendanceWithGeolocation(models.Model):
                         vals['check_in_latitude'] = metadata['latitude']
                         vals['check_in_longitude'] = metadata['longitude']
 
-            attendance = self.create(vals)
+            attendance = Attendance.create(vals)
             return {
                 'success': True,
                 'message': success_message,
@@ -520,7 +524,11 @@ class HrAttendanceWithGeolocation(models.Model):
             if not employee:
                 return {'success': False, 'message': 'Không tìm thấy nhân viên'}
 
-            attendance = self.search([
+            # Employees may read, but cannot write, hr.attendance records with
+            # Odoo's standard "own attendance" group.  Use sudo only after
+            # resolving the current user's employee and constrain the lookup
+            # to that employee.
+            attendance = self.sudo().search([
                 ('employee_id', '=', employee.id),
                 ('check_out', '=', False),
             ], limit=1, order='check_in desc')

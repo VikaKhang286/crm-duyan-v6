@@ -5,7 +5,7 @@ import { NavBar } from "@web/webclient/navbar/navbar";
 import { BurgerMenu } from "@web/webclient/burger_menu/burger_menu";
 import { useService } from "@web/core/utils/hooks";
 import { user } from "@web/core/user";
-import { onMounted, onWillStart, onWillUnmount, useRef, useState } from "@odoo/owl";
+import { onMounted, onPatched, onWillStart, onWillUnmount, useRef, useState } from "@odoo/owl";
 
 const DAC_ROLE_LABELS = {
     manager: "Manager",
@@ -18,8 +18,16 @@ const DAC_ROLE_LABELS = {
 };
 const DAC_ACTIVE_SIDEBAR_MENU_STORAGE_KEY = "dac_v6_active_sidebar_xmlid";
 const DAC_ATTENDANCE_APP_XMLID = "dac_attendance.menu_dac_attendance_root";
+const ODOO_ATTENDANCE_APP_XMLID = "hr_attendance.menu_hr_attendance_root";
+const DAC_MANAGER_ATTENDANCE_GROUP_ID = "dac-manager-odoo-attendance-group";
 const DAC_ATTENDANCE_DASHBOARD_MENU_XMLID = "dac_attendance.menu_dac_attendance_employee_dashboard";
 const DAC_ATTENDANCE_DASHBOARD_ACTION_XMLID = "dac_attendance.dac_attendance_employee_dashboard_action";
+const DAC_ATTENDANCE_MANAGER_MENU_XMLID = "dac_attendance.menu_dac_attendance_manager_dashboard";
+const DAC_ATTENDANCE_MANAGER_ACTION_XMLID = "dac_attendance.dac_attendance_manager_dashboard_action";
+const DAC_EMPLOYEE_ATTENDANCE_MENU_XMLIDS = new Set([
+    DAC_ATTENDANCE_APP_XMLID,
+    DAC_ATTENDANCE_DASHBOARD_MENU_XMLID,
+]);
 const DAC_PRODUCTION_DASHBOARD_MENU_XMLID = "dac_report.menu_dashboards_manage_production";
 const DAC_PRODUCTION_DASHBOARD_ACTION_XMLID = "dac_erp.dac_production_dashboard_action";
 const DAC_DESIGN_DASHBOARD_MENU_XMLID = "dac_report.menu_dashboards_manage_design";
@@ -31,8 +39,16 @@ const DAC_HOME_DASHBOARD_ACTION_XMLID = "home_menu.home_menu_action";
 const DAC_PRODUCTION_HIDDEN_APP_XMLIDS = new Set([
     "utm.menu_link_tracker_root",
 ]);
+const DAC_DESIGN_HIDDEN_APP_XMLIDS = new Set([
+    "utm.menu_link_tracker_root",
+]);
 const DAC_PRODUCTION_HIDDEN_MENU_XMLIDS = new Set([
     "dac_report.menu_dac_manage",
+    "dac_report.dac_account_payment_menu",
+]);
+const DAC_DESIGN_HIDDEN_MENU_XMLIDS = new Set([
+    "dac_report.menu_dac_manage",
+    "dac_report.dac_account_payment_menu",
 ]);
 const DAC_HIDDEN_APP_XMLIDS = new Set([
     "home_menu.home_root",
@@ -104,14 +120,19 @@ patch(NavBar.prototype, {
             collapsed: document.body.classList.contains("dac-v6-sidebar-collapsed"),
         });
         this.dacRole = null;
+        this.dacAttendanceAdmin = false;
+        this._dacAttendanceRedirecting = false;
         onWillStart(async () => {
             try {
-                const [currentUser] = await this.dacSearchOrm.read(
-                    "res.users", [user.userId], ["dac_role"]
-                );
+                const [[currentUser], attendanceAdmin] = await Promise.all([
+                    this.dacSearchOrm.read("res.users", [user.userId], ["dac_role"]),
+                    user.hasGroup("hr_attendance.group_hr_attendance_manager"),
+                ]);
                 this.dacRole = currentUser?.dac_role || null;
+                this.dacAttendanceAdmin = attendanceAdmin;
             } catch {
                 this.dacRole = null;
+                this.dacAttendanceAdmin = false;
             }
         });
         this.toggleDacMenuGroup = this.toggleDacMenuGroup.bind(this);
@@ -132,10 +153,15 @@ patch(NavBar.prototype, {
         onMounted(() => document.addEventListener("keydown", this._dacSearchKeydown, true));
         onMounted(() => {
             this._syncDacSidebarMenu(true);
-            this._dacSidebarRouteChange = () => this._syncDacSidebarMenu();
+            this._redirectEmployeeFromManagerAttendance();
+            this._dacSidebarRouteChange = () => {
+                this._syncDacSidebarMenu();
+                this._redirectEmployeeFromManagerAttendance();
+            };
             window.addEventListener("hashchange", this._dacSidebarRouteChange);
             window.addEventListener("popstate", this._dacSidebarRouteChange);
         });
+        onPatched(() => this._redirectEmployeeFromManagerAttendance());
         onWillUnmount(() => {
             document.removeEventListener("keydown", this._dacSearchKeydown, true);
             window.removeEventListener("hashchange", this._dacSidebarRouteChange);
@@ -156,11 +182,43 @@ patch(NavBar.prototype, {
     },
 
     isDacMenuVisible(menu) {
+        // Attendance employees only need their dashboard.  Manager dashboard,
+        // configuration and reports remain available exclusively to members
+        // of the Attendance Administrator group.
+        if (!this.dacAttendanceAdmin
+            && menu.xmlid?.startsWith("dac_attendance.")
+            && !DAC_EMPLOYEE_ATTENDANCE_MENU_XMLIDS.has(menu.xmlid)) {
+            return false;
+        }
+        // DAC Manager uses the consolidated DAC Attendance app below.  Keep
+        // Odoo's attendance root out of the app rail so it is not displayed
+        // as a second, separate application.
+        if (this.dacRole === "manager" && menu.xmlid === ODOO_ATTENDANCE_APP_XMLID) {
+            return false;
+        }
         if (!this.dacRole || this.dacRole === "manager") return true;
         if (this.dacRole === "production" && DAC_PRODUCTION_HIDDEN_APP_XMLIDS.has(menu.xmlid)) {
             return false;
         }
+        if (this.dacRole === "design" && DAC_DESIGN_HIDDEN_APP_XMLIDS.has(menu.xmlid)) {
+            return false;
+        }
+        if (this.dacRole === "production" && ["Trình theo dõi Liên kết", "Link Tracker"].includes(menu.name)) {
+            return false;
+        }
+        if (this.dacRole === "design" && ["Trình theo dõi Liên kết", "Link Tracker"].includes(menu.name)) {
+            return false;
+        }
         if (this.dacRole === "production" && DAC_PRODUCTION_HIDDEN_MENU_XMLIDS.has(menu.xmlid)) {
+            return false;
+        }
+        if (this.dacRole === "design" && DAC_DESIGN_HIDDEN_MENU_XMLIDS.has(menu.xmlid)) {
+            return false;
+        }
+        if (this.dacRole === "production" && ["Báo cáo cũ", "Phiếu thu cũ"].includes(menu.name)) {
+            return false;
+        }
+        if (this.dacRole === "design" && ["Báo cáo cũ", "Phiếu thu cũ"].includes(menu.name)) {
             return false;
         }
         if (DAC_HIDDEN_APP_XMLIDS.has(menu.xmlid)) return false;
@@ -193,8 +251,41 @@ patch(NavBar.prototype, {
         return DAC_ROLE_LABELS[this.dacRole] || "";
     },
 
+    get dacSidebarCurrentApp() {
+        if (this.dacRole === "manager" && this.currentApp?.xmlid === ODOO_ATTENDANCE_APP_XMLID) {
+            return this.dacMenuByXmlid(DAC_ATTENDANCE_APP_XMLID) || this.currentApp;
+        }
+        return this.currentApp;
+    },
+
     get dacVisibleCurrentAppSections() {
-        return this.currentAppSections.filter((menu) => this.isDacMenuVisible(menu));
+        const isConsolidatedAttendance = this.dacAttendanceAdmin && this.dacRole === "manager"
+            && [DAC_ATTENDANCE_APP_XMLID, ODOO_ATTENDANCE_APP_XMLID].includes(this.currentApp?.xmlid);
+        if (!isConsolidatedAttendance) {
+            return this.currentAppSections.filter((menu) => this.isDacMenuVisible(menu));
+        }
+
+        const dacAttendanceApp = this.dacMenuByXmlid(DAC_ATTENDANCE_APP_XMLID);
+        const sections = (this.currentApp?.xmlid === DAC_ATTENDANCE_APP_XMLID
+            ? this.currentAppSections
+            : (dacAttendanceApp?.childrenTree || []))
+            .filter((menu) => this.isDacMenuVisible(menu));
+        const odooAttendanceApp = this.dacMenuByXmlid(ODOO_ATTENDANCE_APP_XMLID);
+        const attendanceSections = (this.currentApp?.xmlid === ODOO_ATTENDANCE_APP_XMLID
+            ? this.currentAppSections
+            : (odooAttendanceApp?.childrenTree || []))
+            .filter((menu) => this.isDacMenuVisible(menu));
+        if (!attendanceSections.length) return sections;
+
+        return [
+            ...sections,
+            {
+                id: DAC_MANAGER_ATTENDANCE_GROUP_ID,
+                xmlid: DAC_MANAGER_ATTENDANCE_GROUP_ID,
+                name: "Chấm công",
+                childrenTree: attendanceSections,
+            },
+        ];
     },
 
     dacVisibleMenuChildren(menu) {
@@ -220,7 +311,47 @@ patch(NavBar.prototype, {
         return Boolean(menu?.actionID) && String(menu.actionID) === String(routeAction);
     },
 
+    _redirectEmployeeFromManagerAttendance() {
+        if (this.dacAttendanceAdmin || this._dacAttendanceRedirecting) return;
+        const currentAction = this.dacSearchAction.currentController?.action;
+        if (currentAction?.tag === "dac_attendance_manager_dashboard") {
+            this._openEmployeeAttendanceDashboard();
+            return;
+        }
+        // At the bare /odoo/ URL, Odoo resolves the user's stored Home Action
+        // internally, so the numeric action is absent from the URL.  A user
+        // without a DAC role must always land on the employee dashboard.
+        if (!this.dacRole && ["/odoo", "/odoo/"].includes(window.location.pathname)) {
+            this._openEmployeeAttendanceDashboard();
+            return;
+        }
+        const params = new URLSearchParams(window.location.hash.slice(1));
+        const routeAction = window.location.pathname.match(/\/action-(\d+)/)?.[1]
+            || params.get("action");
+        if (this.dacRouteMatchesMenu(
+            routeAction,
+            DAC_ATTENDANCE_MANAGER_MENU_XMLID,
+            DAC_ATTENDANCE_MANAGER_ACTION_XMLID
+        )) {
+            this._openEmployeeAttendanceDashboard();
+        }
+    },
+
+    _openEmployeeAttendanceDashboard() {
+        this._dacAttendanceRedirecting = true;
+        Promise.resolve(this.dacSearchAction.doAction(DAC_ATTENDANCE_DASHBOARD_ACTION_XMLID, {
+            clearBreadcrumbs: true,
+        })).finally(() => {
+            this._dacAttendanceRedirecting = false;
+        });
+    },
+
     isDacAppActive(app) {
+        if (this.dacRole === "manager"
+            && app.xmlid === DAC_ATTENDANCE_APP_XMLID
+            && this.currentApp?.xmlid === ODOO_ATTENDANCE_APP_XMLID) {
+            return true;
+        }
         const params = new URLSearchParams(window.location.hash.slice(1));
         const routeAction = window.location.pathname.match(/\/action-(\d+)/)?.[1]
             || params.get("action");
@@ -418,7 +549,7 @@ patch(NavBar.prototype, {
         };
         const roleXmlid = this.dacRole
             ? roleXmlids[this.dacRole]
-            : "dac_attendance.menu_dac_attendance_manager_dashboard";
+            : DAC_ATTENDANCE_DASHBOARD_MENU_XMLID;
         const params = new URLSearchParams(window.location.hash.slice(1));
         const routeAction = window.location.pathname.match(/\/action-(\d+)/)?.[1]
             || params.get("action");
