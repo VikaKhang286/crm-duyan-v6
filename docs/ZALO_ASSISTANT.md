@@ -4,6 +4,10 @@ Addon `dac_zalo_assistant` và dịch vụ `services/zalo-bridge` tạo kênh ch
 giữa nhân viên và tài khoản cá nhân “tro ly DAC”. Phần này phát triển riêng,
 không sửa workflow đơn hàng hoặc addon của dev khác.
 
+Production đã cài bản 18.0.2.0.0 ngày 02/11/2026 và bridge đang chạy; đang
+chờ đăng nhập Zalo bằng QR. Chi tiết môi trường, sao lưu và kiểm tra:
+[ZALO_PRODUCTION_2026-11-02.md](ZALO_PRODUCTION_2026-11-02.md).
+
 **Cách sử dụng**
 
 1. Admin bật kết nối trong **Trợ lý Zalo → Cấu hình**, nhập địa chỉ bridge và

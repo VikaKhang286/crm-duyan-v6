@@ -1,7 +1,9 @@
 # Kiểm thử trợ lý Zalo — 02/11/2026
 
 Đã cài/nâng cấp addon trên database Docker riêng `dac_zalo_test`, dùng image
-`odoo:18.0`. Không dùng database production hoặc môi trường của dev khác.
+`odoo:18.0`. Các test tự động không dùng database production hoặc môi trường
+của dev khác. Sau đó đã cài lên production theo yêu cầu; xem
+[báo cáo triển khai](ZALO_PRODUCTION_2026-11-02.md) cho kiểm tra sau cài.
 
 **Kết quả**
 
@@ -85,11 +87,11 @@ chưa phải kiểm thử nâng cấp trên bản sao dữ liệu production.
 
 Chưa quét QR, đăng nhập tài khoản “tro ly DAC”, gửi tin Zalo thật hoặc gọi
 nhà cung cấp AI bằng API key thật. Các test dùng UID/token giả và mock AI.
-Sau khi triển khai môi trường được chọn, cần kiểm thử với hai tài khoản nhân
+Sau khi đăng nhập trợ lý trên production, cần kiểm thử với hai tài khoản nhân
 viên: xác thực, nhắn hai chiều, kiểm tra mất/kết nối lại, rồi bật AI và kiểm
 tra một câu hỏi thật. Kiểm tra media và tải toàn bộ lịch sử nằm ngoài phạm
-vi bản đầu. Thông báo nghiệp vụ đã được thực hiện và kiểm thử, nhưng chưa
-triển khai hoặc gửi qua production.
+vi bản đầu. Addon và bridge đã triển khai lên production ngày 02/11/2026;
+chưa gửi thông báo qua Zalo thật vì tài khoản trợ lý và nhân viên chưa liên kết.
 
 
 **Bốn ca hồi quy nền chưa sửa trong phạm vi này**

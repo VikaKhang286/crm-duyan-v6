@@ -1,8 +1,9 @@
 # Thông báo chủ động qua trợ lý DAC
 
 Các nhóm thông báo trong đề xuất ban đầu đã được triển khai trong
-`dac_zalo_assistant` phiên bản 18.0.2.0.0. Cần nâng cấp addon và kết nối tài
-khoản trợ lý trước khi sử dụng trên môi trường thật.
+`dac_zalo_assistant` phiên bản 18.0.2.0.0. Production đã cài addon và bridge
+ngày 02/11/2026, đang chờ đăng nhập tài khoản trợ lý và liên kết nhân viên.
+Xem [báo cáo triển khai](ZALO_PRODUCTION_2026-11-02.md).
 
 **Bật/tắt và giờ nhận**
 
