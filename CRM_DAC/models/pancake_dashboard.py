@@ -219,8 +219,9 @@ class PancakeSyncDashboard(models.TransientModel):
     @api.model
     def _build_dashboard_values(self):
         values = {
-            'access_token': self._get_icp().get_param(self.PARAM_ACCESS_TOKEN) or '',
-            'webhook_secret': self._get_icp().get_param(self.PARAM_WEBHOOK_SECRET) or '',
+            # Write-only credential inputs: never send stored secrets to the browser.
+            'access_token': '',
+            'webhook_secret': '',
             'sync_batch_size': self._get_int_param(self.PARAM_BATCH_SIZE, 50),
             'same_day_sync_interval_minutes': self._get_int_param(self.PARAM_SAME_DAY_INTERVAL, 10),
             'nightly_two_day_sync_time': self._get_icp().get_param(self.PARAM_NIGHTLY_RUN_TIME) or '23:30',
@@ -498,11 +499,15 @@ class PancakeSyncDashboard(models.TransientModel):
     def _write_configuration_params(self):
         self.ensure_one()
         icp = self._get_icp()
-        token = (self.access_token or '').strip()
+        submitted_token = (self.access_token or '').strip()
         old_token = icp.get_param(self.PARAM_ACCESS_TOKEN) or ''
-        icp.set_param(self.PARAM_ACCESS_TOKEN, token)
-        icp.set_param(self.PARAM_ACCESS_TOKEN_COMPAT, token)
-        icp.set_param(self.PARAM_WEBHOOK_SECRET, (self.webhook_secret or '').strip())
+        token = submitted_token or old_token.strip()
+        if submitted_token:
+            icp.set_param(self.PARAM_ACCESS_TOKEN, submitted_token)
+            icp.set_param(self.PARAM_ACCESS_TOKEN_COMPAT, submitted_token)
+        submitted_webhook_secret = (self.webhook_secret or '').strip()
+        if submitted_webhook_secret:
+            icp.set_param(self.PARAM_WEBHOOK_SECRET, submitted_webhook_secret)
         icp.set_param(self.PARAM_BATCH_SIZE, str(self.sync_batch_size))
         icp.set_param(self.PARAM_SAME_DAY_INTERVAL, str(self.same_day_sync_interval_minutes))
         icp.set_param(self.PARAM_NIGHTLY_RUN_TIME, (self.nightly_two_day_sync_time or '23:30').strip())
@@ -511,7 +516,7 @@ class PancakeSyncDashboard(models.TransientModel):
         icp.set_param(self.PARAM_SMART_RECENT_DAYS, str(self.smart_recent_days))
         icp.set_param(self.PARAM_DEEP_RECENT_DAYS, str(self.deep_recent_days))
         icp.set_param(self.PARAM_CIRCUIT_BREAKER_MINUTES, str(self.circuit_breaker_pause_minutes))
-        if token != (old_token or '').strip():
+        if submitted_token and token != (old_token or '').strip():
             page_model = self.env['page.fm.page'].sudo()
             page_model.clear_all_token_cache()
             icp.set_param(page_model.PARAM_TOKEN_CHECK_STATUS, '')
@@ -558,7 +563,7 @@ class PancakeSyncDashboard(models.TransientModel):
     def action_check_access_token(self):
         self.ensure_one()
         self._write_configuration_params()
-        self.env['page.fm.page'].sudo()._check_main_access_token(access_token=(self.access_token or '').strip(), store=True)
+        self.env['page.fm.page'].sudo()._check_main_access_token(store=True)
         return self.action_reload_dashboard()
 
     def action_test_connection(self):
@@ -569,13 +574,13 @@ class PancakeSyncDashboard(models.TransientModel):
         self._write_configuration_params()
         page_model = self.env['page.fm.page'].sudo()
         result = page_model._load_pages_from_token(
-            access_token=(self.access_token or '').strip(),
+            access_token=None,
             store=True,
         )
         if result.get('status') != 'valid':
             raise UserError(result.get('message') or 'Không thể tải danh sách page từ Pancake.')
         page_model._prepare_page_tokens_from_main_token(
-            main_access_token=(self.access_token or '').strip(),
+            main_access_token=None,
             pages=result.get('loaded_pages', page_model.browse()),
         )
         return self.action_reload_dashboard()

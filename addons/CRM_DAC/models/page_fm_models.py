@@ -5,6 +5,7 @@ from odoo import models, fields, api, _
 from odoo.exceptions import UserError
 from datetime import datetime, timedelta
 from odoo.tools import DEFAULT_SERVER_DATETIME_FORMAT
+from ..security_utils import redact_pancake_secrets
 
 _logger = logging.getLogger(__name__)
 
@@ -217,7 +218,7 @@ class PageFmPage(models.Model):
         except requests.exceptions.RequestException as exc:
             result = {
                 'status': 'network_error',
-                'message': str(exc),
+                'message': redact_pancake_secrets(exc),
                 'page_count': 0,
                 'payload': {},
                 'checked_at': checked_at,
@@ -486,7 +487,7 @@ class PageFmPage(models.Model):
                 _logger.warning(f"Invalid cache time format for page {page_fm_id}, generating new token")
                 pass  # Invalid cache time, proceed to generate new token
         
-        generate_token_url = f"{PAGES_FM_API_V1_BASE_URL}/pages/{page_fm_id}/generate_page_access_token?access_token={main_access_token}&page_id={page_fm_id}"
+        generate_token_url = f"{PAGES_FM_API_V1_BASE_URL}/pages/{page_fm_id}/generate_page_access_token"
 
         try:
             # Retry logic với exponential backoff
@@ -500,7 +501,8 @@ class PageFmPage(models.Model):
             
             _logger.info(f"Generating NEW page token for {page_fm_id}")
             response = requests.post(
-                generate_token_url, 
+                generate_token_url,
+                params={'access_token': main_access_token, 'page_id': page_fm_id},
                 headers={'Content-Type': 'application/json', 'Accept': 'application/json'}, 
                 timeout=30  # Tăng từ 10s lên 30s
             )
@@ -519,7 +521,7 @@ class PageFmPage(models.Model):
                     _job_log('success', f"[{self.name}] Tạo lại page token thành công sau {retry_count} lần thử.")
                 return token
             
-            error_msg = data.get('message', 'Unknown error')
+            error_msg = redact_pancake_secrets(data.get('message', 'Unknown error'))
             _logger.error(f"Failed to generate page token for {page_fm_id}: {error_msg}")
             
             # Chỉ retry với lỗi token thực sự có thể hồi phục.
@@ -534,17 +536,20 @@ class PageFmPage(models.Model):
             
         except (requests.exceptions.ConnectTimeout, requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
             if retry_count < max_retries:
-                _logger.warning(f"Network error for page {page_fm_id}, retry {retry_count + 1}/{max_retries}: {e}")
-                _job_log('warning', f"[{self.name}] Lỗi mạng khi tạo token trang: {e}. Đang retry {retry_count + 1}/{max_retries}.")
+                safe_error = redact_pancake_secrets(e)
+                _logger.warning(f"Network error for page {page_fm_id}, retry {retry_count + 1}/{max_retries}: {safe_error}")
+                _job_log('warning', f"[{self.name}] Lỗi mạng khi tạo token trang: {safe_error}. Đang retry {retry_count + 1}/{max_retries}.")
                 return self._generate_page_specific_access_token(main_access_token, retry_count + 1, max_retries, job=job)
             else:
-                _logger.error(f"Max retries exceeded for page {page_fm_id}: {e}")
-                _job_log('error', f"[{self.name}] Hết số lần retry tạo token trang: {e}")
+                safe_error = redact_pancake_secrets(e)
+                _logger.error(f"Max retries exceeded for page {page_fm_id}: {safe_error}")
+                _job_log('error', f"[{self.name}] Hết số lần retry tạo token trang: {safe_error}")
                 return None
                 
         except Exception as e:
-            _logger.error(f"Error generating page token for {page_fm_id}: {e}", exc_info=True)
-            _job_log('error', f"[{self.name}] Lỗi tạo token trang: {e}")
+            safe_error = redact_pancake_secrets(e)
+            _logger.error(f"Error generating page token for {page_fm_id}: {safe_error}")
+            _job_log('error', f"[{self.name}] Lỗi tạo token trang: {safe_error}")
             return None
 
     def clear_token_cache(self):
@@ -737,7 +742,7 @@ class PageFmPage(models.Model):
                         #_logger.info(f"✅ Synced {len(odoo_tag_ids)} tags to new partner {new_conv.partner_id.name}")
                         
             except Exception as e:
-                _logger.error(f"Error C/U conversation FM ID {conv_fm_id} for page {self.page_fm_id_str}: {e}", exc_info=True)
+                _logger.error(f"Error C/U conversation FM ID {conv_fm_id} for page {self.page_fm_id_str}: {redact_pancake_secrets(e)}")
                 
         #_logger.info(f"Conversations for page {self.page_fm_id_str}: {created_count} created, {updated_count} updated.")
         self.invalidate_recordset(['conversation_count'])
@@ -1071,7 +1076,7 @@ class PageFmPage(models.Model):
             _logger.info("Full Page.fm sync completed successfully for selected pages.")
             return True
         except Exception as e:
-            _logger.error(f"Error during selected Page.fm sync: {e}", exc_info=True)
+            _logger.error(f"Error during selected Page.fm sync: {redact_pancake_secrets(e)}")
             return False
 
     @api.model
@@ -1318,7 +1323,7 @@ class PageFmPage(models.Model):
                 }
             }
         except Exception as e:
-            _logger.error(f"Error generating page token cache: {e}")
+            _logger.error(f"Error generating page token cache: {redact_pancake_secrets(e)}")
             return {
                 'type': 'ir.actions.client',
                 'tag': 'display_notification',

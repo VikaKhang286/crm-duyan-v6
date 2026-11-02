@@ -44,8 +44,9 @@ class ResConfigSettings(models.TransientModel):
         values = self._dashboard_service()._build_dashboard_values()
         bulk_values = self._bulk_dashboard_service()._build_dashboard_values()
         res.update({
-            'access_token': values.get('access_token', ''),
-            'webhook_secret': values.get('webhook_secret', ''),
+            # Credentials are write-only and must never be returned to the web client.
+            'access_token': '',
+            'webhook_secret': '',
             'token_check_status': values.get('token_check_status', False),
             'token_check_message': values.get('token_check_message', False),
             'token_check_at': values.get('token_check_at', False),

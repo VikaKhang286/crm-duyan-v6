@@ -37,6 +37,7 @@
     'data': [
         'security/user_access.xml',
         'security/ir.model.access.csv',
+        'security/workflow_review_preference_rules.xml',
         'security/sale_order_access_rules.xml',
         'security/account_access_rules.xml',
         'security/dac_work_task_access_rules.xml',

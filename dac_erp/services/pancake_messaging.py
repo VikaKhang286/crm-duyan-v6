@@ -17,6 +17,7 @@ import json
 import logging
 
 import requests
+from ..security_utils import redact_pancake_secrets
 
 
 _logger = logging.getLogger(__name__)
@@ -84,7 +85,7 @@ def send_pancake_message(env, conversation, text, attachment_urls=None):
         return {
             'ok': False,
             'error_code': 'token_generation_failed',
-            'error_message': str(exc),
+            'error_message': redact_pancake_secrets(exc),
         }
     if not page_token:
         return {
@@ -129,14 +130,15 @@ def send_pancake_message(env, conversation, text, attachment_urls=None):
             timeout=SEND_MESSAGE_TIMEOUT,
         )
     except requests.exceptions.RequestException as exc:
-        _logger.warning("Pancake send_message network error: %s", exc)
+        safe_error = redact_pancake_secrets(exc)
+        _logger.warning("Pancake send_message network error: %s", safe_error)
         return {
             'ok': False,
             'error_code': 'network_error',
-            'error_message': str(exc),
+            'error_message': safe_error,
         }
 
-    raw = (response.text or '')[:4000]
+    raw = redact_pancake_secrets(response.text or '')[:4000]
     if not (200 <= response.status_code < 300):
         return {
             'ok': False,

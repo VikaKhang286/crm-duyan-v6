@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 from odoo.tools import DEFAULT_SERVER_DATETIME_FORMAT
 import time
 import odoo
+from ..security_utils import redact_pancake_secrets
 
 _logger = logging.getLogger(__name__)
 
@@ -42,7 +43,7 @@ def sync_one_conversation(conv_id, dbname):
                 conv.action_sync_messages()
                 cr.commit()
     except Exception as e:
-        _logger.error(f"Lỗi khi sync hội thoại {conv_id}: {e}")
+        _logger.error(f"Lỗi khi sync hội thoại {conv_id}: {redact_pancake_secrets(e)}")
 
 
 
@@ -339,7 +340,7 @@ class PageFmConversation(models.Model):
             return None, "API không hỗ trợ GET tags của conversation cụ thể"
 
         except Exception as e:
-            _logger.error(f"🔍 DEBUG: Unexpected error: {e}", exc_info=True)
+            _logger.error(f"🔍 DEBUG: Unexpected error: {redact_pancake_secrets(e)}")
             return None, f"Lỗi kết nối: {str(e)}"
 
     def _get_tag_by_code(self, code):
@@ -425,7 +426,7 @@ class PageFmConversation(models.Model):
             'tag_fm_id': tag.tag_fm_id,
             'ok': ok,
             'status_code': response.status_code,
-            'response_text': (response.text or '')[:300],
+            'response_text': redact_pancake_secrets(response.text or '')[:300],
         }
 
     def _ai_replace_tags_by_codes(
@@ -704,7 +705,7 @@ class PageFmConversation(models.Model):
                     # else:
                     #     _logger.warning(f"AUTO SYNC: Không thể gỡ tag cũ: {remove_response.status_code} - {remove_response.text}")
                 except Exception as e:
-                    _logger.warning(f"AUTO SYNC: Lỗi khi gỡ tag cũ: {e}")
+                    _logger.warning(f"AUTO SYNC: Lỗi khi gỡ tag cũ: {redact_pancake_secrets(e)}")
 
             # Thêm tag mới
             add_data = {
@@ -724,17 +725,17 @@ class PageFmConversation(models.Model):
                 _logger.info(f"✓ AUTO SYNC: Đã sync tag '{tag_name}' (ID: {tag_id}) cho conversation {conversation_id} lên Pancake")
                 return True
             else:
-                _logger.warning(f"AUTO SYNC: API Pancake trả về lỗi {response.status_code}: {response.text}")
+                _logger.warning(f"AUTO SYNC: API Pancake trả về lỗi {response.status_code}: {redact_pancake_secrets(response.text)}")
                 return False
 
         except requests.exceptions.Timeout:
             _logger.warning(f"AUTO SYNC: Timeout khi sync tags cho conversation {self.conversation_fm_id}")
             return False
         except requests.exceptions.RequestException as e:
-            _logger.warning(f"AUTO SYNC: Lỗi request khi sync tags: {e}")
+            _logger.warning(f"AUTO SYNC: Lỗi request khi sync tags: {redact_pancake_secrets(e)}")
             return False
         except Exception as e:
-            _logger.error(f"AUTO SYNC: Lỗi không mong đợi khi sync tags: {e}", exc_info=True)
+            _logger.error(f"AUTO SYNC: Lỗi không mong đợi khi sync tags: {redact_pancake_secrets(e)}")
             return False
 
     def action_sync_pancake_tags_manual(self):
@@ -825,11 +826,11 @@ class PageFmConversation(models.Model):
                             _logger.info(f"✓ Đã gỡ tag '{tag_name}' (ID: {tag_id}) cho conversation {conversation_id}")
                         else:
                             error_count += 1
-                            _logger.warning(f"Lỗi gỡ tag '{tag_name}': {response.status_code} - {response.text}")
+                            _logger.warning(f"Lỗi gỡ tag '{tag_name}': {response.status_code} - {redact_pancake_secrets(response.text)}")
                             
                     except Exception as e:
                         error_count += 1
-                        _logger.error(f"Lỗi gỡ tag '{tag_name}': {e}")
+                        _logger.error(f"Lỗi gỡ tag '{tag_name}': {redact_pancake_secrets(e)}")
             else:
                 # Sync từng tag được chọn
                 for tag in self.pancake_tag_ids:
@@ -910,7 +911,7 @@ class PageFmConversation(models.Model):
                 }
                 
         except Exception as e:
-            _logger.error(f"Lỗi sync pancake tags: {e}", exc_info=True)
+            _logger.error(f"Lỗi sync pancake tags: {redact_pancake_secrets(e)}")
             return {
                 'type': 'ir.actions.client',
                 'tag': 'display_notification',
@@ -1025,7 +1026,7 @@ class PageFmConversation(models.Model):
                     })
                     #_logger.info(f"✅ Synced {len(record.pancake_tag_ids)} tags to partner {record.partner_id.name}")
                 except Exception as e:
-                    _logger.error(f"Lỗi sync tags to partner: {e}", exc_info=True)
+                    _logger.error(f"Lỗi sync tags to partner: {redact_pancake_secrets(e)}")
 
     # (tuỳ chọn) auto gợi ý trạng thái dựa vào unread/last message
     def apply_status_rule(self):
@@ -1373,7 +1374,8 @@ class PageFmConversation(models.Model):
                 return (should_continue, filtered_msgs)
                 
             except requests.exceptions.Timeout as e:
-                _logger.warning(f"Timeout fetching messages (attempt {attempt + 1}/{max_retries}): {e}")
+                safe_error = redact_pancake_secrets(e)
+                _logger.warning(f"Timeout fetching messages (attempt {attempt + 1}/{max_retries}): {safe_error}")
                 if attempt == max_retries - 1:
                     _logger.error(f"Final timeout for conversation {conv_fm_id} after {max_retries} attempts")
                     raise RuntimeError(
@@ -1388,17 +1390,19 @@ class PageFmConversation(models.Model):
                         time.sleep(5 * (attempt + 1))  # Longer delay for rate limits
                         continue
                 
-                _logger.error(f"Request error fetching messages (attempt {attempt + 1}): {e}")
+                safe_error = redact_pancake_secrets(e)
+                _logger.error(f"Request error fetching messages (attempt {attempt + 1}): {safe_error}")
                 if attempt == max_retries - 1:
                     raise RuntimeError(
-                        f"Request error fetching messages for conversation {conv_fm_id}: {e}"
+                        f"Request error fetching messages for conversation {conv_fm_id}: {safe_error}"
                     ) from e
                     
             except Exception as e:
-                _logger.error(f"Unexpected error fetching messages (attempt {attempt + 1}): {e}", exc_info=True)
+                safe_error = redact_pancake_secrets(e)
+                _logger.error(f"Unexpected error fetching messages (attempt {attempt + 1}): {safe_error}")
                 if attempt == max_retries - 1:
                     raise RuntimeError(
-                        f"Unexpected error fetching messages for conversation {conv_fm_id}: {e}"
+                        f"Unexpected error fetching messages for conversation {conv_fm_id}: {safe_error}"
                     ) from e
 
         raise RuntimeError(f"Unable to fetch messages for conversation {conv_fm_id}.")
@@ -1458,7 +1462,7 @@ class PageFmConversation(models.Model):
                 _logger.warning(f"Failed to fetch conversation {self.conversation_fm_id}: {response.status_code}")
                 return None
         except Exception as e:
-            _logger.error(f"Error fetching conversation {self.conversation_fm_id}: {e}")
+            _logger.error(f"Error fetching conversation {self.conversation_fm_id}: {redact_pancake_secrets(e)}")
             return None
 
     
@@ -1583,7 +1587,7 @@ class PageFmConversation(models.Model):
                     
             except Exception as e:
                 customer_name = getattr(conv, 'customer_name_fm', None) or getattr(conv, 'name', None) or f"Conversation {conv.id}"
-                _logger.error(f"Lỗi khi sync hội thoại {conv.id} ({customer_name}): {e}")
+                _logger.error(f"Lỗi khi sync hội thoại {conv.id} ({customer_name}): {redact_pancake_secrets(e)}")
                 error_count += 1
                 consecutive_errors += 1
                 self.env.cr.rollback()
@@ -1949,7 +1953,7 @@ class PageFmConversation(models.Model):
                     else:
                         _logger.info(f"ℹ️ No assignees from API for conversation {record.conversation_fm_id}")
             except Exception as e:
-                _logger.error(f"❌ Error syncing assignees for conversation {record.id}: {e}", exc_info=True)
+                _logger.error(f"❌ Error syncing assignees for conversation {record.id}: {redact_pancake_secrets(e)}")
 
             # Tự động cập nhật require_processing sau khi sync tin nhắn
             try:
@@ -2739,7 +2743,7 @@ class PageFmConversation(models.Model):
                 time.sleep(0.5)
                 
             except Exception as e:
-                _logger.error(f"[{priority_label}] Error syncing conversation {conv.id}: {e}")
+                _logger.error(f"[{priority_label}] Error syncing conversation {conv.id}: {redact_pancake_secrets(e)}")
                 error_count += 1
                 self.env.cr.rollback()
         
@@ -3465,7 +3469,7 @@ class PageFmConversation(models.Model):
                         }
                     }
                 except Exception as e:
-                    _logger.error(f"Error refreshing conversation {record.conversation_fm_id}: {e}")
+                    _logger.error(f"Error refreshing conversation {record.conversation_fm_id}: {redact_pancake_secrets(e)}")
                     return {
                         'type': 'ir.actions.client',
                         'tag': 'display_notification',
@@ -3526,7 +3530,7 @@ class PageFmConversation(models.Model):
                     'context': self.env.context,
                 }
             except Exception as e:
-                _logger.error(f"Lỗi khi sync tin nhắn cho conversation {record.id}: {e}")
+                _logger.error(f"Lỗi khi sync tin nhắn cho conversation {record.id}: {redact_pancake_secrets(e)}")
                 return {
                     'type': 'ir.actions.client',
                     'tag': 'display_notification', 
@@ -3585,8 +3589,9 @@ class PageFmConversation(models.Model):
                 }
             }
         except Exception as e:
-            _logger.error(f"Error syncing tags: {e}", exc_info=True)
-            raise UserError(f"Lỗi khi sync tags: {e}")
+            safe_error = redact_pancake_secrets(e)
+            _logger.error(f"Error syncing tags: {safe_error}")
+            raise UserError(f"Lỗi khi sync tags: {safe_error}")
 
     def action_sync_all_conversations_force(self):
         """Force sync ALL conversations without any filters"""
@@ -3637,7 +3642,7 @@ class PageFmConversation(models.Model):
                     
             except Exception as e:
                 customer_name = getattr(conv, 'customer_name_fm', None) or f"Conversation {conv.id}"
-                _logger.error(f"FORCE SYNC outer error for conversation {conv.id} ({customer_name}): {e}")
+                _logger.error(f"FORCE SYNC outer error for conversation {conv.id} ({customer_name}): {redact_pancake_secrets(e)}")
                 error_count += 1
                 self.env.cr.rollback()
         

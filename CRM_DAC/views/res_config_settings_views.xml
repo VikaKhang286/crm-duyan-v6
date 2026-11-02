@@ -28,7 +28,7 @@
                             <setting id="crm_dac_pancake_token_entry"
                                      string="Access Token Pancake"
                                      help="Dán Public API access token từ Pancake để Odoo có thể kiểm tra token và tải danh sách Page.">
-                                <field name="access_token" placeholder="Nhập access token từ Pancake..."/>
+                                <field name="access_token" password="True" placeholder="Để trống để giữ token hiện tại..."/>
                             </setting>
                             <setting id="crm_dac_pancake_token_status"
                                      string="Trạng thái token"

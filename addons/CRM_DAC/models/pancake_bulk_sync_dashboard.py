@@ -670,7 +670,8 @@ class PancakeBulkSyncDashboard(models.TransientModel):
             'preset': preset,
             'preset_name': preset.name if preset else False,
             'preset_description': preset.description if preset else False,
-            'access_token': icp.get_param(self.PARAM_ACCESS_TOKEN) or '',
+            # Credential input is write-only; expose only token_configured below.
+            'access_token': '',
             'sync_batch_size': self._get_int_param(self.PARAM_BATCH_SIZE, preset.sync_batch_size if preset else 50),
             'smart_recent_days': self._get_int_param(self.PARAM_SMART_RECENT_DAYS, preset.smart_recent_days if preset else 3),
             'deep_recent_days': self._get_int_param(self.PARAM_DEEP_RECENT_DAYS, preset.deep_recent_days if preset else 7),
@@ -838,16 +839,18 @@ class PancakeBulkSyncDashboard(models.TransientModel):
         self.ensure_one()
         icp = self._get_icp()
         old_token = (icp.get_param(self.PARAM_ACCESS_TOKEN) or '').strip()
-        new_token = (self.access_token or '').strip()
-        icp.set_param(self.PARAM_ACCESS_TOKEN, new_token)
-        icp.set_param(self.PARAM_ACCESS_TOKEN_COMPAT, new_token)
+        submitted_token = (self.access_token or '').strip()
+        new_token = submitted_token or old_token
+        if submitted_token:
+            icp.set_param(self.PARAM_ACCESS_TOKEN, submitted_token)
+            icp.set_param(self.PARAM_ACCESS_TOKEN_COMPAT, submitted_token)
         icp.set_param(self.PARAM_BATCH_SIZE, str(self.sync_batch_size))
         icp.set_param(self.PARAM_SMART_RECENT_DAYS, str(self.smart_recent_days))
         icp.set_param(self.PARAM_DEEP_RECENT_DAYS, str(self.deep_recent_days))
         icp.set_param(self.PARAM_CIRCUIT_BREAKER_MINUTES, str(self.circuit_breaker_pause_minutes))
         icp.set_param(self.PARAM_STALE_TIMEOUT_MINUTES, str(self.stale_timeout_minutes))
         icp.set_param(self.PARAM_PRESET_ID, str(self.preset_id.id if self.preset_id else 0))
-        if old_token != new_token:
+        if submitted_token and old_token != new_token:
             self.env['page.fm.page'].sudo().clear_all_token_cache()
 
     def _write_runner_configuration(self):
@@ -943,7 +946,7 @@ class PancakeBulkSyncDashboard(models.TransientModel):
         self._validate_configuration()
         self._sync_page_line_selection_to_pages()
         self._write_configuration_params()
-        self.env['page.fm.page'].sudo()._check_main_access_token(access_token=self.access_token or None, store=True)
+        self.env['page.fm.page'].sudo()._check_main_access_token(store=True)
         self.write(self._build_dashboard_values())
         return {'type': 'ir.actions.client', 'tag': 'reload'}
 
@@ -953,11 +956,11 @@ class PancakeBulkSyncDashboard(models.TransientModel):
         self._sync_page_line_selection_to_pages()
         self._write_configuration_params()
         page_model = self.env['page.fm.page'].sudo()
-        result = page_model._load_pages_from_token(access_token=self.access_token or None, store=True)
+        result = page_model._load_pages_from_token(access_token=None, store=True)
         if result.get('status') != 'valid':
             raise UserError(result.get('message') or _('Không thể tải page từ Pancake.'))
         page_model._prepare_page_tokens_from_main_token(
-            main_access_token=self.access_token or None,
+            main_access_token=None,
             pages=result.get('loaded_pages', page_model.browse()),
         )
         self.write(self._build_dashboard_values())

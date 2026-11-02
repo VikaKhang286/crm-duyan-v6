@@ -126,7 +126,7 @@
                                 <group string="Thiết lập vận hành">
                                     <group>
                                         <label for="access_token"/>
-                                        <field name="access_token" placeholder="Nhập main access token từ Pancake..."/>
+                                        <field name="access_token" password="True" placeholder="Để trống để giữ token hiện tại..."/>
                                         <div class="text-muted">Main access token dùng để lấy catalog page và tự sinh page access token theo từng page.</div>
 
                                         <label for="sync_batch_size"/>

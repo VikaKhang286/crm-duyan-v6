@@ -54,7 +54,50 @@ class SaleOrder(models.Model):
         ('installation', 'Thi công - lắp đặt'),
         ('delivery', 'Giao hàng'),
         ('completed', 'Hoàn thành'),
-    ], string='Bước đang xem', default='quotation', copy=False)
+    ], string='Bước đang xem', compute='_compute_workflow_review_state',
+        inverse='_inverse_workflow_review_state', store=False, copy=False)
+
+    @api.depends('order_state_custom')
+    @api.depends_context('uid')
+    def _compute_workflow_review_state(self):
+        """Load review mode from the current user's private preference."""
+        saved_states = {}
+        persisted_orders = self.filtered('id')
+        if persisted_orders:
+            preferences = self.env['dac.workflow.review.preference'].search([
+                ('order_id', 'in', persisted_orders.ids),
+                ('user_id', '=', self.env.uid),
+            ])
+            saved_states = {
+                preference.order_id.id: preference.review_state
+                for preference in preferences
+            }
+        for order in self:
+            order.workflow_review_state = (
+                saved_states.get(order.id)
+                or (order.order_state_custom if order.order_state_custom != 'cancel' else 'quotation')
+            )
+
+    def _inverse_workflow_review_state(self):
+        """Persist review mode per user, never on the shared sale order."""
+        Preference = self.env['dac.workflow.review.preference']
+        for order in self.filtered('id'):
+            preference = Preference.search([
+                ('order_id', '=', order.id),
+                ('user_id', '=', self.env.uid),
+            ], limit=1)
+            review_state = order.workflow_review_state
+            current_state = order.order_state_custom
+            if not review_state or review_state == current_state:
+                preference.unlink()
+            elif preference:
+                preference.review_state = review_state
+            else:
+                Preference.create({
+                    'order_id': order.id,
+                    'user_id': self.env.uid,
+                    'review_state': review_state,
+                })
 
     date = fields.Datetime(string='Ngày đơn hàng', default=fields.Datetime.now)
     delivery_date = fields.Date(
@@ -504,13 +547,6 @@ class SaleOrder(models.Model):
         """Override write để trigger kiểm tra deposit khi cần"""
         if 'phone' in vals:
             self._validate_customer_phone(vals.get('phone'))
-        if (
-            'order_state_custom' in vals
-            and vals['order_state_custom'] != 'cancel'
-            and 'workflow_review_state' not in vals
-        ):
-            vals['workflow_review_state'] = vals['order_state_custom']
-
         # workflow_review_state is presentation-only: users may inspect a
         # completed step, but must never open (and persist) a future one by
         # clicking the statusbar.  Keep this server-side guard in addition to
@@ -556,6 +592,13 @@ class SaleOrder(models.Model):
 
         # 3) Gọi super() viết dữ liệu
         result = super().write(vals)
+
+        if 'order_state_custom' in vals:
+            # A real workflow transition invalidates every user's presentation-only
+            # review preference. sudo is required to clear other users' private rows.
+            self.env['dac.workflow.review.preference'].sudo().search([
+                ('order_id', 'in', self.ids),
+            ]).unlink()
 
         # Khi bắt đầu flow Giao hàng, mặc định COD bằng số tiền còn phải thu
         # nếu đơn đã thực nhận cọc. Không ghi đè COD được nhập rõ ràng/thủ công.
@@ -715,11 +758,6 @@ class SaleOrder(models.Model):
                 vals['design_assigned_date'] = fields.Date.context_today(self)
             if not vals.get('is_priority'):
                 vals['is_priority_today'] = False
-            review_state = vals.get('order_state_custom', 'quotation')
-            vals.setdefault(
-                'workflow_review_state',
-                review_state if review_state != 'cancel' else 'quotation',
-            )
         records = super().create(vals_list)
         for rec, vals in zip(records, vals_list):
             if (self.env.context.get('import_file')

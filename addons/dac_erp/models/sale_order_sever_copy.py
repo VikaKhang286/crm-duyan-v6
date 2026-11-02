@@ -33,6 +33,7 @@ from datetime import datetime
 from odoo.exceptions import UserError
 import os
 import json
+from ..security_utils import redact_pancake_secrets
 
 from odoo.tools import DEFAULT_SERVER_DATETIME_FORMAT
 
@@ -366,11 +367,16 @@ class SaleOrderInherit(models.Model):
             limit_per_page = 50
 
         while True:
-            api_url = f"https://pos.pages.fm/api/v1/shops/{shop_id}/orders?api_key={api_key}&page_size={limit_per_page}&page_number={current_page}"
-            _logger.info(f"Calling Pancake API (Page {current_page}): {api_url.replace(api_key, '***REDACTED***')}")
+            api_url = f"https://pos.pages.fm/api/v1/shops/{shop_id}/orders"
+            request_params = {
+                'api_key': api_key,
+                'page_size': limit_per_page,
+                'page_number': current_page,
+            }
+            _logger.info("Calling Pancake API (Page %s): %s", current_page, api_url)
 
             try:
-                response = requests.get(api_url, timeout=120)
+                response = requests.get(api_url, params=request_params, timeout=120)
                 response.raise_for_status()
                 page_data = response.json()
             except requests.exceptions.Timeout:
@@ -378,11 +384,13 @@ class SaleOrderInherit(models.Model):
                 self.env.cr.commit() # Commit những gì đã xử lý trước đó
                 raise UserError(_("Pancake API call timed out for page %s. Processed orders before timeout have been saved.") % current_page)
             except requests.exceptions.RequestException as e:
-                _logger.error(f"API call failed for page {current_page}: {e}")
+                safe_error = redact_pancake_secrets(e)
+                _logger.error(f"API call failed for page {current_page}: {safe_error}")
                 self.env.cr.commit()
-                raise UserError(_("Failed to connect to Pancake API on page %s: %s. Processed orders before error have been saved.") % (current_page, e))
+                raise UserError(_("Failed to connect to Pancake API on page %s: %s. Processed orders before error have been saved.") % (current_page, safe_error))
             except ValueError as e: # JSONDecodeError
-                _logger.error(f"Failed to decode JSON response for page {current_page}: {e}. Response text: {response.text[:500]}")
+                safe_response = redact_pancake_secrets(response.text or '')[:500]
+                _logger.error(f"Failed to decode JSON response for page {current_page}: {e}. Response text: {safe_response}")
                 self.env.cr.commit()
                 raise UserError(_("Failed to parse response from Pancake API on page %s: %s. Processed orders before error have been saved.") % (current_page, e))
 

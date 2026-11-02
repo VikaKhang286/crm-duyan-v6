@@ -85,8 +85,8 @@
                             <page string="Truy cập Pancake">
                                 <group>
                                     <group>
-                                        <field name="access_token" placeholder="Nhập main access token từ Pancake..."/>
-                                        <field name="webhook_secret" placeholder="Webhook secret dự phòng nếu cần dùng về sau..."/>
+                                        <field name="access_token" password="True" placeholder="Để trống để giữ token hiện tại..."/>
+                                        <field name="webhook_secret" password="True" placeholder="Để trống để giữ secret hiện tại..."/>
                                     </group>
                                     <group>
                                         <field name="token_check_message" readonly="1" widget="text"/>
