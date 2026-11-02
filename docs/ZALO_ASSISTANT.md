@@ -1,4 +1,4 @@
-# Trợ lý DAC qua Zalo — giai đoạn 1
+# Trợ lý DAC qua Zalo
 
 Addon `dac_zalo_assistant` và dịch vụ `services/zalo-bridge` tạo kênh chat
 giữa nhân viên và tài khoản cá nhân “tro ly DAC”. Phần này phát triển riêng,
@@ -100,7 +100,7 @@ thật trong mã. HTTP không có TLS chỉ phù hợp mạng Docker riêng ho�
   thống nhất thời hạn lưu khi triển khai chính thức. Sao lưu volume cookie
   và database phải được bảo vệ như thông tin đăng nhập.
 
-Thông báo công việc tự động chưa bật trong giai đoạn này. Đề xuất cho giai
-đoạn sau: [ZALO_NOTIFICATION_IDEAS.md](ZALO_NOTIFICATION_IDEAS.md).
+Thông báo nghiệp vụ đã được triển khai, có bật/tắt chung và theo từng nhân
+viên. Nâng cấp addon rồi chọn các nhóm cần nhận; hướng dẫn chi tiết: [ZALO_NOTIFICATION_IDEAS.md](ZALO_NOTIFICATION_IDEAS.md).
 
 Kết quả và cách chạy kiểm thử: [ZALO_VALIDATION.md](ZALO_VALIDATION.md).

@@ -14,19 +14,23 @@ root = Path('/mnt/extra-addons')
 for module in ('dac_erp', 'CRM_DAC', 'dac_report'):
     for path in (root / module / 'views').glob('*.xml'):
         tree = etree.parse(str(path))
-        for node in tree.xpath('//menuitem[@id] | //record[@model="ir.actions.client"]'):
+        for node in tree.xpath('//menuitem[@id] | //record[@model="ir.actions.client"] | //record[@model="ir.actions.server"]'):
             name = node.get('id')
             if '.' in name or env.ref(module + '.' + name, raise_if_not_found=False):  # noqa: F821
                 continue
             if node.tag == 'menuitem':
                 model = 'ir.ui.menu'
                 values = {'name': node.get('name') or name}
-            else:
+            elif node.get('model') == 'ir.actions.client':
                 tag = node.find('field[@name="tag"]')
                 if tag is None or not tag.text:
                     continue
                 model = 'ir.actions.client'
                 values = {'name': 'Test prerequisite ' + name, 'tag': tag.text}
+            else:
+                model = 'ir.actions.server'
+                values = {'name': 'Test prerequisite ' + name, 'state': 'code', 'code': 'action = None',
+                    'model_id': env['ir.model']._get_id('res.users')}  # noqa: F821
             record = env[model].create(values)  # noqa: F821
             env['ir.model.data'].create({  # noqa: F821
                 'module': module, 'name': name, 'model': model, 'res_id': record.id,

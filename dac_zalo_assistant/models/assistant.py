@@ -305,7 +305,8 @@ class ZaloMessage(models.Model):
                 ('direction', '=', 'out'), ('external_message_id', '=', event['message_id'])]):
                 continue
             state = 'sent' if direction == 'out' else 'received'
-            if direction == 'in' and not match and not historical and config.ai_enabled and (text.startswith('/ai ') or config.ai_auto_reply) and not text.startswith('/congviec') and not text.startswith('/trogiup'):
+            notification_command = self.env['dac.zalo.preference']._chat_command(binding, text) if direction == 'in' and not match and not historical else False
+            if direction == 'in' and not match and not historical and not notification_command and config.ai_enabled and (text.startswith('/ai ') or config.ai_auto_reply) and not text.startswith('/congviec') and not text.startswith('/trogiup'):
                 state = 'ai_pending'
             message = self.create({'conversation_id': conversation.id, 'event_key': key,
                 'external_message_id': event['message_id'], 'text': text, 'direction': direction, 'state': state})
@@ -314,12 +315,14 @@ class ZaloMessage(models.Model):
                 continue
             if historical:
                 continue
-            if match:
+            if notification_command:
+                answer = notification_command
+            elif match:
                 answer = 'Đã liên kết với %s. Dùng /congviec để xem việc của bạn, /ai <câu hỏi> để hỏi AI.' % binding.user_id.name
             elif text.strip() == '/congviec':
                 answer = binding._task_summary()
             elif text.strip() == '/trogiup':
-                answer = '/congviec: công việc của bạn\n/ai <câu hỏi>: hỏi AI\nHủy liên kết: vào Odoo → Trợ lý Zalo → Liên kết của tôi.'
+                answer = '/congviec: công việc của bạn\n/ai <câu hỏi>: hỏi AI\n/tat-thongbao hoặc /bat-thongbao\n/tam-dung 60: dừng thông báo 60 phút\n/tiep-tuc: nhận lại thông báo\nChọn từng nhóm tại Odoo → Trợ lý Zalo → Thông báo của tôi.\nHủy liên kết tại Liên kết của tôi.'
             elif text.startswith('/ai') and not config.ai_enabled:
                 answer = 'AI chưa được admin bật. Bạn vẫn có thể dùng /congviec.'
             else:
@@ -340,7 +343,7 @@ class ZaloMessage(models.Model):
                 with self.env.cr.savepoint():
                     binding = message.conversation_id.binding_id
                     if binding.state != 'linked' or binding.zalo_uid != message.conversation_id.zalo_uid or not binding.user_id.active or binding.user_id.share:
-                        message.write({'state': 'failed', 'error_message': 'Liên kết nhân viên không còn hiệu lực.'})
+                        message.write({'state': 'cancelled' if message.notification_id else 'failed', 'error_message': 'Liên kết nhân viên không còn hiệu lực.'})
                         continue
                     if message.state == 'ai_pending':
                         message._process_ai(config)
@@ -381,10 +384,14 @@ class ZaloMessage(models.Model):
         self.conversation_id._queue(answer, 'reply:%s' % self.id)
         self.write({'state': 'received', 'error_message': False, 'ai_processed': True})
 
+    def _bridge_request_id(self):
+        self.ensure_one()
+        return str(self.id)
+
     def _send(self, config):
         self.ensure_one()
         try:
-            result = config._bridge_request('/send', {'request_id': str(self.id),
+            result = config._bridge_request('/send', {'request_id': self._bridge_request_id(),
                 'account_id': config.assistant_uid, 'thread_id': self.conversation_id.zalo_uid, 'text': self.text})
         except UserError as error:
             attempts = self.attempts + 1
