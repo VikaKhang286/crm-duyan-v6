@@ -612,7 +612,9 @@
                     </div>
                 </xpath>
 
-                <xpath expr="//div[hasclass('dac-control-panel-tools')]" position="inside">
+                <!-- Render the flow-aware transition directly below the Save/New
+                     action group in the upper control-panel block. -->
+                <xpath expr="//div[hasclass('dac-control-panel-primary-actions')]" position="inside">
                     <div class="dac-v6-control-next-step"><span class="d-none"/></div>
                 </xpath>
 

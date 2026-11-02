@@ -150,6 +150,7 @@
   }
 
   .dac-control-panel-tools {
+    display: none;
     grid-area: tools;
     min-height: 58px;
     width: 100%;
@@ -438,7 +439,7 @@
 
   .o_web_client .o_control_panel.dac-sale-order-control-panel-active .dac-control-panel-top-row {
     display: grid !important;
-    grid-template-columns: minmax(0, 1fr) minmax(420px, 540px) minmax(0, 0.75fr) !important;
+    grid-template-columns: minmax(0, 1fr) minmax(420px, 500px) minmax(0, 1fr) !important;
     grid-template-areas: "title progress primary" !important;
   }
 
@@ -3379,16 +3380,20 @@
   border-color: var(--dac-order-primary) !important;
 }
 
-.o_web_client .dac-control-panel-tools .dac-v6-control-next-step {
-  order: 100;
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  min-width: 0;
-  margin-left: auto;
+.o_web_client .dac-control-panel-primary-actions {
+  flex-wrap: wrap;
 }
 
-.o_web_client .dac-control-panel-tools .dac-v6-control-next-step>div {
+.o_web_client .dac-control-panel-primary-actions .dac-v6-control-next-step {
+  order: 100;
+  display: flex;
+  flex: 0 0 100%;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.o_web_client .dac-control-panel-primary-actions .dac-v6-control-next-step>div {
   position: relative;
   display: flex;
   width: auto;
@@ -3401,7 +3406,7 @@
   background: transparent;
 }
 
-.o_web_client .dac-control-panel-tools .dac-v6-control-next-step .dac-v6-next-step-info {
+.o_web_client .dac-control-panel-primary-actions .dac-v6-control-next-step .dac-v6-next-step-info {
   position: absolute;
   top: -7px;
   right: -7px;
@@ -3421,7 +3426,7 @@
   font-size: 0;
 }
 
-.o_web_client .dac-control-panel-tools .dac-v6-control-next-step .dac-v6-next-step-info::before {
+.o_web_client .dac-control-panel-primary-actions .dac-v6-control-next-step .dac-v6-next-step-info::before {
   content: "i";
   font-family: Georgia, serif;
   font-size: 11px;
@@ -3430,27 +3435,27 @@
   line-height: 1;
 }
 
-.o_web_client .dac-control-panel-tools .dac-v6-control-next-step .dac-v6-next-step-info>* {
+.o_web_client .dac-control-panel-primary-actions .dac-v6-control-next-step .dac-v6-next-step-info>* {
   display: none !important;
 }
 
-.o_web_client .dac-control-panel-tools .dac-v6-control-next-step :is(.dac-v6-design-next-step--blocked, .dac-v6-production-next-step--blocked) .dac-v6-next-step-info {
+.o_web_client .dac-control-panel-primary-actions .dac-v6-control-next-step :is(.dac-v6-design-next-step--blocked, .dac-v6-production-next-step--blocked) .dac-v6-next-step-info {
   border-color: #ef6b80;
   background: #fff0f2;
   color: #b4233c;
 }
 
-.o_web_client .dac-control-panel-tools .dac-v6-control-next-step .btn {
+.o_web_client .dac-control-panel-primary-actions .dac-v6-control-next-step .btn {
   min-width: 0;
   min-height: 38px;
   padding: 8px 14px !important;
 }
 
-.o_web_client .dac-control-panel-tools .dac-v6-installation-next-step {
+.o_web_client .dac-control-panel-primary-actions .dac-v6-installation-next-step {
   display: flex;
 }
 
-.o_web_client .dac-control-panel-tools .dac-v6-installation-next-step>div {
+.o_web_client .dac-control-panel-primary-actions .dac-v6-installation-next-step>div {
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -3604,7 +3609,7 @@
 /* Read-only workflow review: clicking a milestone selects it for inspection
    without changing the real order state. */
 .o_web_client .dac-sale-order-control-panel-slot .dac-control-panel-progress .o_statusbar_status>.o_arrow_button[data-value] {
-  padding: 5px 10px !important;
+  padding: 5px 5px !important;
   border: 1px solid transparent !important;
   border-radius: 10px !important;
   cursor: pointer !important;
@@ -4718,6 +4723,7 @@
   }
 
   .o_web_client .dac-control-panel-tools {
+    display: none;
     grid-area: tools;
     width: 100%;
     min-height: 58px;
