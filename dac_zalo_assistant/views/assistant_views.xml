@@ -100,7 +100,8 @@
         <field name="name">dac.zalo.compose.wizard.form</field><field name="model">dac.zalo.compose.wizard</field>
         <field name="arch" type="xml"><form><group><field name="conversation_id" readonly="1"/><field name="text"/></group><footer><button name="action_send" type="object" string="Đưa vào hàng đợi gửi" class="btn-primary"/><button special="cancel" string="Hủy"/></footer></form></field>
     </record>
-    <menuitem id="menu_root" name="Trợ lý Zalo" sequence="12" groups="base.group_user"/>
+    <menuitem id="menu_root" name="Trợ lý Zalo" sequence="12" groups="base.group_user"
+              web_icon="dac_zalo_assistant,static/description/icon.png"/>
     <menuitem id="menu_link" name="Xác thực với trợ lý" parent="menu_root" action="link_action" sequence="1"/>
     <menuitem id="menu_binding" name="Liên kết của tôi" parent="menu_root" action="binding_action" sequence="2"/>
     <menuitem id="menu_conversations" name="Hội thoại" parent="menu_root" action="conversation_action" sequence="3"/>
