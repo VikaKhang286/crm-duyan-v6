@@ -1,0 +1,6 @@
+<odoo noupdate="1">
+    <record id="config_default" model="dac.zalo.config">
+        <field name="name">tro ly DAC</field>
+        <field name="active" eval="False"/>
+    </record>
+</odoo>

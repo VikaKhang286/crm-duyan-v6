@@ -1,0 +1,111 @@
+<odoo>
+    <record id="config_form" model="ir.ui.view">
+        <field name="name">dac.zalo.config.form</field>
+        <field name="model">dac.zalo.config</field>
+        <field name="arch" type="xml">
+            <form string="Trợ lý Zalo" create="0" delete="0">
+                <header>
+                    <button name="action_login" type="object" string="Đăng nhập Zalo bằng QR" class="btn-primary" groups="base.group_system"/>
+                    <button name="action_refresh" type="object" string="Lấy QR / cập nhật kết nối" groups="base.group_system"/>
+                    <button name="action_disconnect" type="object" string="Ngắt kết nối" groups="base.group_system" confirm="Ngừng trợ lý và xóa phiên đăng nhập lưu ở dịch vụ Zalo?"/>
+                    <field name="connection_state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <h1><field name="name"/></h1>
+                    <group>
+                        <group string="Kết nối">
+                            <field name="active" widget="boolean_toggle"/>
+                            <field name="assistant_uid"/>
+                            <field name="last_checked_at"/>
+                            <field name="bridge_url" groups="base.group_system"/>
+                            <field name="bridge_token" password="True" groups="base.group_system"/>
+                        </group>
+                        <group string="Quét bằng tài khoản tro ly DAC" groups="base.group_system">
+                            <field name="qr_image" widget="image" nolabel="1" invisible="not qr_image"/>
+                            <div class="text-muted">Bấm cập nhật để lấy mã QR. Quét và xác nhận trên điện thoại, sau đó cập nhật lần nữa. Mỗi tài khoản trợ lý chỉ chạy một phiên web.</div>
+                        </group>
+                    </group>
+                    <group string="AI tương thích OpenAI" groups="base.group_system">
+                        <field name="ai_enabled"/>
+                        <field name="ai_base_url" placeholder="https://nha-cung-cap.example/v1"/>
+                        <field name="ai_api_key" password="True"/>
+                        <field name="ai_model"/>
+                        <field name="ai_auto_reply"/>
+                        <field name="ai_include_tasks"/>
+                        <field name="ai_instructions"/>
+                        <button name="action_test_ai" type="object" string="Kiểm tra kết nối AI" invisible="not ai_enabled"/>
+                        <div class="text-muted">AI nhận các tin nhắn gần đây của hội thoại và công việc của chính người hỏi nếu được bật. Nhà cung cấp AI nhận dữ liệu này. Trợ lý chưa tự thay đổi đơn hàng hay thanh toán.</div>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="config_action" model="ir.actions.act_window">
+        <field name="name">Cấu hình trợ lý Zalo</field>
+        <field name="res_model">dac.zalo.config</field>
+        <field name="view_mode">form</field>
+        <field name="res_id" ref="config_default"/>
+    </record>
+    <record id="binding_list" model="ir.ui.view">
+        <field name="name">dac.zalo.binding.list</field><field name="model">dac.zalo.binding</field>
+        <field name="arch" type="xml">
+            <list create="0" delete="0"><field name="user_id"/><field name="zalo_uid"/><field name="state"/><field name="linked_at"/>
+                <button name="action_revoke" type="object" string="Hủy liên kết" invisible="state != 'linked'" confirm="Hủy liên kết Zalo? Trợ lý sẽ ngừng nhận và gửi tin nhắn cho liên kết này."/>
+            </list>
+        </field>
+    </record>
+    <record id="binding_action" model="ir.actions.act_window">
+        <field name="name">Liên kết của tôi</field><field name="res_model">dac.zalo.binding</field><field name="view_mode">list</field>
+        <field name="domain">[('user_id', '=', uid)]</field>
+    </record>
+    <record id="bindings_admin_action" model="ir.actions.act_window">
+        <field name="name">Liên kết nhân viên</field><field name="res_model">dac.zalo.binding</field><field name="view_mode">list</field>
+    </record>
+    <record id="link_form" model="ir.ui.view">
+        <field name="name">dac.zalo.link.wizard.form</field><field name="model">dac.zalo.link.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Liên kết Zalo của tôi"><group><field name="instructions" nolabel="1"/><field name="code" widget="CopyClipboardChar"/><field name="expires_at"/></group>
+                <footer><button name="action_generate" type="object" string="Tạo mã dùng một lần" class="btn-primary"/><button special="cancel" string="Đóng"/></footer>
+            </form>
+        </field>
+    </record>
+    <record id="link_action" model="ir.actions.act_window">
+        <field name="name">Xác thực với trợ lý</field><field name="res_model">dac.zalo.link.wizard</field><field name="view_mode">form</field><field name="target">new</field>
+    </record>
+    <record id="conversation_list" model="ir.ui.view">
+        <field name="name">dac.zalo.conversation.list</field><field name="model">dac.zalo.conversation</field>
+        <field name="arch" type="xml"><list create="0" delete="0"><field name="user_id"/><field name="zalo_uid"/><field name="last_message_at"/></list></field>
+    </record>
+    <record id="conversation_form" model="ir.ui.view">
+        <field name="name">dac.zalo.conversation.form</field><field name="model">dac.zalo.conversation</field>
+        <field name="arch" type="xml">
+            <form create="0" edit="0" delete="0"><header><button name="action_compose" type="object" string="Nhắn qua trợ lý" class="btn-primary"/></header>
+                <sheet><group><field name="user_id"/><field name="binding_id"/><field name="zalo_uid"/><field name="last_message_at"/></group>
+                    <field name="message_ids"><list create="0" edit="0" delete="0" default_order="create_date desc"><field name="create_date"/><field name="direction"/><field name="text"/><field name="state"/><field name="error_message" optional="hide"/></list></field>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="conversation_action" model="ir.actions.act_window">
+        <field name="name">Hội thoại với trợ lý</field><field name="res_model">dac.zalo.conversation</field><field name="view_mode">list,form</field>
+    </record>
+    <record id="message_list" model="ir.ui.view">
+        <field name="name">dac.zalo.message.list</field><field name="model">dac.zalo.message</field>
+        <field name="arch" type="xml"><list create="0" edit="0" delete="0"><field name="create_date"/><field name="user_id"/><field name="direction"/><field name="text"/><field name="state"/><field name="attempts"/><field name="error_message"/></list></field>
+    </record>
+    <record id="message_action" model="ir.actions.act_window">
+        <field name="name">Theo dõi tin nhắn</field><field name="res_model">dac.zalo.message</field><field name="view_mode">list</field>
+    </record>
+    <record id="compose_form" model="ir.ui.view">
+        <field name="name">dac.zalo.compose.wizard.form</field><field name="model">dac.zalo.compose.wizard</field>
+        <field name="arch" type="xml"><form><group><field name="conversation_id" readonly="1"/><field name="text"/></group><footer><button name="action_send" type="object" string="Đưa vào hàng đợi gửi" class="btn-primary"/><button special="cancel" string="Hủy"/></footer></form></field>
+    </record>
+    <menuitem id="menu_root" name="Trợ lý Zalo" sequence="12" groups="base.group_user"
+              web_icon="dac_zalo_assistant,static/description/icon.png"/>
+    <menuitem id="menu_link" name="Xác thực với trợ lý" parent="menu_root" action="link_action" sequence="1"/>
+    <menuitem id="menu_binding" name="Liên kết của tôi" parent="menu_root" action="binding_action" sequence="2"/>
+    <menuitem id="menu_conversations" name="Hội thoại" parent="menu_root" action="conversation_action" sequence="3"/>
+    <menuitem id="menu_messages" name="Theo dõi tin nhắn" parent="menu_root" action="message_action" groups="dac_erp.group_dac_erp_manager,base.group_system" sequence="4"/>
+    <menuitem id="menu_bindings_admin" name="Liên kết nhân viên" parent="menu_root" action="bindings_admin_action" groups="base.group_system" sequence="5"/>
+    <menuitem id="menu_config" name="Cấu hình" parent="menu_root" action="config_action" groups="base.group_system" sequence="10"/>
+</odoo>

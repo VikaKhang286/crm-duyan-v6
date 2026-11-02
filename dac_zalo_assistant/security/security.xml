@@ -1,0 +1,62 @@
+<odoo>
+    <record id="binding_own" model="ir.rule">
+        <field name="name">Zalo: liên kết của chính nhân viên</field>
+        <field name="model_id" ref="model_dac_zalo_binding"/>
+        <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+        <field name="domain_force">[('user_id', '=', user.id)]</field>
+    </record>
+    <record id="binding_admin" model="ir.rule">
+        <field name="name">Zalo: admin xem liên kết</field>
+        <field name="model_id" ref="model_dac_zalo_binding"/>
+        <field name="groups" eval="[(4, ref('base.group_system')), (4, ref('dac_erp.group_dac_erp_manager'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+    </record>
+    <record id="conversation_own" model="ir.rule">
+        <field name="name">Zalo: hội thoại của chính nhân viên</field>
+        <field name="model_id" ref="model_dac_zalo_conversation"/>
+        <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+        <field name="domain_force">[('user_id', '=', user.id)]</field>
+    </record>
+    <record id="conversation_manager" model="ir.rule">
+        <field name="name">Zalo: quản lý giám sát hội thoại trợ lý</field>
+        <field name="model_id" ref="model_dac_zalo_conversation"/>
+        <field name="groups" eval="[(4, ref('dac_erp.group_dac_erp_manager')), (4, ref('base.group_system'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+    </record>
+    <record id="message_own" model="ir.rule">
+        <field name="name">Zalo: tin nhắn của chính nhân viên</field>
+        <field name="model_id" ref="model_dac_zalo_message"/>
+        <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+        <field name="domain_force">[('user_id', '=', user.id)]</field>
+    </record>
+    <record id="message_manager" model="ir.rule">
+        <field name="name">Zalo: quản lý giám sát tin nhắn trợ lý</field>
+        <field name="model_id" ref="model_dac_zalo_message"/>
+        <field name="groups" eval="[(4, ref('dac_erp.group_dac_erp_manager')), (4, ref('base.group_system'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+    </record>
+    <record id="rule_pref_own" model="ir.rule">
+        <field name="name">Zalo: pref của chính mình</field>
+        <field name="model_id" ref="model_dac_zalo_preference"/>
+        <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+        <field name="domain_force">[('user_id', '=', user.id)]</field>
+    </record>
+    <record id="rule_pref_system" model="ir.rule">
+        <field name="name">Zalo: admin xem pref</field>
+        <field name="model_id" ref="model_dac_zalo_preference"/>
+        <field name="groups" eval="[(4, ref('base.group_system'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+    </record>
+    <record id="rule_notification_own" model="ir.rule">
+        <field name="name">Zalo: notification của chính mình</field>
+        <field name="model_id" ref="model_dac_zalo_notification"/>
+        <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+        <field name="domain_force">[('user_id', '=', user.id)]</field>
+    </record>
+    <record id="rule_notification_system" model="ir.rule">
+        <field name="name">Zalo: admin xem notification</field>
+        <field name="model_id" ref="model_dac_zalo_notification"/>
+        <field name="groups" eval="[(4, ref('base.group_system'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+    </record>
+</odoo>

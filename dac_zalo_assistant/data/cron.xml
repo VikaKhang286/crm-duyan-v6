@@ -1,0 +1,22 @@
+<odoo noupdate="1">
+    <record id="cron_zalo_process" model="ir.cron">
+        <field name="name">Zalo: xử lý AI và tin nhắn chờ gửi</field>
+        <field name="model_id" ref="model_dac_zalo_message"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_process()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">minutes</field>
+        <field name="user_id" ref="base.user_root"/>
+        <field name="active" eval="True"/>
+    </record>
+    <record id="cron_zalo_notifications" model="ir.cron">
+        <field name="name">Zalo: nhắc việc, bản tin, nhân sự và vận hành</field>
+        <field name="model_id" ref="model_dac_zalo_notification"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_scan()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">minutes</field>
+        <field name="user_id" ref="base.user_root"/>
+        <field name="active" eval="True"/>
+    </record>
+</odoo>

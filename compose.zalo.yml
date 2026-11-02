@@ -1,0 +1,17 @@
+services:
+  zalo-bridge:
+    build: ./services/zalo-bridge
+    environment:
+      ODOO_URL: http://web:8069
+      ZALO_BRIDGE_TOKEN: ${ZALO_BRIDGE_TOKEN:?Set a random shared secret of at least 32 characters}
+    volumes:
+      - zalo-session:/data
+    restart: unless-stopped
+    init: true
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8095/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+volumes:
+  zalo-session:
