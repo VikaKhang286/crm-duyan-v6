@@ -120,19 +120,21 @@ patch(NavBar.prototype, {
             collapsed: document.body.classList.contains("dac-v6-sidebar-collapsed"),
         });
         this.dacRole = null;
-        this.dacAttendanceAdmin = false;
+        this.dacAttendanceAdmin = Boolean(user.isAdmin || user.isSystem);
         this._dacAttendanceRedirecting = false;
         onWillStart(async () => {
-            try {
-                const [[currentUser], attendanceAdmin] = await Promise.all([
-                    this.dacSearchOrm.read("res.users", [user.userId], ["dac_role"]),
-                    user.hasGroup("hr_attendance.group_hr_attendance_manager"),
-                ]);
+            const [roleResult, attendanceResult] = await Promise.allSettled([
+                this.dacSearchOrm.read("res.users", [user.userId], ["dac_role"]),
+                user.hasGroup("hr_attendance.group_hr_attendance_manager"),
+            ]);
+            if (roleResult.status === "fulfilled") {
+                const [currentUser] = roleResult.value;
                 this.dacRole = currentUser?.dac_role || null;
-                this.dacAttendanceAdmin = attendanceAdmin;
-            } catch {
+            } else {
                 this.dacRole = null;
-                this.dacAttendanceAdmin = false;
+            }
+            if (attendanceResult.status === "fulfilled") {
+                this.dacAttendanceAdmin = this.dacAttendanceAdmin || attendanceResult.value;
             }
         });
         this.toggleDacMenuGroup = this.toggleDacMenuGroup.bind(this);
@@ -193,7 +195,7 @@ patch(NavBar.prototype, {
         // DAC Manager uses the consolidated DAC Attendance app below.  Keep
         // Odoo's attendance root out of the app rail so it is not displayed
         // as a second, separate application.
-        if (this.dacRole === "manager" && menu.xmlid === ODOO_ATTENDANCE_APP_XMLID) {
+        if (this.dacAttendanceAdmin && menu.xmlid === ODOO_ATTENDANCE_APP_XMLID) {
             return false;
         }
         if (!this.dacRole || this.dacRole === "manager") return true;
@@ -252,14 +254,14 @@ patch(NavBar.prototype, {
     },
 
     get dacSidebarCurrentApp() {
-        if (this.dacRole === "manager" && this.currentApp?.xmlid === ODOO_ATTENDANCE_APP_XMLID) {
+        if (this.dacAttendanceAdmin && this.currentApp?.xmlid === ODOO_ATTENDANCE_APP_XMLID) {
             return this.dacMenuByXmlid(DAC_ATTENDANCE_APP_XMLID) || this.currentApp;
         }
         return this.currentApp;
     },
 
     get dacVisibleCurrentAppSections() {
-        const isConsolidatedAttendance = this.dacAttendanceAdmin && this.dacRole === "manager"
+        const isConsolidatedAttendance = this.dacAttendanceAdmin
             && [DAC_ATTENDANCE_APP_XMLID, ODOO_ATTENDANCE_APP_XMLID].includes(this.currentApp?.xmlid);
         if (!isConsolidatedAttendance) {
             return this.currentAppSections.filter((menu) => this.isDacMenuVisible(menu));
@@ -347,7 +349,7 @@ patch(NavBar.prototype, {
     },
 
     isDacAppActive(app) {
-        if (this.dacRole === "manager"
+        if (this.dacAttendanceAdmin
             && app.xmlid === DAC_ATTENDANCE_APP_XMLID
             && this.currentApp?.xmlid === ODOO_ATTENDANCE_APP_XMLID) {
             return true;

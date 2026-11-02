@@ -4,6 +4,27 @@ import logging
 _logger = logging.getLogger(__name__)
 
 
+class ResUsers(models.Model):
+    _inherit = 'res.users'
+
+    @api.model
+    def get_chameleon_public_branding(self):
+        """Return the two non-secret branding values required at web startup.
+
+        This deliberately exposes a fixed allowlist instead of accepting an
+        arbitrary system-parameter key from the browser.
+        """
+        params = self.env['ir.config_parameter'].sudo()
+        return {
+            'website_title': params.get_param(
+                'change_odoo_theme_header_color.website_title'
+            ) or '',
+            'image_1024': params.get_param(
+                'change_odoo_theme_header_color.image_1024'
+            ) or '',
+        }
+
+
 class ResConfigSettings(models.TransientModel):
     _inherit = 'res.config.settings'
     _description = 'Alert Tag'

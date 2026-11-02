@@ -41,6 +41,22 @@ class TestSecurityAndWorkflowReview(TransactionCase):
             with self.assertRaises(AccessError):
                 self.env['ir.config_parameter'].with_user(user).search_read([], ['key'], limit=1)
 
+    def test_operational_user_can_load_public_branding_only(self):
+        params = self.env['ir.config_parameter'].sudo()
+        params.set_param('change_odoo_theme_header_color.website_title', 'DAC Test')
+        params.set_param('change_odoo_theme_header_color.image_1024', 'public-image')
+        params.set_param('page_fm.access_token', 'must-not-be-exposed')
+
+        branding = self.env['res.users'].with_user(
+            self.sale_a
+        ).get_chameleon_public_branding()
+
+        self.assertEqual(branding, {
+            'website_title': 'DAC Test',
+            'image_1024': 'public-image',
+        })
+        self.assertNotIn('must-not-be-exposed', str(branding))
+
     def test_review_state_is_isolated_per_user(self):
         self.order.with_user(self.sale_a).write({'workflow_review_state': 'quotation'})
 

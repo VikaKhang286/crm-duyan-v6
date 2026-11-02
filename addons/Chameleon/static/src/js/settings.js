@@ -12,36 +12,30 @@ patch(WebClient.prototype, {
   setup() {
     super.setup();
     this.rpc = rpc;
-    this.updateTitle();
-    this.updateLogo();
+    this.updateBranding();
   },
 
-  async updateTitle() {
-    const title = await this.rpc(
-      "/web/dataset/call_kw/ir.config_parameter/get_param",
-      {
-        model: "ir.config_parameter",
-        method: "get_param",
-        args: ["change_odoo_theme_header_color.website_title"],
-        kwargs: {},
-      }
-    );
+  async updateBranding() {
+    let branding;
+    try {
+      branding = await this.rpc(
+        "/web/dataset/call_kw/res.users/get_chameleon_public_branding",
+        {
+          model: "res.users",
+          method: "get_chameleon_public_branding",
+          args: [],
+          kwargs: {},
+        }
+      );
+    } catch {
+      // Branding is optional. Keep Odoo defaults instead of interrupting startup.
+      return;
+    }
 
-    this.title.setParts({ zopenerp: title || "" });
-  },
-
-  async updateLogo() {
-    const image_1024 = await this.rpc(
-      "/web/dataset/call_kw/ir.config_parameter/get_param",
-      {
-        model: "ir.config_parameter",
-        method: "get_param",
-        args: ["change_odoo_theme_header_color.image_1024"],
-        kwargs: {},
-      }
-    );
+    this.title.setParts({ zopenerp: branding.website_title || "" });
     const backendIconEl = document.querySelector("link[rel~='icon']");
-    // Save initial backend values.
-    backendIconEl.href = "data:image/png;base64," + image_1024;
+    if (backendIconEl && branding.image_1024) {
+      backendIconEl.href = "data:image/png;base64," + branding.image_1024;
+    }
   },
 });
