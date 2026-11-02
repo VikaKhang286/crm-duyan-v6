@@ -167,7 +167,14 @@ class ZaloConfig(models.Model):
 
     def action_refresh(self):
         self._require_admin()
-        status = self._bridge_request('/status')
+        try:
+            status = self._bridge_request('/status')
+        except UserError as error:
+            self.sudo().write({'connection_state': 'error', 'qr_image': False, 'last_checked_at': fields.Datetime.now()})
+            return {'type': 'ir.actions.client', 'tag': 'display_notification', 'params': {
+                'title': _('Không kiểm tra được kết nối Zalo'), 'message': str(error),
+                'type': 'danger', 'sticky': True,
+            }}
         self._apply_bridge_status(status)
         return {'type': 'ir.actions.client', 'tag': 'reload'}
 
@@ -493,6 +500,8 @@ class ZaloMessage(models.Model):
             status = config._probe_bridge_status_after_error()
             if status and status.get('state') != 'connected':
                 error_message = config._reconnect_message(status.get('state'))
+            elif not status:
+                error_message = 'Không kiểm tra được trạng thái Zalo. Admin cần kiểm tra bridge; nếu tài khoản mất phiên, tạo mã QR và quét lại. Tin chưa xác nhận sẽ không tự gửi lại.'
             else:
                 error_message = 'Bridge chưa xác nhận gửi; đã kiểm tra trạng thái Zalo. Không gửi lại tự động để tránh trùng tin.'
             self.write({'state': 'uncertain', 'error_message': error_message})
