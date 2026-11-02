@@ -1,6 +1,7 @@
 import hashlib
 import re
 import secrets
+import time
 from datetime import timedelta
 from urllib.parse import urlsplit
 
@@ -94,6 +95,13 @@ class ZaloConfig(models.Model):
     def action_login(self):
         self._require_admin()
         self._bridge_request('/login', {})
+        # QR callbacks are asynchronous; wait briefly so the admin sees the actual
+        # image after one click instead of an empty field that needs repeated refresh.
+        for _attempt in range(20):
+            status = self._bridge_request('/status')
+            if status.get('qr_image') or status.get('state') in ('scanned', 'connected', 'error'):
+                break
+            time.sleep(0.5)
         return self.action_refresh()
 
     def action_refresh(self):

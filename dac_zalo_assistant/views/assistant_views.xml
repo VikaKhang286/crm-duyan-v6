@@ -5,37 +5,65 @@
         <field name="arch" type="xml">
             <form string="Trợ lý Zalo" create="0" delete="0">
                 <header>
-                    <button name="action_login" type="object" string="Đăng nhập Zalo bằng QR" class="btn-primary" groups="base.group_system"/>
-                    <button name="action_refresh" type="object" string="Lấy QR / cập nhật kết nối" groups="base.group_system"/>
+                    <button name="action_login" type="object" string="Tạo / làm mới mã QR" class="btn-primary" groups="base.group_system"/>
+                    <button name="action_refresh" type="object" string="Cập nhật trạng thái" groups="base.group_system"/>
                     <button name="action_disconnect" type="object" string="Ngắt kết nối" groups="base.group_system" confirm="Ngừng trợ lý và xóa phiên đăng nhập lưu ở dịch vụ Zalo?"/>
                     <field name="connection_state" widget="statusbar"/>
                 </header>
                 <sheet>
-                    <h1><field name="name"/></h1>
-                    <group>
-                        <group string="Kết nối">
-                            <field name="active" widget="boolean_toggle"/>
-                            <field name="assistant_uid"/>
-                            <field name="last_checked_at"/>
-                            <field name="bridge_url" groups="base.group_system"/>
-                            <field name="bridge_token" password="True" groups="base.group_system"/>
-                        </group>
-                        <group string="Quét bằng tài khoản tro ly DAC" groups="base.group_system">
-                            <field name="qr_image" widget="image" nolabel="1" invisible="not qr_image"/>
-                            <div class="text-muted">Bấm cập nhật để lấy mã QR. Quét và xác nhận trên điện thoại, sau đó cập nhật lần nữa. Mỗi tài khoản trợ lý chỉ chạy một phiên web.</div>
-                        </group>
-                    </group>
-                    <group string="AI tương thích OpenAI" groups="base.group_system">
-                        <field name="ai_enabled"/>
-                        <field name="ai_base_url" placeholder="https://nha-cung-cap.example/v1"/>
-                        <field name="ai_api_key" password="True"/>
-                        <field name="ai_model"/>
-                        <field name="ai_auto_reply"/>
-                        <field name="ai_include_tasks"/>
-                        <field name="ai_instructions"/>
-                        <button name="action_test_ai" type="object" string="Kiểm tra kết nối AI" invisible="not ai_enabled"/>
-                        <div class="text-muted">AI nhận các tin nhắn gần đây của hội thoại và công việc của chính người hỏi nếu được bật. Nhà cung cấp AI nhận dữ liệu này. Trợ lý chưa tự thay đổi đơn hàng hay thanh toán.</div>
-                    </group>
+                    <div class="oe_title">
+                        <label for="name" string="Tên trợ lý"/>
+                        <h1><field name="name" placeholder="Trợ lý DAC"/></h1>
+                    </div>
+                    <notebook>
+                        <page name="connection" string="Kết nối">
+                            <div class="alert alert-info" role="status">
+                                <strong>Đăng nhập bot Zalo</strong>
+                                <div>Bấm “Tạo / làm mới mã QR”, quét bằng tài khoản “tro ly DAC” trên điện thoại, rồi xác nhận trên điện thoại.</div>
+                            </div>
+                            <group>
+                                <group string="Trạng thái">
+                                    <field name="active" widget="boolean_toggle"/>
+                                    <field name="assistant_uid" readonly="1"/>
+                                    <field name="last_checked_at" readonly="1"/>
+                                </group>
+                                <group string="Quét mã QR" groups="base.group_system">
+                                    <field name="qr_image" widget="image" nolabel="1"
+                                           options="{'size': [260, 260]}" invisible="not qr_image"/>
+                                    <div class="text-muted" invisible="qr_image">
+                                        Chưa có mã QR. Bấm “Tạo / làm mới mã QR” phía trên.
+                                    </div>
+                                    <div class="text-muted" invisible="not qr_image">
+                                        Dùng ứng dụng Zalo trên điện thoại của tài khoản “tro ly DAC” để quét mã.
+                                    </div>
+                                </group>
+                            </group>
+                            <group string="Kết nối dịch vụ" groups="base.group_system" col="2">
+                                <field name="bridge_url"/>
+                                <field name="bridge_token" password="True"/>
+                            </group>
+                        </page>
+                        <page name="ai" string="Trợ lý AI" groups="base.group_system">
+                            <div class="alert alert-secondary" role="note">
+                                AI là tùy chọn. Thông báo công việc và lệnh /congviec vẫn hoạt động khi AI tắt.
+                            </div>
+                            <group>
+                                <group string="Nhà cung cấp">
+                                    <field name="ai_enabled" widget="boolean_toggle"/>
+                                    <field name="ai_base_url" placeholder="https://nha-cung-cap.example/v1"/>
+                                    <field name="ai_model"/>
+                                    <field name="ai_api_key" password="True"/>
+                                    <button name="action_test_ai" type="object" string="Kiểm tra kết nối AI"
+                                            class="btn-secondary" invisible="not ai_enabled"/>
+                                </group>
+                                <group string="Cách trả lời">
+                                    <field name="ai_auto_reply"/>
+                                    <field name="ai_include_tasks"/>
+                                    <field name="ai_instructions"/>
+                                </group>
+                            </group>
+                        </page>
+                    </notebook>
                 </sheet>
             </form>
         </field>
@@ -107,5 +135,5 @@
     <menuitem id="menu_conversations" name="Hội thoại" parent="menu_root" action="conversation_action" sequence="3"/>
     <menuitem id="menu_messages" name="Theo dõi tin nhắn" parent="menu_root" action="message_action" groups="dac_erp.group_dac_erp_manager,base.group_system" sequence="4"/>
     <menuitem id="menu_bindings_admin" name="Liên kết nhân viên" parent="menu_root" action="bindings_admin_action" groups="base.group_system" sequence="5"/>
-    <menuitem id="menu_config" name="Cấu hình" parent="menu_root" action="config_action" groups="base.group_system" sequence="10"/>
+    <menuitem id="menu_config" name="Cấu hình" parent="menu_root" action="config_action" groups="base.group_system" sequence="0"/>
 </odoo>
