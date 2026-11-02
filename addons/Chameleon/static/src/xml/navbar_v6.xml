@@ -42,11 +42,7 @@
                             <i class="fa fa-lg fa-clock-o" role="img" aria-label="Hoạt động"/>
                         </button>
                     </div>
-                    <div class="dac_v6_role_bar_container">
-                        <div t-if="dacRoleLabel" class="dac_v6_role_bar" aria-label="DAC role hiện tại">
-                            <div class="dac_v6_role_badge" t-esc="dacRoleLabel"></div>
-                        </div>
-                    </div>
+                    
                     <div class="o_navbar_breadcrumbs d-contents"/>
 
                     <div class="dac_v6_navigation_grid">
@@ -79,11 +75,7 @@
                     </div>
 
                     <div class="o_menu_systray d-flex flex-shrink-0 ms-auto" role="menu">
-                        <button class="sidebar-collapse" type="button"
-                                t-att-title="dacSidebarState.collapsed ? 'Mở rộng sidebar' : 'Thu gọn sidebar'"
-                                t-att-aria-label="dacSidebarState.collapsed ? 'Mở rộng sidebar' : 'Thu gọn sidebar'"
-                                t-on-click="toggleDacSidebar"
-                                t-esc="dacSidebarState.collapsed ? 'Mở rộng' : 'Thu gọn'"/>
+                        
                         <t t-foreach="systrayItems" t-as="item" t-key="item.key">
                             <div t-att-data-index="item.index"/>
                             <ErrorHandler onError="error => this.handleItemError(error, item)">
