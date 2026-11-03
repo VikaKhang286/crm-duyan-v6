@@ -17,6 +17,26 @@ const DAC_ROLE_LABELS = {
     full_stack: "Full-stack",
 };
 const DAC_ACTIVE_SIDEBAR_MENU_STORAGE_KEY = "dac_v6_active_sidebar_xmlid";
+const DAC_SYSTEM_APP_XMLID = "dac_erp.dac_system_settings_root";
+const DAC_SETTINGS_APP_XMLID = "base.menu_administration";
+const DAC_GENERAL_SETTINGS_GROUP_XMLID = "dac_sidebar.general_settings";
+const DAC_GENERAL_SETTINGS_TABS = [
+    ["general_settings", "Thiết lập Chung"],
+    ["event", "Sự kiện"],
+    ["sale_management", "Bán hàng"],
+    ["account", "Hóa đơn"],
+    ["hr", "Nhân viên"],
+    ["hr_attendance", "Chấm công"],
+];
+const DAC_GENERAL_SETTINGS_HASHES = new Set(DAC_GENERAL_SETTINGS_TABS.map(([hash]) => hash));
+
+// Repair bookmarks created by the former sidebar implementation before
+// Odoo's router consumes and drops the settings fragment from an action URL.
+const dacInitialSettingsHash = window.location.hash.slice(1);
+if (window.location.pathname !== "/odoo/settings"
+    && DAC_GENERAL_SETTINGS_HASHES.has(dacInitialSettingsHash)) {
+    window.location.replace(`/odoo/settings#${dacInitialSettingsHash}`);
+}
 const DAC_ATTENDANCE_APP_XMLID = "dac_attendance.menu_dac_attendance_root";
 const ODOO_ATTENDANCE_APP_XMLID = "hr_attendance.menu_hr_attendance_root";
 const DAC_ATTENDANCE_DASHBOARD_MENU_XMLID = "dac_attendance.menu_dac_attendance_employee_dashboard";
@@ -153,9 +173,11 @@ patch(NavBar.prototype, {
         };
         onMounted(() => document.addEventListener("keydown", this._dacSearchKeydown, true));
         onMounted(() => {
+            if (this._redirectLegacyDacSettingsRoute()) return;
             this._syncDacSidebarMenu(true);
             this._redirectEmployeeFromManagerAttendance();
             this._dacSidebarRouteChange = () => {
+                if (this._redirectLegacyDacSettingsRoute()) return;
                 this._syncDacSidebarMenu();
                 this._redirectEmployeeFromManagerAttendance();
             };
@@ -182,7 +204,20 @@ patch(NavBar.prototype, {
         ];
     },
 
+    _redirectLegacyDacSettingsRoute() {
+        const settingsHash = window.location.hash.slice(1);
+        if (window.location.pathname !== "/odoo/settings"
+            && DAC_GENERAL_SETTINGS_HASHES.has(settingsHash)) {
+            window.location.replace(`/odoo/settings#${settingsHash}`);
+            return true;
+        }
+        return false;
+    },
+
     isDacMenuVisible(menu) {
+        // Settings is rendered inside Hệ Thống as "Cài đặt chung" and must
+        // never appear as a separate app, including for Manager/System users.
+        if (menu.xmlid === DAC_SETTINGS_APP_XMLID) return false;
         // Attendance employees only need their dashboard.  Manager dashboard,
         // configuration and reports remain available exclusively to members
         // of the Attendance Administrator group.
@@ -229,6 +264,7 @@ patch(NavBar.prototype, {
     },
 
     dacMenuName(menu) {
+        if (menu.xmlid === DAC_SYSTEM_APP_XMLID) return "Hệ Thống & Cài Đặt";
         if (this.dacRole !== "manager") {
             if (menu.xmlid === DAC_ATTENDANCE_APP_XMLID) return "Chấm công";
             if (menu.xmlid === "dac_attendance.menu_dac_attendance_amendment_admin") return "Đơn điều chỉnh";
@@ -241,7 +277,14 @@ patch(NavBar.prototype, {
         if (!this.dacRole) {
             return apps.filter((app) => app.xmlid === DAC_ATTENDANCE_APP_XMLID);
         }
-        return apps.filter((app) => this.isDacMenuVisible(app));
+        const visibleApps = apps.filter((app) => this.isDacMenuVisible(app));
+        const systemApp = visibleApps.find((app) => app.xmlid === DAC_SYSTEM_APP_XMLID);
+        const regularApps = visibleApps.filter(
+            (app) => app !== systemApp
+        );
+
+        // Cài đặt is folded into Hệ Thống below, so Hệ Thống is the final app.
+        return [...regularApps, ...(systemApp ? [systemApp] : [])];
     },
 
     get dacMessagesVisible() {
@@ -253,6 +296,9 @@ patch(NavBar.prototype, {
     },
 
     get dacSidebarCurrentApp() {
+        if (this.currentApp?.xmlid === DAC_SETTINGS_APP_XMLID) {
+            return this.dacMenuByXmlid(DAC_SYSTEM_APP_XMLID) || this.currentApp;
+        }
         if (this.dacAttendanceAdmin && this.currentApp?.xmlid === ODOO_ATTENDANCE_APP_XMLID) {
             return this.dacMenuByXmlid(DAC_ATTENDANCE_APP_XMLID) || this.currentApp;
         }
@@ -260,6 +306,27 @@ patch(NavBar.prototype, {
     },
 
     get dacVisibleCurrentAppSections() {
+        const sidebarApp = this.dacSidebarCurrentApp;
+        if (sidebarApp?.xmlid === DAC_SYSTEM_APP_XMLID) {
+            const rawSystemSections = this.currentApp?.xmlid === DAC_SYSTEM_APP_XMLID
+                ? this.currentAppSections
+                : (this.dacMenuService.getMenuAsTree(sidebarApp.id).childrenTree || []);
+            const systemSections = rawSystemSections
+                .filter((menu) => this.isDacMenuVisible(menu));
+            systemSections.push({
+                id: DAC_GENERAL_SETTINGS_GROUP_XMLID,
+                xmlid: DAC_GENERAL_SETTINGS_GROUP_XMLID,
+                name: "Cài đặt chung",
+                childrenTree: DAC_GENERAL_SETTINGS_TABS.map(([hash, name]) => ({
+                    id: `${DAC_GENERAL_SETTINGS_GROUP_XMLID}.${hash}`,
+                    xmlid: `${DAC_GENERAL_SETTINGS_GROUP_XMLID}.${hash}`,
+                    name,
+                    dacSettingsHash: hash,
+                    childrenTree: [],
+                })),
+            });
+            return systemSections;
+        }
         const isConsolidatedAttendance = this.dacAttendanceAdmin
             && [DAC_ATTENDANCE_APP_XMLID, ODOO_ATTENDANCE_APP_XMLID].includes(this.currentApp?.xmlid);
         if (!isConsolidatedAttendance) {
@@ -289,7 +356,9 @@ patch(NavBar.prototype, {
             }
             return null;
         };
-        return findMenu(this.dacMenuService.getApps());
+        const appTrees = this.dacMenuService.getApps()
+            .map((app) => this.dacMenuService.getMenuAsTree(app.id));
+        return findMenu(appTrees);
     },
 
     dacRouteMatchesMenu(routeAction, menuXmlid, actionXmlid) {
@@ -364,7 +433,15 @@ patch(NavBar.prototype, {
             || (menu.childrenTree || []).some(containsActiveMenu);
         if (activeXmlid) {
             const activeApp = this.dacMenuService.getApps().find(containsActiveMenu);
-            if (activeApp) return activeApp.id === app.id;
+            if (activeApp) {
+                if (activeApp.xmlid === DAC_SETTINGS_APP_XMLID) {
+                    return app.xmlid === DAC_SYSTEM_APP_XMLID;
+                }
+                return activeApp.id === app.id;
+            }
+        }
+        if (this.currentApp?.xmlid === DAC_SETTINGS_APP_XMLID) {
+            return app.xmlid === DAC_SYSTEM_APP_XMLID;
         }
         return this.currentApp?.id === app.id;
     },
@@ -586,6 +663,18 @@ patch(NavBar.prototype, {
             window.localStorage.setItem(DAC_ACTIVE_SIDEBAR_MENU_STORAGE_KEY, menu.xmlid);
         } catch {
             // Keeping the active state in memory is sufficient as a fallback.
+        }
+        if (menu.dacSettingsHash) {
+            const settingsUrl = `/odoo/settings#${menu.dacSettingsHash}`;
+            if (window.location.pathname === "/odoo/settings") {
+                // Odoo's settings form reads the selected app only during
+                // setup; a bare hash change updates the URL but not content.
+                window.location.replace(settingsUrl);
+                window.location.reload();
+            } else {
+                window.location.assign(settingsUrl);
+            }
+            return;
         }
         return this.onNavBarDropdownItemSelection(menu);
     },

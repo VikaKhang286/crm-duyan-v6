@@ -28,7 +28,7 @@
 
         <!-- App 5: Cấu Hình & Hệ Thống -->
         <menuitem id="dac_system_settings_root"
-                  name="Hệ Thống"
+                  name="Hệ Thống &amp; Cài Đặt"
                   sequence="100"
                   web_icon="base,static/description/settings.png"
                   groups="dac_erp.group_dac_erp_manager,base.group_system"/>
