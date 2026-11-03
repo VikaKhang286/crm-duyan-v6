@@ -24,10 +24,12 @@ export class Bridge {
   constructor({ zalo, store, dataDir, odooUrl, token, fetchImpl = fetch, sendTimeoutMs = 25000 }) {
     Object.assign(this, { zalo, store, dataDir, odooUrl, token, fetchImpl, sendTimeoutMs });
     this.state = 'disconnected'; this.api = null; this.qr = null; this.accountId = null;
+    this.accountName = null; this.accountAvatar = null;
     this.loginTask = null; this.flushing = false; this.generation = 0; this.abortQR = null;
   }
   status() {
-    return { state: this.state, account_id: this.accountId, qr_image: this.qr, pending_events: this.store.count() };
+    return { state: this.state, account_id: this.accountId, account_name: this.accountName,
+      account_avatar: this.accountAvatar, qr_image: this.qr, pending_events: this.store.count() };
   }
   async saveCredentials(credentials) {
     await mkdir(this.dataDir, { recursive: true, mode: 0o700 });
@@ -49,7 +51,7 @@ export class Bridge {
     if (this.loginTask || this.api) return;
     const generation = ++this.generation;
     this.state = 'waiting_qr';
-    this.loginTask = (async () => {
+    const task = (async () => {
       try {
         const api = await this.zalo.loginQR({}, (event) => {
           if (generation !== this.generation) { event.actions?.abort?.(); return; }
@@ -75,8 +77,52 @@ export class Bridge {
         }
         await this.attach(api);
       } catch { if (generation === this.generation) { this.state = 'error'; this.qr = null; } }
-      finally { this.loginTask = null; this.abortQR = null; }
+      finally {
+        if (this.loginTask === task) this.loginTask = null;
+        if (generation === this.generation) this.abortQR = null;
+      }
     })();
+    this.loginTask = task;
+  }
+  async restartLogin() {
+    await this.logout();
+    const previous = this.loginTask;
+    if (previous) {
+      await Promise.race([previous, new Promise((resolve) => setTimeout(resolve, 8000))]);
+      if (this.loginTask) throw new Error('login_in_progress');
+    }
+    this.startLogin();
+  }
+  async loadAccountProfile(api) {
+    try {
+      if (typeof api.getUserInfo !== 'function') return;
+      const result = await api.getUserInfo(this.accountId);
+      if (this.api !== api) return;
+      const profiles = result?.changed_profiles || {};
+      const profile = profiles[this.accountId] || profiles[`${this.accountId}_0`]
+        || Object.values(profiles).find((item) => String(item?.userId || item?.uid || '') === this.accountId);
+      if (!profile) return;
+      this.accountName = String(profile.displayName || profile.zaloName || profile.zalo_name || '').slice(0, 160) || null;
+      const avatarUrl = profile.avatar;
+      if (typeof avatarUrl !== 'string' || !avatarUrl) return;
+      const parsed = new URL(avatarUrl);
+      if (parsed.protocol !== 'https:') return;
+      const response = await fetch(parsed, { redirect: 'error', signal: AbortSignal.timeout(8000) });
+      const contentType = response.headers.get('content-type') || '';
+      const declaredSize = Number(response.headers.get('content-length') || 0);
+      if (!response.ok || !contentType.toLowerCase().startsWith('image/') || declaredSize > 1024 * 1024) return;
+      const reader = response.body?.getReader();
+      if (!reader) return;
+      const chunks = []; let size = 0;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        size += value.length;
+        if (size > 1024 * 1024) { await reader.cancel(); return; }
+        chunks.push(Buffer.from(value));
+      }
+      if (size && this.api === api) this.accountAvatar = Buffer.concat(chunks).toString('base64');
+    } catch { /* Profile lookup is optional; keep the live connection status. */ }
   }
   async attach(api) {
     this.api = api; this.accountId = String(api.getOwnId()); this.qr = null;
@@ -101,10 +147,12 @@ export class Bridge {
     api.listener.onError(() => { if (this.api === api) this.state = 'error'; });
     this.state = 'connected';
     api.listener.start();
+    void this.loadAccountProfile(api);
   }
   async logout() {
     ++this.generation; this.abortQR?.(); this.api?.listener.stop();
-    this.api = null; this.accountId = null; this.qr = null; this.state = 'disconnected';
+    this.api = null; this.accountId = null; this.accountName = null; this.accountAvatar = null;
+    this.qr = null; this.state = 'disconnected';
     // Keep a cancelled login task reserved until it settles, preventing a new login racing its cleanup.
     await rm(join(this.dataDir, 'credentials.json'), { force: true });
     await rm(join(this.dataDir, 'credentials.json.tmp'), { force: true });
@@ -144,8 +192,13 @@ export class Bridge {
       return { delivery: 'sent', message_id: String(id) };
     } catch {
       // A failed network call may already have delivered; never automatically send it twice.
+      const api = this.api;
+      if (api === this.api && typeof api.getUserInfo === 'function') {
+        try { await api.getUserInfo(this.accountId); }
+        catch { if (this.api === api && this.state === 'connected') this.state = 'error'; }
+      }
       this.store.finish(payload.request_id, 'uncertain');
-      return { delivery: 'uncertain', message_id: null };
+      return { delivery: 'uncertain', message_id: null, connection_state: this.state };
     } finally { clearTimeout(timer); }
   }
 }

@@ -2,15 +2,45 @@
     <record id="notification_config_form" model="ir.ui.view">
         <field name="name">dac.zalo.notification.config.form</field><field name="model">dac.zalo.config</field>
         <field name="inherit_id" ref="config_form"/>
-        <field name="arch" type="xml"><xpath expr="//sheet" position="inside"><group string="Thông báo nghiệp vụ" groups="base.group_system">
-            <field name="notifications_enabled"/>
-            <field name="notification_started_at"/>
-            <group string="Cho phép theo nhóm trên toàn hệ thống" colspan="2">
-                <group><field name="notify_order_created"/><field name="notify_order_updates"/><field name="notify_task_assigned"/><field name="notify_task_updates"/><field name="notify_deadline_changed"/><field name="notify_deadline_warning"/><field name="notify_task_overdue"/><field name="notify_personal_reminder"/></group>
-                <group><field name="notify_handover"/><field name="notify_delivery"/><field name="notify_financial"/><field name="notify_mentions"/><field name="notify_hr_requests"/><field name="notify_hr_results"/><field name="notify_digest_morning"/><field name="notify_digest_evening"/><field name="notify_system_alerts"/></group>
-            </group>
-            <div class="text-muted">Mỗi nhân viên chọn nhóm và giờ nhận trong Thông báo của tôi. Chỉ gửi cho tài khoản đã xác thực; thu hồi quyền hoặc đổi người phụ trách sẽ hủy tin cũ. Cảnh báo vận hành có hoạt động cần làm dự phòng trong Odoo.</div>
-        </group></xpath><xpath expr="//sheet" position="after"><chatter groups="base.group_system"/></xpath></field>
+        <field name="arch" type="xml"><xpath expr="//notebook" position="inside">
+            <page name="notifications" string="Thông báo" groups="base.group_system">
+                <div class="alert alert-info" role="note">
+                    Nhân viên tùy chỉnh loại tin và giờ nhận trong “Thông báo của tôi”.
+                    Chỉ sự kiện mới sau ngày bật tính năng mới được gửi.
+                </div>
+                <group>
+                    <group string="Điều khiển chung">
+                        <field name="notifications_enabled" widget="boolean_toggle"/>
+                        <field name="notification_started_at" readonly="1"/>
+                    </group>
+                    <group string="Đơn hàng và công việc">
+                        <field name="notify_order_created"/>
+                        <field name="notify_order_updates"/>
+                        <field name="notify_task_assigned"/>
+                        <field name="notify_task_updates"/>
+                        <field name="notify_deadline_changed"/>
+                        <field name="notify_deadline_warning"/>
+                        <field name="notify_task_overdue"/>
+                        <field name="notify_personal_reminder"/>
+                    </group>
+                </group>
+                <group>
+                    <group string="Theo dõi đơn và nhân sự">
+                        <field name="notify_handover"/>
+                        <field name="notify_delivery"/>
+                        <field name="notify_financial"/>
+                        <field name="notify_mentions"/>
+                        <field name="notify_hr_requests"/>
+                        <field name="notify_hr_results"/>
+                    </group>
+                    <group string="Bản tin và cảnh báo">
+                        <field name="notify_digest_morning"/>
+                        <field name="notify_digest_evening"/>
+                        <field name="notify_system_alerts"/>
+                    </group>
+                </group>
+            </page>
+        </xpath></field>
     </record>
     <record id="preference_form" model="ir.ui.view">
         <field name="name">dac.zalo.preference.form</field><field name="model">dac.zalo.preference</field>
