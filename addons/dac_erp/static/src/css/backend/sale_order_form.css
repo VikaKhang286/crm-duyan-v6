@@ -439,7 +439,7 @@
 
   .o_web_client .o_control_panel.dac-sale-order-control-panel-active .dac-control-panel-top-row {
     display: grid !important;
-    grid-template-columns: minmax(0, 1fr) minmax(420px, 420px) minmax(0, 1fr) !important;
+    grid-template-columns: minmax(0, 1.3fr) minmax(420px, 420px) minmax(0, 1fr) !important;
     grid-template-areas: "title progress primary" !important;
   }
 
