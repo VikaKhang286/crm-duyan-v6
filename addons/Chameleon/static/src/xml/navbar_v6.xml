@@ -55,7 +55,9 @@
                                 <span class="dac_v6_app_icon">
                                     <i t-attf-class="fa {{ dacAppIcon(app) }}" aria-hidden="true"/>
                                 </span>
-                                <span class="dac_v6_app_name" t-esc="dacMenuName(app)"/>
+                                <span class="dac_v6_app_name">
+                                    <span class="dac_v6_app_name_text" t-esc="dacMenuName(app)"/>
+                                </span>
                             </button>
                         </div>
 

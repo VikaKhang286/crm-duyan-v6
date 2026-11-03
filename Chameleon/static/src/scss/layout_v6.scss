@@ -425,6 +425,28 @@
         white-space: nowrap;
     }
 
+    .dac_v6_app_name_text {
+        display: block;
+        width: max-content;
+        min-width: 100%;
+        will-change: transform;
+    }
+
+    .dac_v6_app_button:hover .dac_v6_app_name_text {
+        animation: dac-v6-app-name-marquee 3.5s linear infinite;
+    }
+
+    @keyframes dac-v6-app-name-marquee {
+        0%, 15% { transform: translateX(0); }
+        85%, 100% { transform: translateX(calc(-100% + 60px)); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .dac_v6_app_button:hover .dac_v6_app_name_text {
+            animation: none;
+        }
+    }
+
     .dac_v6_section_panel {
         min-width: 0;
         min-height: 0;
