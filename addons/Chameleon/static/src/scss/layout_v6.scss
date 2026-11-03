@@ -342,6 +342,7 @@
     .dac_v6_app_rail {
         display: flex;
         min-width: 0;
+        max-width: 60px;
         min-height: 0;
         padding: 10px 0px;
         flex-direction: column;
