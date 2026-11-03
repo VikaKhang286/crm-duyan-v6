@@ -439,7 +439,7 @@
 
   .o_web_client .o_control_panel.dac-sale-order-control-panel-active .dac-control-panel-top-row {
     display: grid !important;
-    grid-template-columns: minmax(0, 1fr) minmax(420px, 500px) minmax(0, 1fr) !important;
+    grid-template-columns: minmax(0, 1fr) minmax(420px, 420px) minmax(0, 1fr) !important;
     grid-template-areas: "title progress primary" !important;
   }
 
@@ -743,7 +743,7 @@
   position: relative;
   align-items: flex-start;
   isolation: isolate;
-  gap: 4px !important;
+  gap: 0px !important;
 }
 
 .o_web_client .dac-control-panel-progress .o_statusbar_status::before {
@@ -3609,7 +3609,7 @@
 /* Read-only workflow review: clicking a milestone selects it for inspection
    without changing the real order state. */
 .o_web_client .dac-sale-order-control-panel-slot .dac-control-panel-progress .o_statusbar_status>.o_arrow_button[data-value] {
-  padding: 5px 5px !important;
+  padding: 0 !important;
   border: 1px solid transparent !important;
   border-radius: 10px !important;
   cursor: pointer !important;
