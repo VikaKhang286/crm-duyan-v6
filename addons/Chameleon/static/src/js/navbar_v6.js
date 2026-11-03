@@ -20,23 +20,8 @@ const DAC_ACTIVE_SIDEBAR_MENU_STORAGE_KEY = "dac_v6_active_sidebar_xmlid";
 const DAC_SYSTEM_APP_XMLID = "dac_erp.dac_system_settings_root";
 const DAC_SETTINGS_APP_XMLID = "base.menu_administration";
 const DAC_GENERAL_SETTINGS_GROUP_XMLID = "dac_sidebar.general_settings";
-const DAC_GENERAL_SETTINGS_TABS = [
-    ["general_settings", "Thiết lập Chung"],
-    ["event", "Sự kiện"],
-    ["sale_management", "Bán hàng"],
-    ["account", "Hóa đơn"],
-    ["hr", "Nhân viên"],
-    ["hr_attendance", "Chấm công"],
-];
-const DAC_GENERAL_SETTINGS_HASHES = new Set(DAC_GENERAL_SETTINGS_TABS.map(([hash]) => hash));
-
-// Repair bookmarks created by the former sidebar implementation before
-// Odoo's router consumes and drops the settings fragment from an action URL.
-const dacInitialSettingsHash = window.location.hash.slice(1);
-if (window.location.pathname !== "/odoo/settings"
-    && DAC_GENERAL_SETTINGS_HASHES.has(dacInitialSettingsHash)) {
-    window.location.replace(`/odoo/settings#${dacInitialSettingsHash}`);
-}
+const DAC_USERS_COMPANIES_GROUP_XMLID = "dac_sidebar.users_companies";
+const DAC_SYSTEM_UTILITY_PATHS = new Set(["/odoo/settings", "/odoo/users", "/odoo/companies"]);
 const DAC_ATTENDANCE_APP_XMLID = "dac_attendance.menu_dac_attendance_root";
 const ODOO_ATTENDANCE_APP_XMLID = "hr_attendance.menu_hr_attendance_root";
 const DAC_ATTENDANCE_DASHBOARD_MENU_XMLID = "dac_attendance.menu_dac_attendance_employee_dashboard";
@@ -173,11 +158,9 @@ patch(NavBar.prototype, {
         };
         onMounted(() => document.addEventListener("keydown", this._dacSearchKeydown, true));
         onMounted(() => {
-            if (this._redirectLegacyDacSettingsRoute()) return;
             this._syncDacSidebarMenu(true);
             this._redirectEmployeeFromManagerAttendance();
             this._dacSidebarRouteChange = () => {
-                if (this._redirectLegacyDacSettingsRoute()) return;
                 this._syncDacSidebarMenu();
                 this._redirectEmployeeFromManagerAttendance();
             };
@@ -202,16 +185,6 @@ patch(NavBar.prototype, {
             ["task", "Công việc"],
             ["action", "Hành động"],
         ];
-    },
-
-    _redirectLegacyDacSettingsRoute() {
-        const settingsHash = window.location.hash.slice(1);
-        if (window.location.pathname !== "/odoo/settings"
-            && DAC_GENERAL_SETTINGS_HASHES.has(settingsHash)) {
-            window.location.replace(`/odoo/settings#${settingsHash}`);
-            return true;
-        }
-        return false;
     },
 
     isDacMenuVisible(menu) {
@@ -296,7 +269,8 @@ patch(NavBar.prototype, {
     },
 
     get dacSidebarCurrentApp() {
-        if (this.currentApp?.xmlid === DAC_SETTINGS_APP_XMLID) {
+        if (DAC_SYSTEM_UTILITY_PATHS.has(window.location.pathname)
+            || this.currentApp?.xmlid === DAC_SETTINGS_APP_XMLID) {
             return this.dacMenuByXmlid(DAC_SYSTEM_APP_XMLID) || this.currentApp;
         }
         if (this.dacAttendanceAdmin && this.currentApp?.xmlid === ODOO_ATTENDANCE_APP_XMLID) {
@@ -317,13 +291,36 @@ patch(NavBar.prototype, {
                 id: DAC_GENERAL_SETTINGS_GROUP_XMLID,
                 xmlid: DAC_GENERAL_SETTINGS_GROUP_XMLID,
                 name: "Cài đặt chung",
-                childrenTree: DAC_GENERAL_SETTINGS_TABS.map(([hash, name]) => ({
-                    id: `${DAC_GENERAL_SETTINGS_GROUP_XMLID}.${hash}`,
-                    xmlid: `${DAC_GENERAL_SETTINGS_GROUP_XMLID}.${hash}`,
-                    name,
-                    dacSettingsHash: hash,
-                    childrenTree: [],
-                })),
+                childrenTree: [
+                    {
+                        id: `${DAC_GENERAL_SETTINGS_GROUP_XMLID}.general`,
+                        xmlid: `${DAC_GENERAL_SETTINGS_GROUP_XMLID}.general`,
+                        name: "Thiết lập chung",
+                        dacTargetPath: "/odoo/settings",
+                        childrenTree: [],
+                    },
+                    {
+                        id: DAC_USERS_COMPANIES_GROUP_XMLID,
+                        xmlid: DAC_USERS_COMPANIES_GROUP_XMLID,
+                        name: "Người dùng & Công ty",
+                        childrenTree: [
+                            {
+                                id: `${DAC_USERS_COMPANIES_GROUP_XMLID}.users`,
+                                xmlid: `${DAC_USERS_COMPANIES_GROUP_XMLID}.users`,
+                                name: "Người dùng",
+                                dacTargetPath: "/odoo/users",
+                                childrenTree: [],
+                            },
+                            {
+                                id: `${DAC_USERS_COMPANIES_GROUP_XMLID}.companies`,
+                                xmlid: `${DAC_USERS_COMPANIES_GROUP_XMLID}.companies`,
+                                name: "Công ty",
+                                dacTargetPath: "/odoo/companies",
+                                childrenTree: [],
+                            },
+                        ],
+                    },
+                ],
             });
             return systemSections;
         }
@@ -404,6 +401,9 @@ patch(NavBar.prototype, {
     },
 
     isDacAppActive(app) {
+        if (DAC_SYSTEM_UTILITY_PATHS.has(window.location.pathname)) {
+            return app.xmlid === DAC_SYSTEM_APP_XMLID;
+        }
         if (this.dacAttendanceAdmin
             && app.xmlid === DAC_ATTENDANCE_APP_XMLID
             && this.currentApp?.xmlid === ODOO_ATTENDANCE_APP_XMLID) {
@@ -664,16 +664,8 @@ patch(NavBar.prototype, {
         } catch {
             // Keeping the active state in memory is sufficient as a fallback.
         }
-        if (menu.dacSettingsHash) {
-            const settingsUrl = `/odoo/settings#${menu.dacSettingsHash}`;
-            if (window.location.pathname === "/odoo/settings") {
-                // Odoo's settings form reads the selected app only during
-                // setup; a bare hash change updates the URL but not content.
-                window.location.replace(settingsUrl);
-                window.location.reload();
-            } else {
-                window.location.assign(settingsUrl);
-            }
+        if (menu.dacTargetPath) {
+            window.location.assign(menu.dacTargetPath);
             return;
         }
         return this.onNavBarDropdownItemSelection(menu);
