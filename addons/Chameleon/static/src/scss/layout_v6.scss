@@ -59,12 +59,11 @@
     }
 
     .dac_v6_navigation_grid {
-        display: grid;
+        display: flex;
         width: 100%;
         min-width: 0;
         min-height: 0;
         flex: 1 1 auto;
-        grid-template-columns: minmax(0, 68px) minmax(0, 1fr);
         overflow: hidden;
         border: 1px solid #292c33;
         border-radius: 12px;
