@@ -296,7 +296,7 @@ patch(NavBar.prototype, {
                         id: `${DAC_GENERAL_SETTINGS_GROUP_XMLID}.general`,
                         xmlid: `${DAC_GENERAL_SETTINGS_GROUP_XMLID}.general`,
                         name: "Thiết lập chung",
-                        dacTargetPath: "/odoo/settings",
+                        dacActionXmlid: "base_setup.action_general_configuration",
                         childrenTree: [],
                     },
                     {
@@ -308,14 +308,14 @@ patch(NavBar.prototype, {
                                 id: `${DAC_USERS_COMPANIES_GROUP_XMLID}.users`,
                                 xmlid: `${DAC_USERS_COMPANIES_GROUP_XMLID}.users`,
                                 name: "Người dùng",
-                                dacTargetPath: "/odoo/users",
+                                dacActionXmlid: "base.action_res_users",
                                 childrenTree: [],
                             },
                             {
                                 id: `${DAC_USERS_COMPANIES_GROUP_XMLID}.companies`,
                                 xmlid: `${DAC_USERS_COMPANIES_GROUP_XMLID}.companies`,
                                 name: "Công ty",
-                                dacTargetPath: "/odoo/companies",
+                                dacActionXmlid: "base.action_res_company_form",
                                 childrenTree: [],
                             },
                         ],
@@ -664,9 +664,10 @@ patch(NavBar.prototype, {
         } catch {
             // Keeping the active state in memory is sufficient as a fallback.
         }
-        if (menu.dacTargetPath) {
-            window.location.assign(menu.dacTargetPath);
-            return;
+        if (menu.dacActionXmlid) {
+            return this.dacSearchAction.doAction(menu.dacActionXmlid, {
+                clearBreadcrumbs: true,
+            });
         }
         return this.onNavBarDropdownItemSelection(menu);
     },
