@@ -3406,45 +3406,6 @@
   background: transparent;
 }
 
-.o_web_client .dac-control-panel-primary-actions .dac-v6-control-next-step .dac-v6-next-step-info {
-  position: absolute;
-  top: -7px;
-  right: -7px;
-  z-index: 2;
-  display: inline-flex;
-  width: 18px;
-  height: 18px;
-  flex: 0 0 18px;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  border: 1px solid #e5c34a;
-  border-radius: 50%;
-  background: #fff8d9;
-  color: #806000;
-  cursor: help;
-  font-size: 0;
-}
-
-.o_web_client .dac-control-panel-primary-actions .dac-v6-control-next-step .dac-v6-next-step-info::before {
-  content: "i";
-  font-family: Georgia, serif;
-  font-size: 11px;
-  font-style: italic;
-  font-weight: 700;
-  line-height: 1;
-}
-
-.o_web_client .dac-control-panel-primary-actions .dac-v6-control-next-step .dac-v6-next-step-info>* {
-  display: none !important;
-}
-
-.o_web_client .dac-control-panel-primary-actions .dac-v6-control-next-step :is(.dac-v6-design-next-step--blocked, .dac-v6-production-next-step--blocked) .dac-v6-next-step-info {
-  border-color: #ef6b80;
-  background: #fff0f2;
-  color: #b4233c;
-}
-
 .o_web_client .dac-control-panel-primary-actions .dac-v6-control-next-step .btn {
   min-width: 0;
   min-height: 38px;

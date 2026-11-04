@@ -610,14 +610,7 @@ patch(FormController.prototype, {
     );
     if (renderedBlocks.length) {
       for (const block of renderedBlocks) {
-        const message = block.querySelector(":scope > div");
-        if (message) {
-          const messageText = message.innerText.replace(/\s+/g, " ").trim();
-          message.classList.add("dac-v6-next-step-info");
-          message.title = messageText;
-          message.setAttribute("aria-label", messageText);
-          message.setAttribute("role", "note");
-        }
+        block.querySelector(":scope > div")?.remove();
       }
       target.replaceChildren(...renderedBlocks);
     }

@@ -26,7 +26,7 @@
                                 <div class="dac-control-panel-heading-group">
                                     <div class="dac-control-panel-title-group">
                                         <button name="action_open_sales_list"
-                                                type="object"
+                                                type="object" invisible="user_id_design or user_id_production"
                                                 class="btn btn-light dac-order-back-btn"
                                                 title="Quay lại danh sách đơn"
                                                 aria-label="Quay lại danh sách đơn">
