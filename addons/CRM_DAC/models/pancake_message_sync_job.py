@@ -831,8 +831,13 @@ class PancakeMessageSyncJob(models.Model):
         stale_page_minutes = round(
             (now - stale_page.last_message_sync_at).total_seconds() / 60
         ) if stale_page and stale_page.last_message_sync_at else 0
-        quality_critical_count = duplicate_customer_count
-        quality_high_count = unassigned_count + stale_page_count
+        # KPI severity counts represent active Data Quality rows/categories,
+        # not the number of affected records inside each row.
+        quality_critical_count = int(bool(duplicate_customer_count))
+        quality_high_count = sum(bool(count) for count in (
+            unassigned_count,
+            stale_page_count,
+        ))
         quality_issue_count = quality_critical_count + quality_high_count
 
         job_data = {
