@@ -831,11 +831,9 @@ class PancakeMessageSyncJob(models.Model):
         stale_page_minutes = round(
             (now - stale_page.last_message_sync_at).total_seconds() / 60
         ) if stale_page and stale_page.last_message_sync_at else 0
-        quality_issue_count = sum(bool(count) for count in (
-            duplicate_customer_count,
-            unassigned_count,
-            stale_page_count,
-        ))
+        quality_critical_count = duplicate_customer_count
+        quality_high_count = unassigned_count + stale_page_count
+        quality_issue_count = quality_critical_count + quality_high_count
 
         job_data = {
             'id': latest_job.id or False,
@@ -864,11 +862,6 @@ class PancakeMessageSyncJob(models.Model):
             'success_today': success_today,
             'success_rate': success_rate,
             'errors': error_today,
-            'critical_errors': Log.search_count([
-                ('logged_at', '>=', day_start),
-                ('level', '=', 'error'),
-                ('event_code', 'in', ['job_failed', 'token_invalid']),
-            ]),
             'job': job_data,
             'last_successful_sync': fields.Datetime.to_string(latest_success.logged_at) if latest_success else False,
             'queue_depth': pending_count,
@@ -878,6 +871,8 @@ class PancakeMessageSyncJob(models.Model):
             'stale_page_name': stale_page.name if stale_page else _('Chưa có page'),
             'stale_page_minutes': stale_page_minutes,
             'quality_issue_count': quality_issue_count,
+            'quality_critical_count': quality_critical_count,
+            'quality_high_count': quality_high_count,
             'circuit_healthy': not bool(latest_job and latest_job.state == 'failed'),
             'recent_logs': [{
                 'id': log.id,
