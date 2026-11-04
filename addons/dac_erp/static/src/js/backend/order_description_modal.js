@@ -415,7 +415,10 @@ async function openDescriptionModal(block, forceReadOnly = false) {
             }
             if (images.length === 1) {
                 event.preventDefault();
-                pendingImageLoad = insertInlineImage(editor, images[0]);
+                pendingImageLoad = Promise.all([
+                    insertInlineImage(editor, images[0]),
+                    addImage(images, gallery, editor),
+                ]).then(() => updateGalleryEmptyState(gallery));
             }
         });
         modal.querySelector(".dac-v6-modal-save").addEventListener("click", async () => {
