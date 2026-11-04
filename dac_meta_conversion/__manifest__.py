@@ -1,9 +1,9 @@
 {
     'name': 'Chuyển đổi Meta',
-    'version': '18.0.1.2.0',
+    'version': '18.0.1.3.0',
     'category': '1. Duy An ERP',
     'summary': 'Gửi Purchase về Meta khi tạo đơn hàng trong CRM',
-    'depends': ['CRM_DAC', 'base_setup'],
+    'depends': ['dac_pancake_connector', 'base_setup'],
     'data': [
         'security/ir.model.access.csv',
         'security/meta_conversion_rules.xml',

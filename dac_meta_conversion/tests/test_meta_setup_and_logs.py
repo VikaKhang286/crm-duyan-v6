@@ -22,6 +22,7 @@ class TestMetaSetupAndLogs(TransactionCase):
         cls.env = cls.env(context=dict(cls.env.context, tracking_disable=True, no_reset_password=True))
         cls.company = cls.env.company
         cls.company.write({
+            'meta_conversion_provider': 'meta_direct',
             'meta_conversion_app_id': False, 'meta_conversion_setup_path': 'new_app',
             'meta_conversion_enabled': False, 'meta_conversion_channel': 'messenger',
             'meta_conversion_dataset_id': '123456789', 'meta_conversion_page_id': '987654321',

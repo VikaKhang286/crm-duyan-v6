@@ -20,12 +20,16 @@ class SaleOrder(models.Model):
     meta_conversion_message = fields.Text(
         compute='_compute_meta_conversion_message', compute_sudo=True, string='Kết quả gửi Meta',
     )
+    meta_conversion_delivery_provider = fields.Selection([
+        ('meta_direct', 'Meta trực tiếp'), ('pancake_pos', 'Pancake POS')],
+        compute='_compute_meta_conversion_message', compute_sudo=True, string='Đích gửi chuyển đổi')
 
     @api.depends('meta_conversion_event_ids.message', 'meta_conversion_event_ids.state')
     def _compute_meta_conversion_message(self):
         for order in self:
             order.meta_conversion_state = order.meta_conversion_event_ids[:1].state
             order.meta_conversion_message = order.meta_conversion_event_ids[:1].message
+            order.meta_conversion_delivery_provider = order.meta_conversion_event_ids[:1].delivery_provider
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -34,12 +38,14 @@ class SaleOrder(models.Model):
         events = Event.browse()
         for order in orders:
             company = order.company_id.sudo()
-            if company.meta_conversion_enabled:
+            if company.meta_conversion_enabled and not order.pancake_order_id:
                 events |= Event.create({
                     'order_id': order.id,
                     'company_id': company.id,
-                    'dataset_id': company.meta_conversion_dataset_id,
-                    'page_id': company.meta_conversion_page_id,
+                    'delivery_provider': company.meta_conversion_provider,
+                    'pancake_shop_id': company.pancake_pos_shop_id if company.meta_conversion_provider == 'pancake_pos' else False,
+                    'dataset_id': company.meta_conversion_dataset_id or 'pancake-pos',
+                    'page_id': company.pancake_pos_page_id if company.meta_conversion_provider == 'pancake_pos' else company.meta_conversion_page_id,
                     'channel': company.meta_conversion_channel,
                     'test_code': company.meta_conversion_test_code,
                     'event_time': fields.Datetime.now(),
@@ -62,6 +68,8 @@ class SaleOrder(models.Model):
         events = self.env['dac.meta.conversion.event'].sudo().search([('order_id', 'in', self.ids)])
         if not events:
             raise UserError(_('Đơn này không có sự kiện Meta. Chỉ đơn được tạo sau khi bật tính năng mới được gửi.'))
+        if events.filtered(lambda event: event.delivery_provider == 'pancake_pos' and (event.payload or event.attempt_count)):
+            raise UserError(_('Đơn đã bắt đầu luồng POS. Dùng Đối soát POS để giữ mã đối chiếu và tránh tạo/gửi trùng.'))
         if any(event.state not in ('waiting', 'error', 'retry', 'pending') for event in events):
             raise UserError(_('Không gửi lại sự kiện đã nhận, đang gửi hoặc chưa rõ kết quả để tránh tính trùng chuyển đổi.'))
         events.write({'state': 'pending', 'payload': False, 'next_attempt_at': fields.Datetime.now()})
@@ -75,3 +83,19 @@ class SaleOrder(models.Model):
         action = self.env.ref('dac_meta_conversion.action_meta_api_logs').read()[0]
         action['domain'] = [('order_id', 'in', self.ids)]
         return action
+
+    def action_pancake_open_order_logs(self):
+        self.check_access('read')
+        if not (self.env.user.has_group('base.group_system') or self.env.user.has_group('dac_erp.group_dac_erp_manager')):
+            raise AccessError(_('Chỉ quản trị viên và quản lý được xem nhật ký API Pancake.'))
+        action = self.env.ref('dac_pancake_connector.action_pancake_api_logs').read()[0]
+        action['domain'] = [('order_id', 'in', self.ids)]
+        return action
+
+    def action_pancake_reconcile_order(self):
+        self.check_access('write')
+        events = self.env['dac.meta.conversion.event'].sudo().search([
+            ('order_id', 'in', self.ids), ('delivery_provider', '=', 'pancake_pos')])
+        for event in events:
+            event._pancake_readonly_reconcile()
+        return {'type': 'ir.actions.client', 'tag': 'reload'}

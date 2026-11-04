@@ -1,5 +1,19 @@
 # Chuyển đổi Meta cho CRM Duy An
 
+## Gửi qua Pancake POS (phiên bản 1.3)
+
+Ứng dụng phụ thuộc **Kết nối Pancake** (`dac_pancake_connector`). Chọn **Qua Pancake POS** trong trang thiết lập sau khi chuẩn bị kết nối. Cách gửi mặc định của cấu hình cũ vẫn là trực tiếp Meta; không tự bật gửi hoặc đổi nhà cung cấp khi nâng cấp. Nhà cung cấp, shop và Page được chụp khi tạo sự kiện; không chuyển sự kiện cũ sang một nhà cung cấp khác.
+
+Đơn mới thủ công trong CRM được xếp hàng sau commit. Đơn nhập từ POS có `pancake_order_id` không được xếp hàng chuyển đổi lại. Với POS: chỉ nhận đơn VND, tổng tiền dương/nguyên và hội thoại Facebook INBOX đúng khách/Page; không suy diễn ID từ URL Business Suite, không xuất Instagram/bình luận. Tạo một dòng SKU dịch vụ số lượng 1, giá bằng tổng CRM; SKU/kho phải được quản trị viên chuẩn bị trên POS, không đồng bộ danh mục/tồn kho hàng thật.
+
+Worker tra mã `ODOO-{event UUID}` trong POS trước khi tạo; kết quả tra cứu lỗi hoặc phân trang chưa đủ không cho phép POST. Tạo đơn Mới, GET lại để đối chiếu mã, shop, Page, hội thoại, VND, số tiền và không có phụ phí/giảm giá thêm; chỉ sau đó PUT `status=1` một lần. Lưu log started và tham chiếu trước khi gọi mạng. POST/PUT không rõ kết quả dừng ở Cần đối soát, không tự gửi lại. Nút **Đối soát POS (chỉ đọc)** chỉ GET, có thể xác nhận một đơn POS đã ở trạng thái Đã xác nhận và khớp đầy đủ; không sửa đơn POS.
+
+Trạng thái **POS đã xác nhận — cần đối chiếu Meta** khác **Meta đã nhận**. Đọc đơn POS thành công chưa chứng minh Purchase tới Dataset hoặc doanh thu được Meta phân bổ. Test Event Code của luồng Meta trực tiếp không được chuyển sang POS. Nhật ký CRM→POS nằm trong **Kết nối Pancake → Lịch sử API**, nhật ký CRM→Meta giữ riêng. Khi worker chết, log started được đánh dấu cần đối soát cùng sự kiện; mã đã xuất giữ nguyên.
+
+Để vận hành: cập nhật token Chat nếu hết hạn, chọn Page và đồng bộ metadata; hoàn tất SKU/kho và cấu hình CAPI Purchase khi Đã xác nhận; tắt hóa đơn/thông báo trên POS; lưu/kiểm tra kết nối; bật gửi và đối chiếu một giao dịch thật ở POS, Dataset và Ads Manager. Một đơn chỉ dùng một nguồn gửi Purchase.
+
+Kiểm thử: `/dac_meta_conversion` gồm các bài hiện có và `test_pancake_provider.py` cho provider snapshot, giá trị, mạng lỗi, chống trùng, webhook, bulk import, cấu hình, ACL và view. Tất cả API trong kiểm thử được giả lập, không tạo đơn POS thật.
+
 Nhân viên chốt mua trong Meta Business Suite, sau đó tạo đơn trong CRM.
 Khi công ty bật tính năng, mỗi đơn mới có một sự kiện `Purchase` và được gửi
 ngay sau khi giao dịch lưu đơn thành công. Không cần chờ xác nhận, đặt cọc hay

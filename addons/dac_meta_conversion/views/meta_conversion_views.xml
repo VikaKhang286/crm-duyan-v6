@@ -5,6 +5,7 @@
         <field name="arch" type="xml">
             <list create="0" edit="0" delete="0" decoration-success="state == 'sent'" decoration-warning="state in ('waiting', 'retry', 'uncertain')" decoration-danger="state == 'error'">
                 <field name="order_id"/>
+                <field name="delivery_provider"/>
                 <field name="event_time"/>
                 <field name="state" widget="badge"/>
                 <field name="channel"/>
@@ -23,7 +24,7 @@
                 <sheet>
                     <group>
                         <group><field name="order_id"/><field name="state"/><field name="message"/><field name="event_id"/><field name="event_time"/><field name="company_id"/></group>
-                        <group><field name="dataset_id"/><field name="page_id"/><field name="channel"/><field name="test_code"/><field name="attempt_count"/><field name="last_attempt_at"/><field name="next_attempt_at"/><field name="sent_at"/><field name="trace_id"/></group>
+                        <group><field name="delivery_provider"/><field name="pancake_shop_id" invisible="delivery_provider != 'pancake_pos'"/><field name="pancake_remote_id" invisible="delivery_provider != 'pancake_pos'"/><field name="dataset_id" invisible="delivery_provider == 'pancake_pos'"/><field name="page_id"/><field name="channel"/><field name="test_code" invisible="delivery_provider == 'pancake_pos'"/><field name="attempt_count"/><field name="last_attempt_at"/><field name="next_attempt_at"/><field name="sent_at"/><field name="trace_id"/></group>
                     </group>
                     <notebook>
                         <page string="Lịch sử từng lần gọi API" name="api_logs">

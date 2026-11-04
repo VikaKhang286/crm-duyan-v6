@@ -8,6 +8,7 @@ class ResConfigSettings(models.TransientModel):
     _inherit = 'res.config.settings'
 
     meta_conversion_enabled = fields.Boolean(related='company_id.meta_conversion_enabled', readonly=False)
+    meta_conversion_provider = fields.Selection(related='company_id.meta_conversion_provider', readonly=False)
     meta_conversion_setup_path = fields.Selection(related='company_id.meta_conversion_setup_path', readonly=False)
     meta_conversion_app_id = fields.Char(related='company_id.meta_conversion_app_id', readonly=False)
     meta_conversion_dataset_request = fields.Char(string='Đường dẫn thiết lập Dataset', compute='_compute_meta_dataset_request')
@@ -61,6 +62,8 @@ class ResConfigSettings(models.TransientModel):
         if not self.env.user.has_group('base.group_system'):
             raise AccessError(_('Chỉ quản trị viên được kiểm tra kết nối Meta.'))
         company = self.company_id.sudo()
+        if company.meta_conversion_provider == 'pancake_pos':
+            return self.action_pancake_connector_check_pos()
         try:
             company._check_meta_configuration(force=True)
         except ValidationError as exc:

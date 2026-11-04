@@ -4,3 +4,4 @@ from . import meta_api_log
 from . import pancake_conversation
 from . import meta_conversion_event
 from . import sale_order
+from . import pancake_provider

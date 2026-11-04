@@ -10,6 +10,9 @@ class ResCompany(models.Model):
     _inherit = 'res.company'
 
     meta_conversion_enabled = fields.Boolean(string='Chuyển đổi Meta')
+    meta_conversion_provider = fields.Selection([
+        ('meta_direct', 'Gửi trực tiếp đến Meta'), ('pancake_pos', 'Qua Pancake POS')],
+        default='meta_direct', required=True, string='Cách gửi chuyển đổi', groups='base.group_system')
     meta_conversion_setup_path = fields.Selection([
         ('new_app', 'Tôi cần tạo Meta App mới'),
         ('existing_app', 'Tôi đã có app tích hợp Messenger'),
@@ -42,6 +45,9 @@ class ResCompany(models.Model):
     def _check_meta_configuration(self, force=False):
         for company in self.sudo():
             if not force and not company.meta_conversion_enabled:
+                continue
+            if company.meta_conversion_provider == 'pancake_pos':
+                company._check_pancake_export()
                 continue
             if company.meta_conversion_app_id and not re.fullmatch(r'[0-9]+', company.meta_conversion_app_id):
                 raise ValidationError(_('Meta App ID phải là ID số lấy từ App Dashboard, không phải URL hoặc Access Token.'))

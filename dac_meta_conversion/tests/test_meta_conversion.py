@@ -20,6 +20,7 @@ class TestMetaConversion(TransactionCase):
         cls.env = cls.env(context=dict(cls.env.context, tracking_disable=True))
         cls.company = cls.env.company
         cls.company.write({
+            'meta_conversion_provider': 'meta_direct',
             'meta_conversion_enabled': False,
             'meta_conversion_dataset_id': '123456789',
             'meta_conversion_page_id': '987654321',

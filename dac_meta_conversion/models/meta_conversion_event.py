@@ -15,6 +15,7 @@ EVENT_STATES = [
     ('sent', 'Meta đã nhận'), ('test_sent', 'Meta đã nhận — có mã kiểm tra'),
     ('retry', 'Chờ thử lại'), ('error', 'Gửi lỗi'),
     ('uncertain', 'Cần đối soát với Meta'), ('cancelled', 'Đã bỏ qua'),
+    ('pos_sent', 'POS đã xác nhận — cần đối chiếu Meta'),
 ]
 
 
