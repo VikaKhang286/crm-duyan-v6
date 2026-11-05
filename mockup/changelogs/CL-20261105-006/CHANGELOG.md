@@ -1,0 +1,96 @@
+# CL-20261105-006 — Sidebar và Tổng quan riêng cho nhân viên Thiết kế
+
+| Thông tin | Giá trị |
+| --- | --- |
+| Ngày | 2026-11-05 (Việt Nam) |
+| Người yêu cầu | Duy An |
+| Người triển khai Odoo | Khang |
+| Trạng thái | Sẵn sàng bàn giao; chờ Duy An duyệt triển khai |
+| Phiên bản mockup | [mockup-CL-20261105-006](https://github.com/marketingduyan/odoo-crm-duyan-addons/tree/mockup-CL-20261105-006/mockup/changelogs/CL-20261105-006/mockup) |
+| Bản trước | CL-20261105-005 |
+
+## Yêu cầu của Duy An
+
+Duy An đồng ý sidebar chỉ gồm Tổng quan, Lịch thiết kế, Đơn hàng được giao và Chấm công; bỏ thanh ứng dụng và các mục không liên quan. Tổng quan gồm thống kê đơn thiết kế, danh sách task; bấm ô thống kê hiển thị đúng danh sách task tương ứng.
+
+## Trước thay đổi
+
+- Sidebar dùng chung thanh ứng dụng Bán hàng/Vận hành/Chấm công/Kế toán, rộng 322px; nhân viên Thiết kế thấy các mục không cần thiết và mục Việc của tôi trùng dashboard.
+- Dashboard tên Công việc thiết kế có thống kê task nhưng chưa có tổng số đơn; bấm ô chỉ đổi bộ lọc tại chỗ, chưa đưa người dùng tới danh sách và chưa nêu rõ nhóm kết quả.
+
+## Mockup đã thay đổi
+
+- Sidebar riêng cho nhân viên Thiết kế, một cột rộng 230px với Tổng quan, Lịch thiết kế, Đơn hàng được giao và Chấm công. Bỏ thanh ứng dụng ngoài cùng và mục dư; footer giữ ca làm việc, tài khoản, cài đặt, đăng xuất.
+- Giữ đúng menu trên chi tiết task/đơn, lịch và chấm công. Khi thu gọn vẫn có đủ bốn icon; mobile mở drawer 230px và đóng khi chọn mục. Các vai trò khác tiếp tục dùng sidebar hiện có.
+- Tổng quan gồm 6 ô: Đơn thiết kế, Cần làm, Quá hạn, Chờ Sale duyệt, Thiết kế xong, Cần chỉnh sửa; giữ mục cần chỉnh sửa và danh sách task hai cột.
+- Đơn thiết kế đếm các mã đơn khác nhau trong tập task được giao, ghi kèm số task; các ô trạng thái đếm task và ghi kèm số đơn. Một đơn nhiều task không làm tăng tổng đơn nhiều lần.
+- Bấm ô thống kê lọc đúng danh sách, xóa tìm kiếm cũ để kết quả khớp số lượng, chọn trạng thái ô, cuộn/focus tới danh sách. Hiện rõ nhóm đang xem, số task/đơn và nút Hiện tất cả; nhóm số 0 có trạng thái rỗng.
+- Dữ liệu mẫu của Thiết kế lọc task theo người được giao/nhân viên thiết kế, đơn theo người thiết kế hoặc task được giao, lịch theo task được giao. Không mở task/đơn thuộc nhân viên khác ở vai trò mẫu Thiết kế.
+- Toolbar chọn màn hình và tìm nhanh chỉ liệt kê bốn màn phù hợp khi xem vai trò Thiết kế; URL màn không thuộc vai trò được đưa về Tổng quan trong mockup.
+- Giữ giao diện hai cột, chat preview, copy/paste, Thiết kế xong, mở sửa sau bàn giao và luồng Sản xuất nhận file của các bản trước.
+
+## Màn hình và vai trò
+
+- Màn hình: design, task, tasks, calendar, orders, order, attendance.
+- Vai trò: design.
+
+## Tiêu chí nghiệm thu để Khang triển khai
+
+- [ ] Vai trò Thiết kế có đúng bốn mục Tổng quan, Lịch thiết kế, Đơn hàng được giao, Chấm công; không có rail ứng dụng hay mục Kế toán/Bán hàng/Sản xuất/Việc của tôi.
+- [ ] Sidebar desktop rộng 230px, thu gọn còn 68px và giữ đủ bốn icon điều hướng. Mobile 390×844 mở/đóng menu, chọn mục đóng drawer, không tràn trang.
+- [ ] Tổng quan có thống kê số đơn không trùng mã và số task. Một đơn có hai task được tính là một đơn, hai task; chỉ task được giao nằm trong các chỉ số.
+- [ ] Bấm từng ô trong sáu ô thống kê hiện đúng tập task và nhãn Đang xem; có aria-pressed cho ô đang chọn và focus/cuộn tới danh sách. Kết quả không bị từ khóa tìm trước đó làm lệch số.
+- [ ] Ô số 0 hiển thị danh sách rỗng, không tự quay về toàn bộ task. Hiện tất cả khôi phục đầy đủ danh sách, tìm kiếm/lọc vẫn hoạt động.
+- [ ] Từ danh sách đã lọc mở đúng task rồi quay lại Tổng quan giữ nhóm đang xem. Menu active đúng trên chi tiết task, chi tiết đơn, lịch và chấm công.
+- [ ] Đơn/task của nhân viên khác không nằm trong danh sách Thiết kế mẫu; URL chi tiết ngoài phạm vi không tự mở một đơn khác. Thực thi quyền tương ứng ở Odoo là tiêu chí triển khai riêng.
+- [ ] Giữ toàn bộ luồng gửi preview → Thiết kế xong → Sale duyệt/góp ý → chỉnh sửa tiếp → bàn giao file → Sản xuất xem/tải. Sale/Sản xuất giữ menu hiện có.
+
+## Hướng triển khai Odoo
+
+- Khang triển khai sidebar theo vai trò ở home_menu/static/src/xml/backend/navbar.xml, home_menu.css và logic menu liên quan; áp dụng cho desktop/mobile và các trạng thái thu gọn.
+- Tổng quan dùng view design_dashboard.xml và dac_task_dashboard.css. Các ô thống kê và danh sách phải dùng cùng domain theo assigned_user_id, trạng thái, hạn và duyệt để số liệu khớp kết quả.
+- Tổng đơn dùng số order_id khác nhau trong tập task được giao; không lấy tổng số dòng task làm tổng số đơn. Các nhóm trạng thái có thể giao nhau, không cộng tất cả các ô để suy ra tổng.
+- Thiết lập menu groups, ACL, record rules, quyền đọc trường/attachment và domain action thật cho nhân viên Thiết kế. Ẩn menu hoặc điều hướng trong mockup không thay thế bảo vệ dữ liệu server.
+- Xác minh mô hình phân công thực tế: demo dùng Thiết kế mẫu, task.assignee hoặc designer của đơn. Không dùng tên hiển thị nhân viên làm định danh phân quyền production.
+- Giữ các yêu cầu đã chốt CL-20261105-002 đến CL-20261105-005; bản này không sửa addon hay deploy production.
+
+File Odoo tham chiếu (xác minh trên nhánh triển khai):
+
+- `addons/dac_erp/static/src/xml/backend/design_dashboard.xml`
+- `addons/dac_erp/static/src/css/backend/dac_task_dashboard.css`
+- `addons/home_menu/static/src/xml/backend/navbar.xml`
+- `addons/home_menu/static/src/css/backend/home_menu.css`
+- `addons/dac_erp/views/dac_work_task_views.xml`
+- `addons/dac_erp/views/sale_order_view.xml`
+- `addons/dac_erp/static/src/css/backend/sale_order_form.css`
+- `addons/dac_erp/static/src/css/backend/sale_order_vip.css`
+- `addons/dac_erp/static/src/css/backend/conversation_widget.css`
+- `addons/dac_attendance/static/src/xml/employee_dashboard.xml`
+- `addons/dac_attendance/static/src/xml/manager_dashboard.xml`
+
+## Đã kiểm tra
+
+- baseline:check trước sửa khớp 23 source UI tại checkout; đọc HANDOFF, danh mục và workflow; đối chiếu navbar.xml/home_menu.css tại checkout; không truy cập lại live production.
+- Playwright kiểm tra sidebar đúng bốn mục/no rail trên Tổng quan, task, đơn, lịch, chấm công; chiều rộng 230px, thu gọn 68px và bốn icon hoạt động; toolbar màn hình cũng giới hạn phù hợp.
+- Kiểm tra từng ô thống kê: tất cả, cần làm, quá hạn, chờ Sale duyệt, thiết kế xong và cần chỉnh sửa. Danh sách, nhãn, aria-pressed và focus khớp; nhóm 0, dashboard rỗng và tìm kiếm cũ được xử lý đúng.
+- Thêm dữ liệu giả trong browser test: một đơn hai task và một đơn/task của nhân viên khác. Chỉ số tổng đơn không bị đếm trùng, task và đơn ngoài phân công không hiện và không mở được qua URL.
+- Kiểm tra mở task/quay lại giữ bộ lọc; menu mobile mở/đóng sau chọn mục, 390×844 không tràn ngang; vai trò Sale giữ giá tiền và sidebar 322px, Sản xuất giữ mục file bàn giao.
+- Chạy lại luồng chat: copy ảnh thật, Cmd+V dán ảnh, gửi preview, hoàn thành, Sale góp ý/duyệt, bàn giao file và Sản xuất tải đúng byte. Không ghi nhận lỗi JavaScript.
+- Đã xem ảnh desktop 1440×1000 và mobile 390×844 tại test-results/mockup-design-overview-20261105; npm run check, baseline:update, build, kiểm tra snapshot bản trước và gói mới.
+
+## Giới hạn và phần còn cần làm
+
+- Đây là mockup local; vai trò và giới hạn bản ghi là mô phỏng theo dữ liệu giả. Chưa triển khai ACL/record rules, quyền nhiều vai trò hoặc danh tính Odoo thật.
+- Tổng đơn thiết kế đếm đơn có task trong phạm vi được giao; Đơn hàng được giao có thể gồm đơn được phân công người thiết kế nhưng chưa có task. Các ô trạng thái ghi số task và số đơn tương ứng.
+- Tin nhắn/ảnh/file đã gửi vẫn lưu trong cùng trình duyệt theo giới hạn bản trước. Không gửi giữa các tài khoản/máy và không có thông báo thật.
+- Kiểm tra mobile trên Chromium giả lập; chưa kiểm tra Safari/iOS/thiết bị thật. Nguồn production tham chiếu giữ nguyên, sidebar theo vai trò là đề xuất mới.
+- Bản CL-20261105-006 và ZIP mới có local, chưa commit/push, chưa tạo tag GitHub hoặc deploy Odoo.
+
+## Mở đúng phiên bản mockup
+
+1. Dùng thư mục `mockup/` đi cùng changelog này hoặc tải đúng Git tag `mockup-CL-20261105-006` sau khi Codex đã push.
+2. Trong thư mục snapshot `mockup/`, chạy `npm run dev`; không cần npm install hoặc Odoo. Nếu đang chạy bản khác ở cổng 4173, dùng `PORT=4174 npm run dev`.
+3. Đăng nhập bằng tài khoản mẫu điền sẵn, rồi chọn vai trò cần đối chiếu.
+4. So sánh tiêu chí ở trên; ghi commit/PR triển khai vào file `IMPLEMENTATION.md` riêng khi bắt đầu đưa vào Odoo.
+
+Snapshot chỉ chứa mã và dữ liệu mẫu đã chốt. Ghi chú/dữ liệu sửa trong localStorage không tự đi vào snapshot; Codex phải đưa yêu cầu cần bàn giao vào changelog trước khi chốt. Thao tác và quyền trong mockup cần Khang triển khai, kiểm tra trên Odoo.

@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "id": "CL-20261105-002",
+  "title": "Dashboard nhân viên Thiết kế và chi tiết task đơn giản",
+  "date": "2026-11-05",
+  "timeZone": "Asia/Ho_Chi_Minh",
+  "createdAt": "2026-11-05T04:37:17.764Z",
+  "status": "ready_for_handoff",
+  "mockupVersion": "mockup-CL-20261105-002",
+  "previousChangelogId": "CL-20261105-001",
+  "repositoryUrl": "https://github.com/marketingduyan/odoo-crm-duyan-addons",
+  "finalizedAt": "2026-11-05T04:43:08.833Z",
+  "sourceBaseCommit": "c13975cc8046a9eeba706a33a45cf657deae146f",
+  "sourceBranch": "feat/ui-mockup-workflow",
+  "sourceChanges": "M mockup/src/app.js\n M mockup/src/data.js\n M mockup/src/styles.css",
+  "odooSources": [
+    "addons/dac_erp/static/src/xml/backend/design_dashboard.xml",
+    "addons/dac_erp/static/src/css/backend/dac_task_dashboard.css",
+    "addons/dac_erp/views/dac_work_task_views.xml",
+    "addons/dac_erp/views/sale_order_view.xml",
+    "addons/dac_erp/static/src/css/backend/sale_order_form.css",
+    "addons/dac_erp/static/src/css/backend/sale_order_vip.css",
+    "addons/dac_erp/static/src/css/backend/conversation_widget.css"
+  ],
+  "browserDraftsIncluded": false,
+  "files": {
+    "change.json": "c43e5d68eda7a3cf000192b7361ac1f1a4ca4d69d7e920d368566096cd59b70c",
+    "CHANGELOG.md": "93da4e860fbf991c9085b114be5473772b6d07a2c33913278f404e9707c4845f",
+    "mockup/assets/dac-logo.png": "1ffd07065770d216bbf3b2d4d9f6dce105b55326d1defc6ea8250a5d88e5cdcf",
+    "mockup/index.html": "dbb4e37515785b6a687cc4d688b78f6d3b176a3ac0a9ba008cb369428aa8e92b",
+    "mockup/package.json": "a8605140ab10e14dffbf5af987b281460d6f4166986c9c9d8f627ecbefa5fd0d",
+    "mockup/scripts/serve.mjs": "cc8570259001c6ffc11524587d32cfe6237354e46db1b35fa374aebf674ba4f8",
+    "mockup/src/app.js": "2dad6973d17754988e9df5e8424cd937fe9886e46986033cf771b7d5a6043b1b",
+    "mockup/src/data.js": "e0ab847f5bee103fca265c880a1c969c61278d94832488b7291f2e837f967c8c",
+    "mockup/src/icons.js": "63a1451f0f70ff90b7cf9c1e2f131003467e6795ff813a74cb507e52f9650eac",
+    "mockup/src/styles.css": "da5c0a987c40881b0826576fb23c415362895a2b26f80a7fac808c24a05115de",
+    "mockup/src/version.js": "370558ee000852f2efc201eeca9011a4364e24cc8c9417d7901445f1ab69b1e1"
+  },
+  "contentSha256": "ce8517a80e3722be23aec43c5b161e2a541d88bbec3308032892c460bfd7f75e"
+}

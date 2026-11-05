@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="580" viewBox="0 0 960 580">
+  <rect width="960" height="580" fill="#f1f3f7"/>
+  <text x="48" y="52" fill="#64748b" font-family="Arial, sans-serif" font-size="18">BẢN XEM TRƯỚC · DỮ LIỆU MẪU</text>
+  <rect x="154" y="105" width="652" height="355" rx="10" fill="#243347"/>
+  <rect x="166" y="117" width="628" height="331" rx="4" fill="#fff7df"/>
+  <rect x="425" y="156" width="110" height="68" rx="12" fill="#f5be35"/>
+  <text x="480" y="201" text-anchor="middle" fill="#353324" font-family="Arial, sans-serif" font-size="30" font-weight="bold">MẪU</text>
+  <text x="480" y="290" text-anchor="middle" fill="#243347" font-family="Arial, sans-serif" font-size="36" font-weight="bold">THƯƠNG HIỆU MẪU</text>
+  <text x="480" y="334" text-anchor="middle" fill="#6b7280" font-family="Arial, sans-serif" font-size="20">Bảng hiệu hộp đèn · 120 × 80 cm</text>
+  <path d="M295 370H665" stroke="#e8c670" stroke-width="2"/>
+  <text x="480" y="406" text-anchor="middle" fill="#6b7280" font-family="Arial, sans-serif" font-size="17">Bố cục minh họa để Sale duyệt</text>
+  <text x="480" y="522" text-anchor="middle" fill="#64748b" font-family="Arial, sans-serif" font-size="16">PREVIEW 01 · CHƯA PHẢI FILE SẢN XUẤT</text>
+</svg>

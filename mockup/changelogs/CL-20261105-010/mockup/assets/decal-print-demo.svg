@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="480" viewBox="0 0 800 480">
+  <rect width="800" height="480" fill="#fff9e9"/>
+  <rect x="30" y="30" width="740" height="420" rx="16" fill="none" stroke="#e1b34a" stroke-width="2" stroke-dasharray="8 8"/>
+  <rect x="345" y="100" width="110" height="70" rx="12" fill="#f5be35"/>
+  <text x="400" y="147" text-anchor="middle" fill="#353324" font-family="Arial, sans-serif" font-size="30" font-weight="bold">MẪU</text>
+  <text x="400" y="242" text-anchor="middle" fill="#243347" font-family="Arial, sans-serif" font-size="36" font-weight="bold">DECAL TRANG TRÍ</text>
+  <text x="400" y="290" text-anchor="middle" fill="#6b7280" font-family="Arial, sans-serif" font-size="19">File vector minh họa · Dữ liệu mẫu</text>
+  <text x="400" y="388" text-anchor="middle" fill="#8b7950" font-family="Arial, sans-serif" font-size="16">DEMO-006 · 100 × 200 cm · 2 tấm</text>
+</svg>
