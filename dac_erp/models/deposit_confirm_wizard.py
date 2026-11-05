@@ -14,7 +14,10 @@ class DepositConfirmWizard(models.TransientModel):
 
     # === Thông tin thanh toán (user nhập) ===
     journal_id = fields.Many2one('account.journal', string='Phương thức thanh toán', domain=[('type', 'in', ('bank', 'cash'))], required=True)
+    journal_type = fields.Selection(related='journal_id.type', readonly=True)
     payment_date = fields.Date(string="Ngày thanh toán", default=fields.Date.context_today, required=True)
+    payment_proof_image = fields.Binary(string='Hình ảnh chuyển khoản', attachment=True)
+    payment_proof_filename = fields.Char(string='Tên hình ảnh')
 
     @api.model
     def default_get(self, fields_list):
@@ -30,8 +33,8 @@ class DepositConfirmWizard(models.TransientModel):
                 res['partner_name'] = order.partner_id.name or ''
                 res['currency_id'] = order.currency_id.id
                 res['amount_total_order'] = order.remaining_amount_display
-                # Khoản cọc đề xuất khi mở popup thanh toán mới.
-                res['deposit_amount'] = 150000.0
+                # Ưu tiên số tiền người dùng vừa nhập cạnh nút Đặt cọc.
+                res['deposit_amount'] = order.deposit_amount or 150000.0
         if 'journal_id' in fields_list and not res.get('journal_id'):
             bank_journal = self.env['account.journal'].search([
                 ('type', '=', 'bank'),
@@ -119,7 +122,12 @@ class DepositConfirmWizard(models.TransientModel):
             'journal_id': self.journal_id.id,
             'payment_date': self.payment_date,
         })
-        payment_register._create_payments()
+        payments = payment_register._create_payments()
+        if self.payment_proof_image and payments:
+            payments.write({
+                'dac_payment_proof_image': self.payment_proof_image,
+                'dac_payment_proof_filename': self.payment_proof_filename or 'chung-tu-chuyen-khoan.png',
+            })
 
         # CHỈ set is_deposit_confirmed, KHÔNG tự động chuyển sang sản xuất
         # Chỉ khi hóa đơn được thanh toán thì mới có thể tiến hành sản xuất

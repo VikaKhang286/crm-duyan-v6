@@ -48,7 +48,6 @@ export class CartOrdersListController extends ListController {
         super.setup();
         this.orm = useService("orm");
         this.action = useService("action");
-        this.quickSale = useService("dac_quick_sale");
         this.cartStats = null;
         this.cartToolbarFilterGroupIds = { search: null, stage: null, sale: null };
         this.cartSearchTimer = null;
@@ -73,7 +72,17 @@ export class CartOrdersListController extends ListController {
     }
 
     openRecord(record) {
-        return this.quickSale.open(record.resId);
+        return this.openOrder(record.resId);
+    }
+
+    openOrder(orderId) {
+        return this.action.doAction({
+            type: "ir.actions.act_window",
+            res_model: "sale.order",
+            res_id: orderId,
+            views: [[false, "form"]],
+            target: "current",
+        });
     }
 
     isCartWorkspace() {
@@ -102,7 +111,7 @@ export class CartOrdersListController extends ListController {
                 if (event.target.closest("a,button,input,select,textarea,.o-checkbox,.o_field_x2many")) return;
                 event.preventDefault();
                 event.stopPropagation();
-                this.quickSale.open(records[index].resId);
+                this.openOrder(records[index].resId);
             }, true);
         });
     }
@@ -425,7 +434,7 @@ export class CartOrdersListController extends ListController {
                     line.textContent = text;
                     card.append(line);
                 }
-                card.addEventListener("click", () => this.quickSale.open(record.id));
+                card.addEventListener("click", () => this.openOrder(record.id));
                 column.append(card);
             }
             board.append(column);

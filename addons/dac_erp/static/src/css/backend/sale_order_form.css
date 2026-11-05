@@ -298,7 +298,7 @@
     border-bottom: 1px solid #e5e8ee !important;
     background: #fafbfc !important;
     color: #8a94a4 !important;
-    font-size: 9px !important;
+    font-size: 12px !important;
   }
 
   .dac-order-lines-panel .o_list_renderer .o_list_table tbody td {
@@ -308,7 +308,7 @@
     border-radius: 0 !important;
     background: #fff !important;
     color: #455064;
-    font-size: 10px;
+    font-size: 12px;
   }
 
   .dac-order-lines-panel .o_list_renderer .o_list_table tbody tr:hover td {
@@ -439,7 +439,7 @@
 
   .o_web_client .o_control_panel.dac-sale-order-control-panel-active .dac-control-panel-top-row {
     display: grid !important;
-    grid-template-columns: minmax(0, 1.3fr) minmax(420px, 420px) minmax(0, 1fr) !important;
+    grid-template-columns: minmax(0, 1.3fr) minmax(450px, 450px) minmax(0, 1.1fr) !important;
     grid-template-areas: "title progress primary" !important;
   }
 
@@ -460,7 +460,7 @@
   .o_web_client .o_control_panel.dac-sale-order-control-panel-active .dac-control-panel-progress .o_arrow_button {
     min-height: 36px !important;
     padding: 5px 4px !important;
-    font-size: 11px !important;
+    font-size: 12px !important;
   }
 
   .o_web_client .o_control_panel.dac-sale-order-control-panel-active .dac-control-panel-pancake {
@@ -1283,7 +1283,7 @@
   border-radius: 8px;
   background: #fff;
   color: #5e6878;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .dac-sale-form .dac-v6-products-head .dac-v6-record-payment-btn {
@@ -1308,7 +1308,7 @@
   border-radius: 8px !important;
   background: #fff !important;
   color: #596579 !important;
-  font-size: 11px !important;
+  font-size: 12px !important;
   font-weight: 750 !important;
 }
 
@@ -1320,7 +1320,7 @@
   border-radius: 999px;
   background: #eaf3ff;
   color: #2875dd;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
   flex: 0 0 auto;
   order: 2;
@@ -1392,7 +1392,7 @@
   border: 0 !important;
   border-bottom: 2px solid transparent !important;
   color: #8791a0;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
   text-align: center;
   white-space: nowrap;
@@ -1687,7 +1687,7 @@
 .dac-sale-form .dac-v6-tab-subtitle {
   margin: 0 0 12px;
   color: #728096;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .dac-sale-form .dac-v6-internal-card {
@@ -1727,7 +1727,7 @@
   display: block;
   margin: 14px 0 7px;
   color: #303746;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .dac-sale-form .dac-v6-internal-tab textarea {
@@ -1735,7 +1735,7 @@
   padding: 11px !important;
   border: 1px solid #dfe4eb !important;
   border-radius: 9px !important;
-  font-size: 11px !important;
+  font-size: 12px !important;
   resize: vertical;
 }
 
@@ -1751,14 +1751,14 @@
   border-radius: 9px !important;
   background: #ffc20e !important;
   color: #302500 !important;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
 }
 
 .dac-sale-form .dac-v6-empty-log {
   margin: 8px 0;
   color: #929cab;
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .dac-sale-form .dac-v6-history-timeline {
@@ -1797,13 +1797,13 @@
   display: block;
   margin-bottom: 5px;
   color: #728096;
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .dac-sale-form .dac-v6-history-timeline p {
   margin: 0;
   color: #2e3543;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.5;
 }
 
@@ -1895,7 +1895,7 @@
   min-height: 31px;
   border-color: transparent !important;
   background: transparent !important;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 750;
 }
 
@@ -1992,7 +1992,7 @@
   border-color: transparent !important;
   background: transparent !important;
   color: #303846;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 750;
 }
 
@@ -4259,28 +4259,28 @@
 }
 
 /* Keep editable amounts and their currency in one normal-flow control. */
-.dac-summary-container .o_field_monetary:is([name="shipping_fee"], [name="promotion_amount"]) {
+.dac-summary-container .o_field_monetary:is([name="shipping_fee"], [name="promotion_amount"], [name="deposit_amount"]) {
   width: 160px;
   max-width: 100%;
   margin-bottom: 0;
   justify-content: end;
 }
 
-.dac-summary-container .o_field_monetary:is([name="shipping_fee"], [name="promotion_amount"])>div:focus-within {
+.dac-summary-container .o_field_monetary:is([name="shipping_fee"], [name="promotion_amount"], [name="deposit_amount"])>div:focus-within {
   border-color: #2563eb;
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
 }
 
-.dac-summary-container .o_field_monetary:is([name="shipping_fee"], [name="promotion_amount"]) .position-absolute {
+.dac-summary-container .o_field_monetary:is([name="shipping_fee"], [name="promotion_amount"], [name="deposit_amount"]) .position-absolute {
   display: none !important;
 }
 
-.dac-summary-container .o_field_monetary:is([name="shipping_fee"], [name="promotion_amount"])>div>.opacity-0 {
+.dac-summary-container .o_field_monetary:is([name="shipping_fee"], [name="promotion_amount"], [name="deposit_amount"])>div>.opacity-0 {
   opacity: 1 !important;
   color: rgb(15, 23, 42);
 }
 
-.dac-summary-container .o_field_monetary:is([name="shipping_fee"], [name="promotion_amount"]) input.o_input {
+.dac-summary-container .o_field_monetary:is([name="shipping_fee"], [name="promotion_amount"], [name="deposit_amount"]) input.o_input {
   min-width: 0;
   width: 100%;
   padding: 6px 8px;
@@ -4317,22 +4317,44 @@
 }
 
 .dac-summary-container .dac-v6-record-payment-btn {
-  width: 100%;
-  min-height: 42px;
-  margin-top: 12px;
-  border-color: #dce3ec;
+  width: auto;
+  min-height: 34px;
+  margin: 0;
+  padding: 2px !important;
+  border-color: #e1b51a !important;
   border-radius: 8px;
-  background: #fff;
-  color: #566174;
-  font-size: 1rem;
-  font-weight: 750;
+  background: #ffc20e !important;
+  color: #2e2500 !important;
+  font-size: .875rem;
+  font-weight: 800;
+  white-space: nowrap;
 }
 
 .dac-summary-container .dac-v6-record-payment-btn:hover,
 .dac-summary-container .dac-v6-record-payment-btn:focus {
-  border-color: #c4ccda;
-  background: #f8fafc;
-  color: #344054;
+  border-color: #c99d00 !important;
+  background: #f2b900 !important;
+  color: #2e2500 !important;
+}
+
+.dac-v6-deposit-action {
+  display: flex;
+  align-items: center;
+  min-width: 0px;
+  gap: 8px;
+  padding: 7px 0px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+}
+
+.dac-v6-deposit-input-label {
+  flex: 1 1 auto;
+  color: #475569;
+  font-weight: 600;
+}
+
+.dac-v6-deposit-input.o_field_monetary {
+  min-width: 0;
+  margin: 0;
 }
 
 .dac-alert {
@@ -4732,6 +4754,7 @@
     border-collapse: separate !important;
     border-spacing: 0 !important;
     border-radius: 10px !important;
+    font-size: 14px !important;
   }
 
   .o_web_client .dac-order-lines-panel .o_list_renderer .o_list_table tbody td {

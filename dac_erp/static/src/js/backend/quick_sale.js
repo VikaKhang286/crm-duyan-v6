@@ -68,11 +68,14 @@ registry.category("main_components").add("DacQuickSaleDrawer", { Component: Quic
 
 export class QuickSaleListController extends ListController {
     setup() {
-        super.setup(); this.quickSale = useService("dac_quick_sale");
+        super.setup(); this.action = useService("action");
         onMounted(() => this.bindQuickSaleRows());
         onPatched(() => this.bindQuickSaleRows());
     }
-    openRecord(record) { return this.quickSale.open(record.resId); }
+    openOrder(orderId) {
+        return this.action.doAction({ type: "ir.actions.act_window", res_model: "sale.order", res_id: orderId, views: [[false, "form"]], target: "current" });
+    }
+    openRecord(record) { return this.openOrder(record.resId); }
     bindQuickSaleRows() {
         const rows = this.rootRef?.el?.querySelectorAll(".o_list_table tbody tr.o_data_row") || [];
         const records = this.model?.root?.records || [];
@@ -83,7 +86,7 @@ export class QuickSaleListController extends ListController {
             row.addEventListener("click", (event) => {
                 if (event.target.closest("a,button,input,select,textarea,.o-checkbox,.o_field_x2many")) return;
                 event.preventDefault(); event.stopPropagation();
-                this.quickSale.open(records[index].resId);
+                this.openOrder(records[index].resId);
             }, true);
         });
     }

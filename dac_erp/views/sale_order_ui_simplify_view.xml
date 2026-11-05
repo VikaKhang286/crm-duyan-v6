@@ -149,12 +149,6 @@
                                             type="button"
                                             class="btn btn-outline-secondary dac-print-quotation-btn"
                                             invisible="not id"/>
-                                    <button name="action_open_deposit_payment"
-                                            string="Đặt cọc"
-                                            type="object"
-                                            class="btn btn-outline-secondary dac-v6-record-payment-btn"
-                                            groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_full_stack,dac_erp.group_dac_erp_manager"
-                                            invisible="workflow_review_state == 'quotation'"/>
                                 </div>
                                 <div class="dac-v6-products-options">
                                     <div class="dac-action-bar-flags" invisible="order_state_custom == 'quotation'">
@@ -195,14 +189,34 @@
                                     </list>
                                 </field>
                             </div>
-                            <div class="dac-summary-container" groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager,dac_erp.group_dac_erp_design,dac_erp.group_dac_erp_production" invisible="(is_design_user and workflow_review_state != 'deposit') or (is_production_user and workflow_review_state != 'production')">
+                            <div class="dac-summary-container dac-summary-container--editable" groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager,dac_erp.group_dac_erp_design,dac_erp.group_dac_erp_production" invisible="(is_design_user and workflow_review_state != 'deposit') or (is_production_user and workflow_review_state != 'production')">
                                 <field name="currency_id" invisible="1"/>
                                 <div class="dac-summary-row"><span class="dac-summary-label">Tạm tính</span><span class="dac-summary-value"><field name="amount_untaxed_original" readonly="1" widget="monetary" nolabel="1"/></span></div>
                                 <div class="dac-summary-row" invisible="1"><span class="dac-summary-label">Thuế</span><span class="dac-summary-value"><field name="amount_tax" readonly="1" widget="monetary" nolabel="1"/></span></div>
                                 <div class="dac-summary-row" invisible="1"><span class="dac-summary-label">Khuyến mãi/Giảm giá</span><span class="dac-summary-value"><field name="promotion_amount" widget="monetary" nolabel="1" readonly="is_design_user or is_production_user"/></span></div>
                                 <div class="dac-summary-row"><span class="dac-summary-label">Phí vận chuyển</span><span class="dac-summary-value"><field name="shipping_fee" widget="monetary" nolabel="1" readonly="is_design_user or is_production_user"/></span></div>
                                 <div class="dac-summary-row"><span class="dac-summary-label">Tổng</span><span class="dac-summary-value dac-summary-value--large"><field name="amount_total" readonly="1" widget="monetary" nolabel="1"/></span></div>
-                                <div class="dac-summary-row" invisible="deposit_paid_display == 0"><span class="dac-summary-label">Cọc / Đã thanh toán</span><span class="dac-summary-value dac-summary-value--deposit"><field name="deposit_paid_display" readonly="1" widget="monetary" nolabel="1"/></span></div>
+                                <div class="dac-summary-row"
+                                     groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_full_stack,dac_erp.group_dac_erp_manager"
+                                     invisible="workflow_review_state == 'quotation'">
+                                    <span class="dac-summary-label">Tiền cọc</span>
+                                    <div class="d-flex gap-2">
+                                    <field name="deposit_amount" widget="monetary" nolabel="1" class="dac-v6-deposit-input"/>
+                                    <button name="action_open_deposit_payment"
+                                            string="Đặt cọc"
+                                            type="object"
+                                            class="btn dac-v6-record-payment-btn"/>
+                                    </div>
+                                </div>
+                                <div class="dac-summary-row dac-summary-row--remaining" invisible="order_state_custom in ['cancel', 'completed']"><span class="dac-summary-label dac-summary-label--highlight">Còn thanh toán</span><span class="dac-summary-value--highlight"><field name="remaining_amount_display" readonly="1" widget="monetary" nolabel="1"/></span></div>
+                                <div class="dac-summary-row dac-summary-row--remaining" invisible="order_state_custom != 'completed'"><span class="dac-summary-label dac-summary-label--highlight">Còn thanh toán</span><span class="dac-summary-value--highlight"><field name="outstanding_amount_display" readonly="1" widget="monetary" nolabel="1"/></span></div>
+                            </div>
+                            <div class="dac-summary-container dac-summary-container--view" groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager,dac_erp.group_dac_erp_design,dac_erp.group_dac_erp_production" invisible="(is_design_user and workflow_review_state != 'deposit') or (is_production_user and workflow_review_state != 'production')">
+                                <field name="currency_id" invisible="1"/>
+                                <div class="dac-summary-row"><span class="dac-summary-label">Tạm tính</span><span class="dac-summary-value"><field name="amount_untaxed_original" readonly="1" widget="monetary" nolabel="1"/></span></div>
+                                <div class="dac-summary-row"><span class="dac-summary-label">Phí vận chuyển</span><span class="dac-summary-value"><field name="shipping_fee" readonly="1" widget="monetary" nolabel="1"/></span></div>
+                                <div class="dac-summary-row"><span class="dac-summary-label">Tổng</span><span class="dac-summary-value dac-summary-value--large"><field name="amount_total" readonly="1" widget="monetary" nolabel="1"/></span></div>
+                                <div class="dac-summary-row" invisible="workflow_review_state == 'quotation'"><span class="dac-summary-label">Tiền cọc</span><span class="dac-summary-value"><field name="deposit_amount" readonly="1" widget="monetary" nolabel="1"/></span></div>
                                 <div class="dac-summary-row dac-summary-row--remaining" invisible="order_state_custom in ['cancel', 'completed']"><span class="dac-summary-label dac-summary-label--highlight">Còn thanh toán</span><span class="dac-summary-value--highlight"><field name="remaining_amount_display" readonly="1" widget="monetary" nolabel="1"/></span></div>
                                 <div class="dac-summary-row dac-summary-row--remaining" invisible="order_state_custom != 'completed'"><span class="dac-summary-label dac-summary-label--highlight">Còn thanh toán</span><span class="dac-summary-value--highlight"><field name="outstanding_amount_display" readonly="1" widget="monetary" nolabel="1"/></span></div>
                             </div>
@@ -540,9 +554,8 @@
                     <attribute name="class" add="flex-column gap-3" separator=" "/>
                 </xpath>
                 <xpath expr="//div[hasclass('dac-box-client')]" position="after">
-                    <xpath expr="//div[hasclass('dac-summary-container')]" position="move"/>
+                    <xpath expr="//div[hasclass('dac-summary-container--editable')]" position="move"/>
                 </xpath>
-
                 <!-- Workflow cards stay outside dac-box-document so their next-step
                      actions remain available when that document card is hidden. -->
                 <xpath expr="//div[hasclass('dac-box-document')]" position="after">

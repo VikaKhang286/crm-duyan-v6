@@ -75,7 +75,7 @@
 
         <section class="dac-sale-grid dac-sale-grid-bottom dac-orders-only">
           <article class="dac-sale-panel dac-orders-panel">
-            <div class="dac-panel-head dac-orders-head"><div><h2>Đơn hàng gần đây</h2><p>Click một đơn để mở Quick View</p></div><button class="dac-link-btn" t-on-click="openOrders">Xem tất cả đơn</button></div>
+            <div class="dac-panel-head dac-orders-head"><div><h2>Đơn hàng gần đây</h2><p>Click một đơn để xem chi tiết</p></div><button class="dac-link-btn" t-on-click="openOrders">Xem tất cả đơn</button></div>
             <div class="dac-orders-table-wrap"><table class="dac-orders-table"><thead><tr><th>Mã đơn</th><th>Khách hàng</th><th>Sale</th><th>Giai đoạn</th><th>Deadline</th><th>Tổng tiền</th><th>Công nợ</th></tr></thead><tbody>
               <tr t-foreach="saleV6.recent_orders" t-as="order" t-key="order.id" t-on-click="() => this.openForm('sale.order', order.id)">
                 <td class="dac-order-code"><strong><t t-esc="order.number"/></strong></td>

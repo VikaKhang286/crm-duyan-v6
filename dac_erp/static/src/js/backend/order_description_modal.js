@@ -1,5 +1,6 @@
 /** @odoo-module **/
 
+import "./payment_proof_paste";
 import { rpc } from "@web/core/network/rpc";
 import { FormController } from "@web/views/form/form_controller";
 import { patch } from "@web/core/utils/patch";

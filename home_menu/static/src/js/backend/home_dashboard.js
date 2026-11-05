@@ -36,7 +36,6 @@ patch(FormController.prototype, {
         super.setup(...arguments);
         this.dacHomeOrm = useService("orm");
         this.dacHomeAction = useService("action");
-        this.dacQuickSale = useService("dac_quick_sale");
         this.dacHomeLoaded = false;
         onMounted(() => this.mountDacHomeDashboard());
         onPatched(() => this.mountDacHomeDashboard());
@@ -153,9 +152,9 @@ patch(FormController.prototype, {
                 row.classList.add("is-clickable");
                 row.setAttribute("role", "button");
                 row.tabIndex = 0;
-                row.addEventListener("click", () => this.dacQuickSale.open(activity.orderId));
+                row.addEventListener("click", () => this.openDacSaleOrder(activity.orderId));
                 row.addEventListener("keydown", (event) => {
-                    if (event.key === "Enter" || event.key === " ") this.dacQuickSale.open(activity.orderId);
+                    if (event.key === "Enter" || event.key === " ") this.openDacSaleOrder(activity.orderId);
                 });
             }
             const avatar = document.createElement("span");
@@ -171,6 +170,16 @@ patch(FormController.prototype, {
             row.append(avatar, copy);
             container.append(row);
         }
+    },
+
+    openDacSaleOrder(orderId) {
+        return this.dacHomeAction.doAction({
+            type: "ir.actions.act_window",
+            res_model: "sale.order",
+            res_id: orderId,
+            views: [[false, "form"]],
+            target: "current",
+        });
     },
 
     openDacQuickTask() {
