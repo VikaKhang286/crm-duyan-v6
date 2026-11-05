@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "id": "CL-20261105-009",
+  "title": "Thu gọn thẻ Cần làm và gom nhãn trạng thái",
+  "date": "2026-11-05",
+  "timeZone": "Asia/Ho_Chi_Minh",
+  "createdAt": "2026-11-05T07:53:08.176Z",
+  "status": "ready_for_handoff",
+  "mockupVersion": "mockup-CL-20261105-009",
+  "previousChangelogId": "CL-20261105-008",
+  "repositoryUrl": "https://github.com/marketingduyan/odoo-crm-duyan-addons",
+  "finalizedAt": "2026-11-05T07:54:42.722Z",
+  "sourceBaseCommit": "c13975cc8046a9eeba706a33a45cf657deae146f",
+  "sourceBranch": "feat/ui-mockup-workflow",
+  "sourceChanges": "M mockup/src/app.js\n M mockup/src/data.js\n M mockup/src/icons.js\n M mockup/src/styles.css\n M mockup/src/version.js\n?? mockup/assets/decal-print-demo.svg\n?? mockup/assets/design-preview-demo.svg\n?? mockup/src/notifications.js",
+  "odooSources": [
+    "addons/dac_erp/static/src/xml/backend/design_dashboard.xml",
+    "addons/dac_erp/static/src/css/backend/dac_task_dashboard.css",
+    "addons/home_menu/static/src/xml/backend/navbar.xml",
+    "addons/home_menu/static/src/css/backend/home_menu.css"
+  ],
+  "browserDraftsIncluded": false,
+  "files": {
+    "change.json": "b3ef00d47e7bd03aed549cb67eca3b84473ffdcaef9afb715c33dd39d54695d2",
+    "CHANGELOG.md": "0c145fb4cc52683753ee8c8ecefdd333d9bb89c5a9d8df72bfed29f6fd7ce690",
+    "mockup/assets/dac-logo.png": "1ffd07065770d216bbf3b2d4d9f6dce105b55326d1defc6ea8250a5d88e5cdcf",
+    "mockup/assets/decal-print-demo.svg": "8029a688662a7e572007e26ba498e0a0fd3e8e7a9becc28def897ebec8537cc2",
+    "mockup/assets/design-preview-demo.svg": "bf6f3b0e9b7ddd6bd53cfbd63f939d2b65363936520255c9c5d43e5f251fbf35",
+    "mockup/index.html": "dbb4e37515785b6a687cc4d688b78f6d3b176a3ac0a9ba008cb369428aa8e92b",
+    "mockup/package.json": "47d5cc0a6a2b50542b16974d07a7626bc22019c12c707607eade6c973f906e77",
+    "mockup/scripts/serve.mjs": "cc8570259001c6ffc11524587d32cfe6237354e46db1b35fa374aebf674ba4f8",
+    "mockup/src/app.js": "8e3c10f220243128737888da181272d6267ce16a4082a4405e2eb27aa8179f7b",
+    "mockup/src/data.js": "bda100ab319b8a587c143d7b9058b7168b8ea6f0abfbbdeda4eaaf60609f762e",
+    "mockup/src/icons.js": "0aa1c813154f84cb57b2b1ee4751f74d222b79db5b85ddbf6a4dfde84c001047",
+    "mockup/src/notifications.js": "24ddf5aa111493238ac3f62c065fc0fd6bba05791f5d3cb9f8976e3c7407a4b4",
+    "mockup/src/styles.css": "e1b05fe40b21df491951d8219de9f3ff5012d3bf7415b62af7b8f5372cdddeca",
+    "mockup/src/version.js": "6d2a760d595081f494f13422108174c2ffd83e8df41248822818cc875865e59f"
+  },
+  "contentSha256": "f5a4160d8822f3102cbc78ba4495031de0281afd783427e0860dc44e8c8f45e2"
+}

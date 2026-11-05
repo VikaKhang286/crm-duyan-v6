@@ -1,0 +1,24 @@
+{
+  "name": "dac-ui-mockup",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Giao diện mẫu DAC ERP để Duy An duyệt và Khang triển khai Odoo",
+  "scripts": {
+    "dev": "node scripts/serve.mjs",
+    "start": "node scripts/serve.mjs",
+    "build": "node scripts/build.mjs",
+    "check": "node scripts/check.mjs",
+    "baseline:check": "node scripts/baseline.mjs check",
+    "baseline:update": "node scripts/baseline.mjs update",
+    "change:new": "node scripts/changelog.mjs new",
+    "change:finalize": "node scripts/changelog.mjs finalize",
+    "change:verify": "node scripts/changelog.mjs verify",
+    "change:pack": "node scripts/changelog.mjs pack",
+    "change:tag": "node scripts/changelog.mjs tag",
+    "test:changelog": "node --test scripts/changelog.test.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
