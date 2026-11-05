@@ -12,6 +12,20 @@ class SaleOrder(models.Model):
 
     _inherit = 'sale.order'
 
+    # Compatibility field for production databases that still contain an
+    # inherited sale-order view from the former Pancake POS routing feature.
+    # The routing feature is no longer present, but Odoo validates the full
+    # inherited view graph whenever dac_erp is upgraded.
+    pancake_pos_route_locked = fields.Boolean(
+        string='Khóa định tuyến POS Pancake',
+        default=False,
+        copy=False,
+    )
+    pancake_pos_connection_id = fields.Integer(
+        string='Kết nối POS Pancake (tương thích)',
+        copy=False,
+    )
+
     @api.model
     def action_open_new_sale_order(self):
         """Open the native new quotation page from custom order lists."""
