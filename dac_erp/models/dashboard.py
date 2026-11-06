@@ -320,7 +320,11 @@ class SaleOrder(models.Model):
                 'amount_total': order.amount_total,
             }
 
-        active_value = sum(orders.mapped('amount_total'))
+        production_orders = [_pack_order(order) for order in orders[:8]]
+        # The dashboard only renders the first eight orders.  Keep the KPI
+        # derived from exactly those cards so it counts visible production
+        # orders rather than their individual tasks.
+        active_order_count = len(production_orders)
         return {
             'task_stats': data['task_stats'],
             'design_tasks': b['design'],
@@ -328,11 +332,10 @@ class SaleOrder(models.Model):
             'user_name': user.name,
             'is_design_user': (user._dac_is_design() or user._dac_is_manager()),
             'production_stats': {
-                'active': len(orders),
-                'active_value': active_value,
+                'active': active_order_count,
                 'overdue': len(overdue),
                 'finishing_soon': len(finishing_soon),
                 'on_time_rate': round((len(orders) - len(overdue)) * 100 / len(orders)) if orders else 100,
             },
-            'production_orders': [_pack_order(order) for order in orders[:8]],
+            'production_orders': production_orders,
         }

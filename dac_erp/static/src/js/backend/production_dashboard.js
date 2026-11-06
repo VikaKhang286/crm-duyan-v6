@@ -151,6 +151,14 @@ class ProductionDashboard extends Component {
   get productionTasks() {
     return this.state.data?.production_tasks || [];
   }
+  get productionInProgressCount() {
+    // Keep the KPI aligned with the "Đơn đang sản xuất" block: each order
+    // already exposes its unfinished task count as remaining_tasks.
+    return this.productionOrders.reduce(
+      (total, order) => total + Number(order.remaining_tasks || 0),
+      0,
+    );
+  }
   get productionStats() {
     return this.state.data?.production_stats || {};
   }
