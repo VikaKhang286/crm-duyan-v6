@@ -44,15 +44,17 @@
         <field name="name">dac.web.lead.list</field><field name="model">dac.web.lead</field>
         <field name="arch" type="xml"><list create="0">
             <field name="received_at"/><field name="site"/><field name="form_type"/><field name="customer_name"/>
-            <field name="phone"/><field name="items"/><field name="page_url" optional="hide"/>
+            <field name="phone"/><field name="items"/><field name="source_info" optional="show"/><field name="phone_only" optional="hide"/><field name="page_url" optional="hide"/>
         </list></field>
     </record>
     <record id="web_lead_form" model="ir.ui.view">
         <field name="name">dac.web.lead.form</field><field name="model">dac.web.lead</field>
         <field name="arch" type="xml"><form create="0"><sheet>
             <group><group><field name="customer_name"/><field name="phone"/><field name="email"/><field name="company_name"/><field name="items"/></group>
-                <group><field name="site"/><field name="form_type"/><field name="form_name"/><field name="page_url"/><field name="submitted_at"/><field name="received_at"/></group></group>
-            <field name="message"/>
+                <group><field name="site"/><field name="form_type"/><field name="form_name"/><field name="page_url"/><field name="page_title"/><field name="submitted_at"/><field name="received_at"/><field name="source_info"/><field name="phone_only"/></group></group>
+            <group string="Nội dung khách nhập"><field name="message" nolabel="1" colspan="2"/></group>
+            <group string="Thông tin khách đã nhập" invisible="not extra_info"><field name="extra_info" nolabel="1" colspan="2"/></group>
+            <group string="Trang khách đã xem (24 giờ gần nhất, cũ → mới)" invisible="not visited_urls"><field name="visited_urls" nolabel="1" colspan="2"/></group>
         </sheet></form></field>
     </record>
     <record id="web_lead_action" model="ir.actions.act_window">

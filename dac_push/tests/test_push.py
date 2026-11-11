@@ -51,6 +51,55 @@ class TestPushEvents(TransactionCase):
         self.assertEqual(self.env['dac.web.lead'].search_count([('event_id', '=', first.id)]), 1)
         self.assertEqual(len(self.channel.message_ids), 1)
 
+    def test_lead_keeps_entered_fields_visited_pages_and_source(self):
+        visited = [{'url': 'https://duyan.vn/?utm_source=google', 'title': 'Trang chủ', 'at': '2026-11-11 10:00:00'},
+                   {'url': 'https://duyan.vn/in-an', 'title': 'In ấn', 'at': '2026-11-11 10:04:00'},
+                   {'url': 'https://example.org/ngoai', 'title': '', 'at': '2026-11-11 10:05:00'}]
+        event, _ = self.events._receive(envelope(
+            'rich1', name='Chị D', message='Cần giao trước thứ 6', page_title='Báo giá', page_url='https://duyan.vn/bao-gia',
+            fields=[{'label': 'Dịch vụ cần làm', 'value': 'In bạt'}, {'label': 'Kích thước', 'value': '2x3m'},
+                    {'label': 'Trống', 'value': ''}, 'rác', {'label': 'A\x00B', 'value': 'ok'}],
+            visited=visited, source={'utm_source': 'google', 'utm_medium': 'cpc', 'utm_campaign': 'in-an'}))
+        lead = self.env['dac.web.lead'].search([('event_id', '=', event.id)])
+        self.assertEqual(lead.extra_info.splitlines(), ['Dịch vụ cần làm: In bạt', 'Kích thước: 2x3m', 'AB: ok'])
+        self.assertEqual(lead.visited_urls.splitlines(), ['10:00 — /?utm_source=google — Trang chủ', '10:04 — /in-an — In ấn', '10:05 — https://example.org/ngoai'])
+        self.assertEqual((lead.source_info, lead.page_title, lead.phone_only), ('google / cpc / in-an', 'Báo giá', False))
+        text = self.channel.message_ids.text
+        for expected in ('Cần giao trước thứ 6', '➕ Thông tin khác:', '• Dịch vụ cần làm: In bạt', '🌐 Nguồn: google / cpc / in-an',
+                         '🧭 Đã xem 3 trang:', '10:04 — /in-an — In ấn', 'Gửi từ: /bao-gia'):
+            self.assertIn(expected, text)
+
+    def test_phone_only_form_is_valid_and_reads_cleanly(self):
+        event, _ = self.events._receive({'event_id': 'ph1', 'event_type': 'web_lead.created', 'source': 'duyan.vn',
+            'data': {'site': 'duyan.vn', 'form_type': 'callback', 'phone': '0955 666 777', 'page_url': 'https://duyan.vn/lien-he',
+                     'visited': [{'url': 'https://duyan.vn/lien-he', 'title': 'Liên hệ', 'at': '2026-11-11 10:00:00'}]}})
+        self.assertEqual(event.state, 'processed')
+        lead = self.env['dac.web.lead'].search([('event_id', '=', event.id)])
+        self.assertTrue(lead.phone_only)
+        text = self.channel.message_ids.text
+        self.assertIn('Khách để lại số điện thoại', text)
+        self.assertIn('📞 0955666777', text)
+        for absent in ('👤', '✉️', '📝', '➕'):
+            self.assertNotIn(absent, text)
+        self.assertIn('🧭 Đã xem 1 trang:', text)
+
+    def test_long_visit_history_is_trimmed_in_the_message_but_kept_in_the_lead(self):
+        visited = [{'url': 'https://duyan.vn/p%s' % i, 'title': 'P%s' % i, 'at': '2026-11-11 10:%02d:00' % i} for i in range(15)]
+        event, _ = self.events._receive(envelope('long1', visited=visited))
+        lead = self.env['dac.web.lead'].search([('event_id', '=', event.id)])
+        self.assertEqual(len(lead.visited_urls.splitlines()), 15)
+        text = self.channel.message_ids.text
+        self.assertIn('Đã xem 15 trang (8 trang gần nhất)', text)
+        self.assertIn('/p14', text)
+        self.assertNotIn('/p6 ', text)
+        self.assertLess(len(text), 2000)
+
+    def test_junk_in_new_fields_never_breaks_the_event(self):
+        event, _ = self.events._receive(envelope('junk1', fields='not-a-list', visited={'a': 1}, source='x'))
+        self.assertEqual(event.state, 'processed')
+        lead = self.env['dac.web.lead'].search([('event_id', '=', event.id)])
+        self.assertFalse(lead.extra_info or lead.visited_urls or lead.source_info)
+
     def test_endpoint_url_is_https_for_public_hosts_only(self):
         icp = self.env['ir.config_parameter'].sudo()
         config = self.env['dac.push.config']._config()

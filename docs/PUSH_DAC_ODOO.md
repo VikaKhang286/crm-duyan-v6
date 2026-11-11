@@ -31,6 +31,18 @@ Nếu Odoo đổi IP phải cập nhật lại.
 Production hiện chạy Bee Contact 2.4.38 (chưa có hub/event bus). Plugin dùng các hook `bcb_bee_form_submitted`,
 `bcb_quote_success`, `bcb_callback_success`, `bcb_lead_created` nên chạy được cả bản cũ lẫn mới.
 
+## Dữ liệu của mỗi lead (`web_lead.created`)
+
+`name`, `phone`, `email`, `company`, `message` (đều có thể rỗng — form chỉ có số điện thoại vẫn hợp lệ, tin Zalo ghi rõ
+“Khách để lại số điện thoại”), `items[]`, `page_url`, `page_title`, và:
+
+- `fields[] {label, value}` — **mọi** thông tin khác khách đã nhập (ghi chú, yêu cầu bổ sung, kích thước…), nhãn lấy từ cấu hình form;
+- `visited[] {url, title, at}` — các trang khách đã xem trong 24 giờ gần nhất (tối đa 15), lấy từ Bee CRM theo `client_id`
+  nên không thêm cookie hay script theo dõi; không có Bee CRM thì để trống;
+- `source{utm_source, utm_medium, utm_campaign, referrer, landing}` — nguồn truy cập.
+
+Odoo lưu đầy đủ ở lead (tab “Thông tin khách đã nhập”, “Trang khách đã xem”); tin Zalo hiện tối đa 15 trường và 8 trang gần nhất.
+
 ## Thêm loại dữ liệu mới
 
 **WordPress** (plugin/theme khác):
