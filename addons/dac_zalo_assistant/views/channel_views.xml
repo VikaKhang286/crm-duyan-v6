@@ -1,0 +1,112 @@
+<odoo>
+    <record id="channel_list" model="ir.ui.view">
+        <field name="name">dac.zalo.channel.list</field><field name="model">dac.zalo.channel</field>
+        <field name="arch" type="xml"><list>
+            <field name="sequence" widget="handle"/>
+            <field name="name"/><field name="thread_type"/>
+            <field name="event_type_ids" widget="many2many_tags"/>
+            <field name="last_sent_at"/><field name="failed_count" decoration-danger="failed_count &gt; 0"/>
+            <field name="active" widget="boolean_toggle"/>
+        </list></field>
+    </record>
+    <record id="channel_form" model="ir.ui.view">
+        <field name="name">dac.zalo.channel.form</field><field name="model">dac.zalo.channel</field>
+        <field name="arch" type="xml"><form string="Hội thoại nhận thông báo">
+            <header><button name="action_send_test" type="object" string="Gửi tin thử" class="btn-secondary"
+                invisible="not id" confirm="Gửi một tin thử vào hội thoại này?"/></header>
+            <sheet>
+                <widget name="web_ribbon" title="Tạm dừng" bg_color="text-bg-warning" invisible="active"/>
+                <div class="oe_title"><label for="name"/><h1><field name="name" placeholder="Vd: Nhóm Sale"/></h1></div>
+                <group>
+                    <group string="Hội thoại">
+                        <field name="thread_type"/><field name="thread_id"/><field name="members"/>
+                    </group>
+                    <group string="Trạng thái"><field name="active" widget="boolean_toggle"/><field name="note"/></group>
+                </group>
+                <notebook>
+                    <page name="events" string="Thông báo nhận">
+                        <div class="text-muted mb-2">Tick các loại thông báo sẽ được gửi vào hội thoại này.</div>
+                        <field name="event_type_ids" widget="many2many_checkboxes"/>
+                    </page>
+                    <page name="messages" string="Tin đã gửi">
+                        <field name="message_ids" readonly="1"><list decoration-danger="state in ('failed','uncertain')" decoration-muted="state == 'cancelled'">
+                            <field name="create_date"/><field name="event_type_id"/><field name="text"/>
+                            <field name="state" widget="badge"/><field name="error_message" optional="show"/>
+                            <button name="action_retry" type="object" string="Gửi lại" icon="fa-refresh" invisible="state != 'failed'"/>
+                        </list></field>
+                    </page>
+                </notebook>
+            </sheet>
+        </form></field>
+    </record>
+    <record id="channel_search" model="ir.ui.view">
+        <field name="name">dac.zalo.channel.search</field><field name="model">dac.zalo.channel</field>
+        <field name="arch" type="xml"><search><field name="name"/><field name="thread_id"/><field name="event_type_ids"/>
+            <filter name="groups" string="Nhóm" domain="[('thread_type','=','group')]"/>
+            <filter name="users" string="Chat riêng" domain="[('thread_type','=','user')]"/>
+            <filter name="inactive" string="Tạm dừng" domain="[('active','=',False)]"/>
+        </search></field>
+    </record>
+    <record id="channel_action" model="ir.actions.act_window">
+        <field name="name">Hội thoại nhận thông báo</field><field name="res_model">dac.zalo.channel</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html"><p class="o_view_nocontent_smiling_face">Chưa có hội thoại nào nhận thông báo</p>
+            <p>Vào menu “Tìm hội thoại Zalo” để tìm nhóm hoặc người, rồi chọn thông báo cần gửi.</p></field>
+    </record>
+
+    <record id="event_type_list" model="ir.ui.view">
+        <field name="name">dac.zalo.event.type.list</field><field name="model">dac.zalo.event.type</field>
+        <field name="arch" type="xml"><list create="0" delete="0">
+            <field name="group_name"/><field name="name"/><field name="code"/>
+            <field name="channel_ids" widget="many2many_tags"/>
+        </list></field>
+    </record>
+    <record id="event_type_form" model="ir.ui.view">
+        <field name="name">dac.zalo.event.type.form</field><field name="model">dac.zalo.event.type</field>
+        <field name="arch" type="xml"><form create="0" delete="0"><sheet>
+            <group><field name="name"/><field name="code"/><field name="group_name"/><field name="description"/>
+                <field name="channel_ids" widget="many2many_tags" string="Hội thoại nhận tin"/></group>
+        </sheet></form></field>
+    </record>
+    <record id="event_type_action" model="ir.actions.act_window">
+        <field name="name">Loại thông báo</field><field name="res_model">dac.zalo.event.type</field><field name="view_mode">list,form</field>
+    </record>
+
+    <record id="thread_search_form" model="ir.ui.view">
+        <field name="name">dac.zalo.thread.search.form</field><field name="model">dac.zalo.thread.search</field>
+        <field name="arch" type="xml"><form string="Tìm hội thoại Zalo">
+            <group>
+                <field name="searched" invisible="1"/>
+                <label for="query"/>
+                <div class="d-flex gap-2">
+                    <field name="query" placeholder="Gõ một phần tên nhóm hoặc người; để trống để xem tất cả" class="flex-grow-1"/>
+                    <button name="action_search" type="object" string="Tìm" class="btn-primary" icon="fa-search"/>
+                </div>
+            </group>
+            <div class="text-muted" invisible="searched">Danh sách lấy từ tài khoản Zalo của trợ lý (bạn bè và nhóm đã tham gia). Trợ lý phải ở trong nhóm mới gửi được.</div>
+            <div class="alert alert-warning" role="alert" invisible="not searched or line_ids">Không tìm thấy hội thoại phù hợp.</div>
+            <field name="line_ids" invisible="not searched or not line_ids">
+                <list editable="bottom" create="0" delete="0" decoration-muted="added">
+                    <field name="selected" widget="boolean_toggle" readonly="added"/>
+                    <field name="name"/><field name="thread_type"/><field name="members"/><field name="added"/>
+                    <field name="thread_id" optional="hide"/>
+                </list>
+            </field>
+            <footer>
+                <button name="action_add" type="object" string="Thêm hội thoại đã chọn" class="btn-primary" invisible="not line_ids"/>
+                <button string="Đóng" special="cancel" class="btn-secondary"/>
+            </footer>
+        </form></field>
+    </record>
+    <record id="thread_search_action" model="ir.actions.server">
+        <field name="name">Tìm hội thoại Zalo</field><field name="model_id" ref="model_dac_zalo_channel"/>
+        <field name="state">code</field><field name="code">action = model.action_open_search()</field>
+    </record>
+
+    <menuitem id="menu_channels" name="Đích nhận thông báo" parent="menu_root" action="channel_action"
+        groups="dac_erp.group_dac_erp_manager,base.group_system" sequence="7"/>
+    <menuitem id="menu_thread_search" name="Tìm hội thoại Zalo" parent="menu_root" action="thread_search_action"
+        groups="dac_erp.group_dac_erp_manager,base.group_system" sequence="8"/>
+    <menuitem id="menu_event_types" name="Loại thông báo" parent="menu_root" action="event_type_action"
+        groups="base.group_system" sequence="9"/>
+</odoo>

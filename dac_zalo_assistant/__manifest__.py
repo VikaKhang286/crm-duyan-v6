@@ -1,8 +1,8 @@
 {
     'name': 'Trợ lý DAC qua Zalo',
-    'version': '18.0.2.6.0',
+    'version': '18.0.2.7.0',
     'category': '1. Duy An ERP',
-    'summary': 'Hội thoại, thông báo nghiệp vụ Zalo và AI tương thích OpenAI',
+    'summary': 'Hội thoại, thông báo nghiệp vụ Zalo, đích nhận thông báo (nhóm/chat) và AI tương thích OpenAI',
     'license': 'LGPL-3',
     'depends': ['dac_erp'],
     'data': [
@@ -10,8 +10,10 @@
         'security/ir.model.access.csv',
         'data/config.xml',
         'data/cron.xml',
+        'data/channels.xml',
         'views/assistant_views.xml',
         'views/notification_views.xml',
+        'views/channel_views.xml',
     ],
     'assets': {
         'web.assets_backend': [

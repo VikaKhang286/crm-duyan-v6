@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, rm, readFile, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { Bridge, authorized, normalizeMessage } from '../src/bridge.js';
+import { Bridge, authorized, normalizeMessage, matchThreads } from '../src/bridge.js';
 import { Store } from '../src/store.js';
 
 const TOKEN = 'test-secret-that-is-longer-than-thirty-two-characters';
@@ -133,4 +133,40 @@ test('logout during credential persistence cannot resurrect the session', async 
     assert.equal(bridge.api, null); assert.equal(bridge.state, 'disconnected');
     await assert.rejects(readFile(join(dir, 'credentials.json')), { code: 'ENOENT' });
   } finally { store.close(); await rm(dir, { recursive: true, force: true }); }
+});
+
+test('thread search lists friends and groups, folds Vietnamese accents and caches the result', async () => {
+  let calls = 0;
+  const api = {
+    getAllFriends: async () => { calls += 1; return [{ userId: 'u1', displayName: 'Nguyễn Văn Kiệt' }, { userId: 'u2', zaloName: 'Lan' }]; },
+    getAllGroups: async () => ({ gridVerMap: { g1: '1', g2: '1' } }),
+    getGroupInfo: async (ids) => ({ gridInfoMap: Object.fromEntries(ids.map((id) => [id, { name: id === 'g1' ? 'Nhóm Sale Đơn hàng' : 'Thiết kế', totalMember: 7 }])) }),
+  };
+  const { bridge, store } = fixture(); bridge.api = api;
+  const all = (await bridge.searchThreads('')).threads;
+  assert.equal(all.length, 4);
+  assert.deepEqual((await bridge.searchThreads('kiet')).threads.map((t) => t.thread_id), ['u1']);
+  const groups = (await bridge.searchThreads('don hang')).threads;
+  assert.deepEqual(groups, [{ thread_id: 'g1', thread_type: 'group', name: 'Nhóm Sale Đơn hàng', members: 7 }]);
+  assert.equal(calls, 1, 'second and third search must reuse the cache');
+  bridge.state = 'disconnected';
+  await assert.rejects(bridge.searchThreads('x'), /not_connected/);
+  store.close();
+});
+
+test('matchThreads limits results and matches an exact thread id', () => {
+  const many = Array.from({ length: 80 }, (_, i) => ({ thread_id: `t${i}`, thread_type: 'user', name: `Khách ${i}` }));
+  assert.equal(matchThreads(many, 'khach').length, 50);
+  assert.deepEqual(matchThreads(many, 't7').map((t) => t.thread_id), ['t7']);
+});
+
+test('group messages are sent with the group thread type and never collide with user sends', async () => {
+  const sent = [];
+  const { bridge, store } = fixture();
+  bridge.api = { sendMessage: async (text, thread, type) => { sent.push([thread, type]); return { message: { msgId: `m${sent.length}` } }; }, getUserInfo: async () => ({}) };
+  assert.equal((await bridge.send({ ...payload, request_id: 'g', thread_id: 'G1', thread_type: 'group' })).delivery, 'sent');
+  assert.equal((await bridge.send({ ...payload, request_id: 'u', thread_id: 'G1' })).delivery, 'sent');
+  assert.deepEqual(sent, [['G1', 1], ['G1', 0]]);
+  await assert.rejects(bridge.send({ ...payload, request_id: 'x', thread_type: 'channel' }), /invalid_payload/);
+  store.close();
 });

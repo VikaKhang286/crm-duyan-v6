@@ -20,6 +20,18 @@ export function normalizeMessage(message, historical = false) {
   };
 }
 
+const THREAD_CACHE_MS = 5 * 60 * 1000;
+const THREAD_LIMIT = 50;
+const fold = (value) => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase();
+
+export function matchThreads(threads, query, limit = THREAD_LIMIT) {
+  const needle = fold(query).trim();
+  return threads
+    .filter((thread) => !needle || fold(thread.name).includes(needle) || thread.thread_id === needle)
+    .sort((a, b) => fold(a.name).localeCompare(fold(b.name)))
+    .slice(0, limit);
+}
+
 export class Bridge {
   constructor({ zalo, store, dataDir, odooUrl, token, fetchImpl = fetch, sendTimeoutMs = 25000 }) {
     Object.assign(this, { zalo, store, dataDir, odooUrl, token, fetchImpl, sendTimeoutMs });
@@ -172,10 +184,36 @@ export class Bridge {
     } catch { /* Keep the persisted batch for retry; do not log message bodies or tokens. */ }
     finally { this.flushing = false; }
   }
+  // Friends + groups of the logged-in account, cached to avoid hammering Zalo (unofficial API).
+  async listThreads() {
+    if (!this.api || this.state !== 'connected') throw new Error('not_connected');
+    const api = this.api;
+    if (this.threadCache?.api === api && Date.now() - this.threadCache.at < THREAD_CACHE_MS) return this.threadCache.items;
+    const items = [];
+    const friends = await api.getAllFriends();
+    for (const friend of Array.isArray(friends) ? friends : []) {
+      const id = String(friend?.userId || '');
+      if (!id) continue;
+      items.push({ thread_id: id, thread_type: 'user', name: String(friend.displayName || friend.zaloName || id).slice(0, 160), members: null });
+    }
+    const groupIds = Object.keys((await api.getAllGroups())?.gridVerMap || {});
+    for (let index = 0; index < groupIds.length; index += 50) {
+      const info = await api.getGroupInfo(groupIds.slice(index, index + 50));
+      for (const [id, group] of Object.entries(info?.gridInfoMap || {})) {
+        items.push({ thread_id: String(id), thread_type: 'group', name: String(group?.name || id).slice(0, 160), members: Number(group?.totalMember) || null });
+      }
+    }
+    if (this.api === api) this.threadCache = { api, at: Date.now(), items };
+    return items;
+  }
+  async searchThreads(query = '') {
+    return { threads: matchThreads(await this.listThreads(), String(query).slice(0, 100)) };
+  }
   async send(payload) {
     for (const field of ['request_id', 'account_id', 'thread_id', 'text']) {
       if (typeof payload[field] !== 'string' || !payload[field] || payload[field].length > (field === 'text' ? 12000 : 200)) throw new Error('invalid_payload');
     }
+    if (payload.thread_type !== undefined && !['user', 'group'].includes(payload.thread_type)) throw new Error('invalid_payload');
     if (payload.account_id !== this.accountId) throw new Error('wrong_account');
     if (!this.api || this.state !== 'connected') throw new Error('not_connected');
     const previous = this.store.reserve(payload.request_id, payload);
@@ -183,7 +221,7 @@ export class Bridge {
     let timer;
     try {
       const result = await Promise.race([
-        this.api.sendMessage(payload.text, payload.thread_id, 0),
+        this.api.sendMessage(payload.text, payload.thread_id, payload.thread_type === 'group' ? 1 : 0),
         new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('send_timeout')), this.sendTimeoutMs); }),
       ]);
       const id = result?.message?.msgId;

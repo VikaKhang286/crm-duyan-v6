@@ -22,6 +22,7 @@ const server = createServer(async (req, res) => {
   if (!authorized(req.headers.authorization, token)) return respond(401, { error: 'unauthorized' });
   try {
     if (req.method === 'GET' && req.url === '/status') return respond(200, bridge.status());
+    if (req.method === 'GET' && req.url.split('?')[0] === '/threads') return respond(200, await bridge.searchThreads(new URL(req.url, 'http://bridge').searchParams.get('q') || ''));
     if (req.method !== 'POST') return respond(404, { error: 'not_found' });
     let text = ''; let bytes = 0;
     for await (const chunk of req) { bytes += chunk.length; if (bytes > 1024 * 1024) return respond(413, { error: 'payload_too_large' }); text += chunk; }

@@ -31,7 +31,7 @@ export class Store {
   }
   count() { return this.db.prepare('SELECT count(*) AS n FROM inbox').get().n; }
   reserve(id, payload) {
-    const fingerprint = createHash('sha256').update(JSON.stringify([payload.account_id, payload.thread_id, payload.text])).digest('hex');
+    const fingerprint = createHash('sha256').update(JSON.stringify(payload.thread_type === 'group' ? [payload.account_id, payload.thread_id, payload.text, 'group'] : [payload.account_id, payload.thread_id, payload.text])).digest('hex');
     const previous = this.db.prepare('SELECT * FROM outbox WHERE id=?').get(id);
     if (previous) {
       if (previous.fingerprint !== fingerprint) throw new Error('request_id_conflict');

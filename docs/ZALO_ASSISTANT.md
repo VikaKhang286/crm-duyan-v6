@@ -108,4 +108,14 @@ thật trong mã. HTTP không có TLS chỉ phù hợp mạng Docker riêng ho�
 Thông báo nghiệp vụ đã được triển khai, có bật/tắt chung và theo từng nhân
 viên. Nâng cấp addon rồi chọn các nhóm cần nhận; hướng dẫn chi tiết: [ZALO_NOTIFICATION_IDEAS.md](ZALO_NOTIFICATION_IDEAS.md).
 
+**Đích nhận thông báo (nhóm / chat riêng)**
+
+Từ bản 18.0.2.7.0, ngoài thông báo cho từng nhân viên, trợ lý có thể gửi thông báo vào bất kỳ hội thoại nào của tài khoản
+“tro ly DAC” (nhóm hoặc chat riêng). Quản lý và admin vào **Trợ lý Zalo → Tìm hội thoại Zalo**: gõ tên, bấm Tìm
+(bridge liệt kê bạn bè + nhóm, cache 5 phút), bật chọn rồi Thêm. Mỗi hội thoại có tab **Thông báo nhận** (tick loại thông
+báo), tab **Tin đã gửi** (trạng thái, Gửi lại) và nút **Gửi tin thử**. Addon khác đăng ký loại thông báo bằng
+`dac.zalo.event.type` và gửi bằng `env['dac.zalo.channel']._notify(code, text, key)` (idempotent theo `key`).
+Hàng đợi riêng `dac.zalo.channel.message`; bridge `/send` nhận thêm `thread_type` (`user` | `group`). Tin gửi nhóm không
+qua giờ yên lặng và không tính vào AI. Tài khoản trợ lý phải là thành viên nhóm. Ví dụ dùng: [PUSH_DAC_ODOO.md](PUSH_DAC_ODOO.md).
+
 Kết quả và cách chạy kiểm thử: [ZALO_VALIDATION.md](ZALO_VALIDATION.md).
