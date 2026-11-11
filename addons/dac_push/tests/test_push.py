@@ -51,6 +51,15 @@ class TestPushEvents(TransactionCase):
         self.assertEqual(self.env['dac.web.lead'].search_count([('event_id', '=', first.id)]), 1)
         self.assertEqual(len(self.channel.message_ids), 1)
 
+    def test_endpoint_url_is_https_for_public_hosts_only(self):
+        icp = self.env['ir.config_parameter'].sudo()
+        config = self.env['dac.push.config']._config()
+        for base, expected in (('http://crm.example.vn', 'https://crm.example.vn'), ('https://crm.example.vn/', 'https://crm.example.vn'),
+                               ('http://localhost:8069', 'http://localhost:8069')):
+            icp.set_param('web.base.url', base)
+            config.invalidate_recordset(['endpoint_url'])
+            self.assertEqual(config.endpoint_url, expected + '/dac_push/v1/events')
+
     def test_system_ping_is_processed_without_side_effects(self):
         event, _ = self.events._receive(envelope('ping1', 'system.ping'))
         self.assertEqual(event.state, 'processed')

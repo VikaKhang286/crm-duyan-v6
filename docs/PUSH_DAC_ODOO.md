@@ -24,6 +24,10 @@ Không dùng OpenClaw. Tin đi qua bridge `zca-js` của Trợ lý Zalo, bằng 
    Mở hội thoại vừa thêm, tab **Thông báo nhận**, tick loại thông báo (vd “Khách mới từ form website”). **Gửi tin thử** để kiểm tra.
    Quản lý toàn bộ ở **Trợ lý Zalo → Đích nhận thông báo**.
 
+Nếu hosting không phân giải được tên miền Odoo (lỗi “Resolving timed out”; đã gặp với Hostinger vì resolver nội bộ không với tới
+name server `zonedns.vn`), điền **IP máy chủ Odoo** (hoặc hằng số `DAC_PUSH_ODOO_IP`) để plugin bỏ qua bước tra DNS; tên miền và TLS giữ nguyên.
+Nếu Odoo đổi IP phải cập nhật lại.
+
 Production hiện chạy Bee Contact 2.4.38 (chưa có hub/event bus). Plugin dùng các hook `bcb_bee_form_submitted`,
 `bcb_quote_success`, `bcb_callback_success`, `bcb_lead_created` nên chạy được cả bản cũ lẫn mới.
 

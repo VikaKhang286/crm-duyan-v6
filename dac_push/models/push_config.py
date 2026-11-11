@@ -1,4 +1,6 @@
+import re
 import secrets
+from urllib.parse import urlsplit
 
 from odoo import _, api, fields, models
 from odoo.exceptions import AccessError
@@ -18,6 +20,11 @@ class PushConfig(models.Model):
     @api.depends_context('uid')
     def _compute_endpoint_url(self):
         base = self.env['ir.config_parameter'].sudo().get_param('web.base.url', '').rstrip('/')
+        parts = urlsplit(base)
+        local = parts.hostname in ('localhost', '127.0.0.1', '::1') or bool(re.search(r'\.(local|test|localhost)$', parts.hostname or ''))
+        if parts.scheme == 'http' and not local:
+            # web.base.url có thể còn là http dù site chạy sau HTTPS; plugin WordPress chỉ nhận https.
+            base = 'https://' + base[len('http://'):]
         for config in self:
             config.endpoint_url = base + '/dac_push/v1/events'
 
