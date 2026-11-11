@@ -40,8 +40,9 @@ class TestPushEvents(TransactionCase):
         message = self.channel.message_ids
         self.assertEqual(len(message), 1)
         self.assertEqual(message.state, 'queued')
-        for expected in ('Khách mới từ duyan.vn', '0901234567', 'In bạt, Standee', 'Cần báo giá gấp'):
-            self.assertIn(expected, message.text)
+        self.assertEqual(message.text.splitlines(), [
+            'Khách yêu cầu tư vấn', '👤 Anh A', '📞 0901234567', '➕ Yêu cầu: In bạt, Standee', '💬 Cần báo giá gấp',
+            'Xem chi tiết: %s' % lead._short_link()])
 
     def test_duplicate_event_is_idempotent(self):
         first, _ = self.events._receive(envelope('dup'))
@@ -64,10 +65,25 @@ class TestPushEvents(TransactionCase):
         self.assertEqual(lead.extra_info.splitlines(), ['Dịch vụ cần làm: In bạt', 'Kích thước: 2x3m', 'AB: ok'])
         self.assertEqual(lead.visited_urls.splitlines(), ['10:00 — https://duyan.vn/?utm_source=google — Trang chủ', '10:04 — https://duyan.vn/in-an — In ấn', '10:05 — https://example.org/ngoai'])
         self.assertEqual((lead.source_info, lead.page_title, lead.phone_only), ('google / cpc / in-an', 'Báo giá', False))
+        # Tin Zalo gọn: chi tiết (trang đã xem, nguồn...) nằm ở trang của lead, không lặp trong tin
         text = self.channel.message_ids.text
-        for expected in ('Cần giao trước thứ 6', '➕ Thông tin khác:', '• Dịch vụ cần làm: In bạt', '🌐 Nguồn: google / cpc / in-an',
-                         '🧭 Đã xem 3 trang (URL đầy đủ):', '10:04 — https://duyan.vn/in-an — In ấn', 'Gửi từ: https://duyan.vn/bao-gia'):
-            self.assertIn(expected, text)
+        self.assertEqual(text.splitlines(), [
+            'Khách yêu cầu tư vấn', '👤 Chị D', '📞 0901234567',
+            '➕ Yêu cầu: In bạt, Standee; Dịch vụ cần làm: In bạt; Kích thước: 2x3m; AB: ok',
+            '💬 Cần giao trước thứ 6', 'Xem chi tiết: %s' % lead._short_link()])
+        for absent in ('utm_', 'duyan.vn/in-an', 'Đã xem', 'Gửi từ'):
+            self.assertNotIn(absent, text)
+
+    def test_zalo_message_has_bold_title_and_short_link(self):
+        event, _ = self.events._receive(envelope('fmt1'))
+        lead = self.env['dac.web.lead'].search([('event_id', '=', event.id)])
+        text, styles = lead._zalo_message()
+        self.assertEqual(styles, [{'start': 0, 'len': len('Khách yêu cầu tư vấn'), 'style': 'bold'}])
+        self.assertEqual(text[:styles[0]['len']], 'Khách yêu cầu tư vấn')
+        self.assertEqual(self.channel.message_ids.styles, styles)
+        base = self.env['ir.config_parameter'].sudo().get_param('web.base.url')
+        self.assertTrue(text.endswith('Xem chi tiết: %s/lead/%s' % (base.split('://')[-1], lead.id)))
+        self.assertNotIn('http', text.splitlines()[-1], 'link is shown without a scheme to stay short')
 
     def test_phone_only_form_is_valid_and_reads_cleanly(self):
         event, _ = self.events._receive({'event_id': 'ph1', 'event_type': 'web_lead.created', 'source': 'duyan.vn',
@@ -76,29 +92,31 @@ class TestPushEvents(TransactionCase):
         self.assertEqual(event.state, 'processed')
         lead = self.env['dac.web.lead'].search([('event_id', '=', event.id)])
         self.assertTrue(lead.phone_only)
-        text = self.channel.message_ids.text
-        self.assertIn('Khách để lại số điện thoại', text)
-        self.assertIn('📞 0955666777', text)
-        for absent in ('👤', '✉️', '📝', '➕'):
-            self.assertNotIn(absent, text)
-        self.assertIn('🧭 Đã xem 1 trang (URL đầy đủ):', text)
-        self.assertIn('10:00 — https://duyan.vn/lien-he — Liên hệ', text)
-        self.assertIn('Gửi từ: https://duyan.vn/lien-he', text)
+        self.assertEqual(self.channel.message_ids.text.splitlines(), ['Khách yêu cầu tư vấn', '📞 0955666777', 'Xem chi tiết: %s' % lead._short_link()])
+        self.assertEqual(lead.visited_urls, '10:00 — https://duyan.vn/lien-he — Liên hệ')
 
-    def test_every_visited_url_is_shown_in_full_even_with_long_query_strings(self):
+    def test_product_url_fields_are_left_out_of_the_request_line(self):
+        event, _ = self.events._receive(envelope(
+            'prod1', items=[], message='', fields=[{'label': 'Sản phẩm/Danh mục', 'value': 'Standee'},
+                                                    {'label': 'Trang sản phẩm', 'value': 'https://duyan.vn/standee'}]))
+        lead = self.env['dac.web.lead'].search([('event_id', '=', event.id)])
+        self.assertIn('Trang sản phẩm: https://duyan.vn/standee', lead.extra_info)
+        lines = self.channel.message_ids.text.splitlines()
+        self.assertIn('➕ Yêu cầu: Sản phẩm/Danh mục: Standee', lines)
+        self.assertFalse([ln for ln in lines if 'duyan.vn/standee' in ln])
+        self.assertFalse([ln for ln in lines if ln.startswith('💬')], 'no note line when the customer wrote none')
+
+    def test_full_visited_urls_are_kept_in_the_lead_even_when_long(self):
         long_url = 'https://duyan.vn/?gad_source=2&gad_campaignid=24120075564&gbraid=0AAAAACdEIguj0C' + 'x' * 200
         visited = [{'url': 'https://duyan.vn/p%s/?a=1&b=2#frag' % i, 'title': 'P%s' % i, 'at': '2026-11-11 10:%02d:00' % i} for i in range(14)]
         visited.append({'url': long_url, 'title': 'Dài', 'at': '2026-11-11 10:14:00'})
         event, _ = self.events._receive(envelope('long1', visited=visited, page_url='https://duyan.vn/bao-gia/?x=1&y=2'))
         lead = self.env['dac.web.lead'].search([('event_id', '=', event.id)])
-        self.assertEqual(len(lead.visited_urls.splitlines()), 15)
-        text = self.channel.message_ids.text
-        self.assertIn('Đã xem 15 trang (URL đầy đủ)', text)
-        for i in range(14):  # không bỏ trang nào và không cắt tham số / fragment
-            self.assertIn('https://duyan.vn/p%s/?a=1&b=2#frag' % i, text)
-        self.assertIn(long_url, text)
-        self.assertIn('Gửi từ: https://duyan.vn/bao-gia/?x=1&y=2', text)
-        self.assertLess(len(text), 6000)
+        lines = lead.visited_urls.splitlines()
+        self.assertEqual(len(lines), 15)
+        self.assertIn('https://duyan.vn/p0/?a=1&b=2#frag', lines[0])  # không cắt tham số / fragment
+        self.assertIn(long_url, lines[14])
+        self.assertLess(len(self.channel.message_ids.text), 500, 'Zalo message stays compact however long the visit history is')
 
     def test_junk_in_new_fields_never_breaks_the_event(self):
         event, _ = self.events._receive(envelope('junk1', fields='not-a-list', visited={'a': 1}, source='x'))
@@ -191,3 +209,15 @@ class TestPushController(HttpCase):
     def test_malformed_bodies_are_400(self):
         for raw in (b'not json', b'[1,2]', json.dumps({'event_type': 'x'}).encode()):
             self.assertEqual(self.post(raw, sign(raw)).status_code, 400)
+
+    def test_short_lead_link_redirects_to_the_lead_form_after_login(self):
+        body = json.dumps(envelope('link1')).encode()
+        self.post(body, sign(body))
+        lead = self.env['dac.web.lead'].search([], order='id desc', limit=1)
+        anonymous = self.url_open('/lead/%d' % lead.id, allow_redirects=False)
+        self.assertEqual(anonymous.status_code, 303)
+        self.assertIn('/web/login', anonymous.headers['Location'], 'anonymous visitors are sent to the login page, never shown the lead')
+        self.authenticate('admin', 'admin')
+        response = self.url_open('/lead/%d' % lead.id, allow_redirects=False)
+        self.assertIn(response.status_code, (302, 303))
+        self.assertEqual(response.headers['Location'].split('?')[0].rsplit('/odoo/', 1)[-1], 'action-dac_push.web_lead_action/%d' % lead.id)

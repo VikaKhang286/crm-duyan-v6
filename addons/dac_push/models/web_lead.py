@@ -45,37 +45,38 @@ class WebLead(models.Model):
             lead.phone_only = bool(lead.phone) and not any(
                 (lead.customer_name, lead.email, lead.company_name, lead.items, lead.message, lead.extra_info))
 
-    def _zalo_text(self):
-        """Nội dung tin Zalo: đủ thông tin khách nhập, nguồn và các trang đã xem nhưng gọn (< ~2000 ký tự)."""
+    def _short_link(self):
+        """Link rút gọn tới lead, không có scheme cho gọn (Zalo tự nhận ra thành link): crm.duyan.vn/lead/736."""
         self.ensure_one()
-        label = dict(FORM_TYPES).get(self.form_type, 'Form')
-        form = '%s%s' % (label, ' (%s)' % self.form_name if self.form_name else '')
-        site = self.site or 'website'
-        if self.phone_only:
-            lines = ['🔔 Khách để lại số điện thoại (%s)' % site, 'Form: ' + form, '📞 %s' % self.phone]
-        else:
-            lines = ['🔔 Khách mới từ %s' % site, 'Form: ' + form]
-            for line in (self.customer_name and '👤 ' + self.customer_name, self.phone and '📞 ' + self.phone,
-                         self.email and '✉️ ' + self.email, self.company_name and '🏢 ' + self.company_name,
-                         self.items and '📦 Hạng mục: ' + self.items, self.message and '📝 ' + self.message[:500]):
-                if line:
-                    lines.append(line)
-            extra = [ln[:300] for ln in (self.extra_info or '').splitlines() if ln.strip()]
-            if extra:
-                lines.append('➕ Thông tin khác:')
-                lines.extend('   • ' + ln for ln in extra[:15])
-        if self.source_info:
-            lines.append('🌐 Nguồn: ' + self.source_info[:200])
-        pages = [ln for ln in (self.visited_urls or '').splitlines() if ln.strip()]
-        if pages:
-            lines.append('🧭 Đã xem %d trang (URL đầy đủ):' % len(pages))
-            lines.extend('   %s' % ln for ln in pages)
-        for line in (self.page_url and '🔗 Gửi từ: ' + self.page_url,
-                     self.submitted_at and '⏰ ' + self.submitted_at):
-            if line:
-                lines.append(line)
-        return '\n'.join(lines)[:6000]
+        # sudo(): đọc tham số hệ thống trong luồng webhook/cron (không có user)
+        base = self.env['ir.config_parameter'].sudo().get_param('web.base.url', '')
+        return '%s/lead/%s' % (urlsplit(base).netloc or 'crm.duyan.vn', self.id)
 
+    def _zalo_message(self):
+        """Tin Zalo gọn: tiêu đề in đậm, tên (nếu có), số điện thoại, yêu cầu, ghi chú và link xem chi tiết.
+
+        Trang đã xem, nguồn, email, công ty... có đầy đủ ở trang chi tiết (link cuối tin). Trả về (text, styles).
+        """
+        self.ensure_one()
+        title = 'Khách yêu cầu tư vấn'
+        lines = [title]
+        if self.customer_name:
+            lines.append('👤 ' + self.customer_name)
+        if self.phone:
+            lines.append('📞 ' + self.phone)
+        wanted = [self.items.strip()] if (self.items or '').strip() else []  # hạng mục: "In bạt, Standee"
+        # Trường dạng URL (vd trang sản phẩm) bỏ khỏi dòng yêu cầu cho gọn; vẫn có ở trang chi tiết.
+        wanted += [ln.strip() for ln in (self.extra_info or '').splitlines()
+                   if ln.strip() and 'http://' not in ln and 'https://' not in ln]
+        if wanted:
+            lines.append('➕ Yêu cầu: ' + '; '.join(wanted)[:300])
+        if self.message:
+            lines.append('💬 ' + self.message[:500])
+        lines.append('Xem chi tiết: ' + self._short_link())
+        return '\n'.join(lines), [{'start': 0, 'len': len(title), 'style': 'bold'}]
+
+    def _zalo_text(self):
+        return self._zalo_message()[0]
 
 class PushEventWebLead(models.Model):
     _inherit = 'dac.push.event'
@@ -114,4 +115,5 @@ class PushEventWebLead(models.Model):
             'extra_info': '\n'.join(extra_lines), 'visited_urls': '\n'.join(visited_lines),
             'source_info': ' / '.join(source_parts),
         })
-        self.env['dac.zalo.channel']._notify('web_lead.created', lead._zalo_text(), 'push:%s' % self.id)
+        text, styles = lead._zalo_message()
+        self.env['dac.zalo.channel']._notify('web_lead.created', text, 'push:%s' % self.id, styles=styles)

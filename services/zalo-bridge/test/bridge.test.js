@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, rm, readFile, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { Bridge, authorized, normalizeMessage, matchThreads } from '../src/bridge.js';
+import { Bridge, authorized, normalizeMessage, matchThreads, buildContent } from '../src/bridge.js';
 import { Store } from '../src/store.js';
 
 const TOKEN = 'test-secret-that-is-longer-than-thirty-two-characters';
@@ -168,5 +168,36 @@ test('group messages are sent with the group thread type and never collide with 
   assert.equal((await bridge.send({ ...payload, request_id: 'u', thread_id: 'G1' })).delivery, 'sent');
   assert.deepEqual(sent, [['G1', 1], ['G1', 0]]);
   await assert.rejects(bridge.send({ ...payload, request_id: 'x', thread_type: 'channel' }), /invalid_payload/);
+  store.close();
+});
+
+test('bold styles are sent as zca-js styled content; plain text stays a plain string', async () => {
+  const sent = [];
+  const { bridge, store } = fixture();
+  bridge.api = { sendMessage: async (content) => { sent.push(content); return { message: { msgId: `m${sent.length}` } }; }, getUserInfo: async () => ({}) };
+  const text = 'Khách yêu cầu tư vấn\n📞 0909';
+  await bridge.send({ ...payload, request_id: 's1', text, styles: [{ start: 0, len: 20, style: 'bold' }] });
+  await bridge.send({ ...payload, request_id: 's2', text: 'không định dạng' });
+  await bridge.send({ ...payload, request_id: 's3', text: 'rỗng', styles: [] });
+  assert.deepEqual(sent[0], { msg: text, styles: [{ start: 0, len: 20, st: 'b' }] });
+  assert.equal(sent[1], 'không định dạng');
+  assert.equal(sent[2], 'rỗng');
+  store.close();
+});
+
+test('invalid styles are rejected before anything is reserved or sent', async () => {
+  const { bridge, store } = fixture();
+  let calls = 0;
+  bridge.api = { sendMessage: async () => { calls += 1; return { message: { msgId: 'x' } }; } };
+  const bad = [
+    [{ start: 0, len: 5, style: 'red' }], [{ start: -1, len: 2, style: 'bold' }], [{ start: 0, len: 0, style: 'bold' }],
+    [{ start: 0, len: 99, style: 'bold' }], [{ start: 1.5, len: 2, style: 'bold' }], 'bold', [null], Array(21).fill({ start: 0, len: 1, style: 'bold' }),
+  ];
+  for (const [index, styles] of bad.entries()) {
+    await assert.rejects(bridge.send({ ...payload, request_id: `bad${index}`, text: 'xin chào', styles }), /invalid_payload/);
+  }
+  assert.equal(calls, 0);
+  assert.equal(store.reserve('bad0', payload), null, 'a rejected request id is still free to use');
+  assert.equal(buildContent({ text: 'abc' }), 'abc');
   store.close();
 });

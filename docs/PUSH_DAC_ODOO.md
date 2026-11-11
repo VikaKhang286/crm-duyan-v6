@@ -41,7 +41,19 @@ Production hiện chạy Bee Contact 2.4.38 (chưa có hub/event bus). Plugin d�
   nên không thêm cookie hay script theo dõi; không có Bee CRM thì để trống;
 - `source{utm_source, utm_medium, utm_campaign, referrer, landing}` — nguồn truy cập.
 
-Odoo lưu đầy đủ ở lead (tab “Thông tin khách đã nhập”, “Trang khách đã xem”); tin Zalo hiện tối đa 15 trường và toàn bộ các trang đã xem (tối đa 15) với URL đầy đủ.
+Odoo lưu đầy đủ ở lead (tab “Thông tin khách đã nhập”, “Trang khách đã xem”, URL đầy đủ). **Tin Zalo gọn**, chỉ gồm:
+
+```
+**Khách yêu cầu tư vấn**          ← in đậm
+👤 Tên (nếu có)
+📞 0999999999
+➕ Yêu cầu: hạng mục / sản phẩm / dịch vụ khách chọn (nếu có)
+💬 Ghi chú hoặc yêu cầu thêm khách nhập (nếu có)
+Xem chi tiết: crm.duyan.vn/lead/736
+```
+
+Link rút gọn `/lead/<id>` chuyển tới trang chi tiết của lead trong Odoo (chưa đăng nhập thì chuyển sang trang đăng nhập rồi quay lại; quyền xem
+vẫn theo ACL). Chữ đậm dùng `styles` của zca-js: bridge chỉ nhận danh sách trắng (hiện chỉ `bold`) và kiểm tra phạm vi.
 
 ## Thêm loại dữ liệu mới
 

@@ -49,6 +49,19 @@ class TestZaloChannels(TransactionCase):
         self.assertEqual((message.state, message.external_message_id), ('sent', 'zm1'))
         self.assertTrue(message.sent_at)
 
+    def test_styles_are_stored_and_forwarded_to_the_bridge(self):
+        styles = [{'start': 0, 'len': 11, 'style': 'bold'}]
+        message = self.channels._notify('unit.lead', 'Có khách mới\nchi tiết', 'lead:styled', styles=styles)
+        self.assertEqual(message.styles, styles)
+        with patch.object(type(self.config), '_bridge_request', return_value={'delivery': 'sent', 'message_id': 'zs1'}) as bridge:
+            self.env['dac.zalo.channel.message']._cron_process()
+        self.assertEqual(bridge.call_args.args[1]['styles'], styles)
+        plain = self.channels._notify('unit.lead', 'Tin thường', 'lead:plain')
+        with patch.object(type(self.config), '_bridge_request', return_value={'delivery': 'sent', 'message_id': 'zs2'}) as bridge:
+            self.env['dac.zalo.channel.message']._cron_process()
+        self.assertNotIn('styles', bridge.call_args.args[1])
+        self.assertFalse(plain.styles)
+
     def test_uncertain_delivery_is_never_retried(self):
         message = self.channels._notify('unit.lead', 'x', 'lead:6')
         with patch.object(type(self.config), '_bridge_request', return_value={'delivery': 'uncertain'}) as bridge:
@@ -105,6 +118,8 @@ class TestZaloChannels(TransactionCase):
         self.direct.with_user(self.manager).action_send_test()
         message = self.direct.message_ids
         self.assertEqual((message.state, message.event_type_id.code), ('queued', 'channel.test'))
+        self.assertEqual(message.styles, [{'start': 0, 'len': len('Tin thử từ Odoo'), 'style': 'bold'}])
+        self.assertTrue(message.text.startswith('Tin thử từ Odoo\nHội thoại "Kiệt" sẽ nhận: Loại khác'))
 
     def test_plain_staff_cannot_manage_channels(self):
         with self.assertRaises(AccessError):

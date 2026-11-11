@@ -20,6 +20,20 @@ export function normalizeMessage(message, historical = false) {
   };
 }
 
+// Kiểu chữ Zalo cho phép (giá trị TextStyle của zca-js). Chỉ nhận danh sách trắng, phạm vi phải nằm trong văn bản.
+const STYLE_CODES = { bold: 'b' };
+
+export function buildContent(payload) {
+  if (payload.styles === undefined || payload.styles === null) return payload.text;
+  if (!Array.isArray(payload.styles) || payload.styles.length > 20) throw new Error('invalid_payload');
+  const styles = payload.styles.map((item) => {
+    const code = item && STYLE_CODES[item.style];
+    if (!code || !Number.isInteger(item.start) || !Number.isInteger(item.len) || item.start < 0 || item.len < 1 || item.start + item.len > payload.text.length) throw new Error('invalid_payload');
+    return { start: item.start, len: item.len, st: code };
+  });
+  return styles.length ? { msg: payload.text, styles } : payload.text;
+}
+
 const THREAD_CACHE_MS = 5 * 60 * 1000;
 const THREAD_LIMIT = 50;
 const fold = (value) => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase();
@@ -214,6 +228,7 @@ export class Bridge {
       if (typeof payload[field] !== 'string' || !payload[field] || payload[field].length > (field === 'text' ? 12000 : 200)) throw new Error('invalid_payload');
     }
     if (payload.thread_type !== undefined && !['user', 'group'].includes(payload.thread_type)) throw new Error('invalid_payload');
+    const content = buildContent(payload); // kiểm tra kiểu chữ trước khi giữ chỗ request_id
     if (payload.account_id !== this.accountId) throw new Error('wrong_account');
     if (!this.api || this.state !== 'connected') throw new Error('not_connected');
     const previous = this.store.reserve(payload.request_id, payload);
@@ -221,7 +236,7 @@ export class Bridge {
     let timer;
     try {
       const result = await Promise.race([
-        this.api.sendMessage(payload.text, payload.thread_id, payload.thread_type === 'group' ? 1 : 0),
+        this.api.sendMessage(content, payload.thread_id, payload.thread_type === 'group' ? 1 : 0),
         new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('send_timeout')), this.sendTimeoutMs); }),
       ]);
       const id = result?.message?.msgId;

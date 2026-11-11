@@ -55,8 +55,11 @@ class ZaloChannel(models.Model):
             channel.last_sent_at = max(sent.mapped('sent_at')) if sent else False
             channel.failed_count = len(channel.message_ids.filtered(lambda m: m.state in ('failed', 'uncertain')))
 
-    def _queue(self, text, key, event_type=False):
-        """Đưa tin vào hàng đợi gửi của riêng kênh này. Idempotent theo key."""
+    def _queue(self, text, key, event_type=False, styles=None):
+        """Đưa tin vào hàng đợi gửi của riêng kênh này. Idempotent theo key.
+
+        `styles`: danh sách {'start', 'len', 'style': 'bold'} (vị trí tính theo ký tự của `text`).
+        """
         self.ensure_one()
         messages = self.env['dac.zalo.channel.message']
         existing = messages.search([('event_key', '=', key)], limit=1)
@@ -65,11 +68,14 @@ class ZaloChannel(models.Model):
         return messages.create({
             'channel_id': self.id, 'event_key': key, 'text': text[:MAX_TEXT],
             'event_type_id': event_type.id if event_type else False, 'state': 'queued',
+            'styles': styles or False,
         })
 
     @api.model
-    def _notify(self, event_code, text, key):
+    def _notify(self, event_code, text, key, styles=None):
         """API cho addon khác: gửi `text` tới mọi hội thoại đang đăng ký `event_code`.
+
+        `styles` (tùy chọn): định dạng chữ, vd [{'start': 0, 'len': 20, 'style': 'bold'}] để in đậm tiêu đề.
 
         `key` phải ổn định cho một sự kiện (vd 'web_lead:duyan.vn:123') để không gửi trùng khi gọi lại.
         Trả về recordset tin đã xếp hàng (rỗng nếu chưa có hội thoại nào đăng ký).
@@ -82,7 +88,7 @@ class ZaloChannel(models.Model):
         channels = self.sudo().search([('active', '=', True), ('event_type_ids', 'in', event_type.id)])
         messages = self.env['dac.zalo.channel.message']
         for channel in channels:
-            messages |= channel._queue(text, '%s:%s' % (key, channel.id), event_type)
+            messages |= channel._queue(text, '%s:%s' % (key, channel.id), event_type, styles)
         if messages:
             self._trigger_send()
         return messages
@@ -98,7 +104,11 @@ class ZaloChannel(models.Model):
     def action_send_test(self):
         self.ensure_one()
         test_type = self.env.ref('dac_zalo_assistant.event_type_channel_test')
-        self._queue('✅ Tin thử từ Odoo gửi tới "%s".' % self.name, 'test:%s' % uuid.uuid4().hex, test_type)
+        title = 'Tin thử từ Odoo'
+        receives = ', '.join(self.event_type_ids.mapped('name')) or 'chưa chọn loại thông báo nào'
+        # Tiêu đề in đậm giống tin thật: nhìn là biết định dạng chữ đậm có hiển thị trên Zalo hay không.
+        self._queue('%s\nHội thoại "%s" sẽ nhận: %s' % (title, self.name, receives), 'test:%s' % uuid.uuid4().hex, test_type,
+                    styles=[{'start': 0, 'len': len(title), 'style': 'bold'}])
         self._trigger_send()
         return {'type': 'ir.actions.client', 'tag': 'display_notification', 'params': {
             'title': _('Đã xếp hàng gửi'), 'message': _('Tin thử sẽ được gửi trong ít phút. Xem tab "Tin đã gửi".'),
@@ -120,6 +130,7 @@ class ZaloChannelMessage(models.Model):
     event_type_id = fields.Many2one('dac.zalo.event.type', string='Loại thông báo', ondelete='set null')
     event_key = fields.Char(required=True, readonly=True, index=True, copy=False)
     text = fields.Text(string='Nội dung', required=True, readonly=True)
+    styles = fields.Json(string='Định dạng chữ', readonly=True, help='Các đoạn in đậm: [{"start", "len", "style": "bold"}].')
     state = fields.Selection([('queued', 'Chờ gửi'), ('sent', 'Đã gửi'), ('failed', 'Lỗi'),
         ('uncertain', 'Cần kiểm tra gửi'), ('cancelled', 'Đã hủy')], string='Trạng thái', default='queued', required=True, index=True)
     attempts = fields.Integer(string='Số lần thử', readonly=True)
@@ -148,10 +159,13 @@ class ZaloChannelMessage(models.Model):
 
     def _send(self, config):
         self.ensure_one()
+        payload = {
+            'request_id': 'ch-%s' % self.id, 'account_id': config.assistant_uid,
+            'thread_id': self.channel_id.thread_id, 'thread_type': self.channel_id.thread_type, 'text': self.text}
+        if self.styles:
+            payload['styles'] = self.styles
         try:
-            result = config._bridge_request('/send', {
-                'request_id': 'ch-%s' % self.id, 'account_id': config.assistant_uid,
-                'thread_id': self.channel_id.thread_id, 'thread_type': self.channel_id.thread_type, 'text': self.text})
+            result = config._bridge_request('/send', payload)
         except UserError as error:
             attempts = self.attempts + 1
             self.write({'attempts': attempts, 'state': 'failed' if attempts >= 5 else 'queued',
