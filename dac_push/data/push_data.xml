@@ -1,0 +1,13 @@
+<odoo noupdate="1">
+    <record id="config_default" model="dac.push.config">
+        <field name="name">Push DAC Odoo</field>
+        <field name="active" eval="False"/>
+    </record>
+    <record id="event_type_web_lead_created" model="dac.zalo.event.type">
+        <field name="name">Khách mới từ form website</field>
+        <field name="code">web_lead.created</field>
+        <field name="group_name">Website</field>
+        <field name="description">Có khách điền form trên duyan.vn (Bee Form, báo giá, gọi lại, Elementor).</field>
+        <field name="sequence">10</field>
+    </record>
+</odoo>
