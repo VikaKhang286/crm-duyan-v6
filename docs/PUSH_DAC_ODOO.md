@@ -41,7 +41,7 @@ Production hiện chạy Bee Contact 2.4.38 (chưa có hub/event bus). Plugin d�
   nên không thêm cookie hay script theo dõi; không có Bee CRM thì để trống;
 - `source{utm_source, utm_medium, utm_campaign, referrer, landing}` — nguồn truy cập.
 
-Odoo lưu đầy đủ ở lead (tab “Thông tin khách đã nhập”, “Trang khách đã xem”); tin Zalo hiện tối đa 15 trường và 8 trang gần nhất.
+Odoo lưu đầy đủ ở lead (tab “Thông tin khách đã nhập”, “Trang khách đã xem”); tin Zalo hiện tối đa 15 trường và toàn bộ các trang đã xem (tối đa 15) với URL đầy đủ.
 
 ## Thêm loại dữ liệu mới
 

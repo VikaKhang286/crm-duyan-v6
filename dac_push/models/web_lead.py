@@ -45,14 +45,6 @@ class WebLead(models.Model):
             lead.phone_only = bool(lead.phone) and not any(
                 (lead.customer_name, lead.email, lead.company_name, lead.items, lead.message, lead.extra_info))
 
-    def _short_url(self, url, limit=80):
-        """Rút gọn URL cho tin nhắn: bỏ scheme + tên miền của chính site, cắt độ dài."""
-        parts = urlsplit(url or '')
-        own = (self.site or '').lower()
-        if parts.hostname and own and parts.hostname.lower().removeprefix('www.') == own.removeprefix('www.'):
-            url = (parts.path or '/') + ('?' + parts.query if parts.query else '')
-        return url if len(url) <= limit else url[:limit - 1] + '…'
-
     def _zalo_text(self):
         """Nội dung tin Zalo: đủ thông tin khách nhập, nguồn và các trang đã xem nhưng gọn (< ~2000 ký tự)."""
         self.ensure_one()
@@ -76,26 +68,18 @@ class WebLead(models.Model):
             lines.append('🌐 Nguồn: ' + self.source_info[:200])
         pages = [ln for ln in (self.visited_urls or '').splitlines() if ln.strip()]
         if pages:
-            shown = pages[-8:]
-            lines.append('🧭 Đã xem %d trang%s:' % (len(pages), ' (8 trang gần nhất)' if len(pages) > 8 else ''))
-            lines.extend('   %s' % ln[:140] for ln in shown)
-        for line in (self.page_url and '🔗 Gửi từ: ' + self._short_url(self.page_url, 120),
+            lines.append('🧭 Đã xem %d trang (URL đầy đủ):' % len(pages))
+            lines.extend('   %s' % ln for ln in pages)
+        for line in (self.page_url and '🔗 Gửi từ: ' + self.page_url,
                      self.submitted_at and '⏰ ' + self.submitted_at):
             if line:
                 lines.append(line)
-        return '\n'.join(lines)[:3500]
+        return '\n'.join(lines)[:6000]
 
 
 class PushEventWebLead(models.Model):
     _inherit = 'dac.push.event'
 
-    @staticmethod
-    def _short_page(site, url):
-        parts = urlsplit(url)
-        host = (parts.hostname or '').lower().removeprefix('www.')
-        if host and host == (site or '').lower().removeprefix('www.'):
-            return (parts.path or '/') + ('?' + parts.query if parts.query else '')
-        return url
 
     def _handle_web_lead_created(self):
         self.ensure_one()
@@ -111,10 +95,11 @@ class PushEventWebLead(models.Model):
         site = clean(data.get('site') or self.source, 100)
         visited_lines = []
         for page in (data.get('visited') if isinstance(data.get('visited'), list) else [])[:20]:
-            if isinstance(page, dict) and clean(page.get('url'), 300):
+            if isinstance(page, dict) and clean(page.get('url'), 500):
                 at = clean(page.get('at'), 19)
                 title = clean(page.get('title'), 120)
-                visited_lines.append(' — '.join(p for p in (at[11:16] if len(at) >= 16 else '', self._short_page(site, clean(page.get('url'), 300)), title) if p))
+                # URL đầy đủ (cả tên miền và tham số truy vấn), không rút gọn
+                visited_lines.append(' — '.join(p for p in (at[11:16] if len(at) >= 16 else '', clean(page.get('url'), 500), title) if p))
         src = data.get('source') if isinstance(data.get('source'), dict) else {}
         source_parts = [clean(src.get(k), 100) for k in ('utm_source', 'utm_medium', 'utm_campaign') if clean(src.get(k), 100)]
         if not source_parts and clean(src.get('referrer'), 200):
