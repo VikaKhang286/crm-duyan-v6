@@ -49,11 +49,19 @@ Odoo lưu đầy đủ ở lead (tab “Thông tin khách đã nhập”, “Tra
 📞 0999999999
 ➕ Yêu cầu: hạng mục / sản phẩm / dịch vụ khách chọn (nếu có)
 💬 Ghi chú hoặc yêu cầu thêm khách nhập (nếu có)
-Xem chi tiết: crm.duyan.vn/lead/736
+Xem chi tiết: crm.duyan.vn/lead/Ab3xK9pQ2wLz
 ```
 
-Link rút gọn `/lead/<id>` chuyển tới trang chi tiết của lead trong Odoo (chưa đăng nhập thì chuyển sang trang đăng nhập rồi quay lại; quyền xem
-vẫn theo ACL). Chữ đậm dùng `styles` của zca-js: bridge chỉ nhận danh sách trắng (hiện chỉ `bold`) và kiểm tra phạm vi.
+Link `/lead/<mã ngẫu nhiên>` **ai có link đều mở được, không cần đăng nhập**. Mã 72 bit lưu ở `dac.web.lead.access_token`
+(chỉ quản trị hệ thống đọc được), không dùng số thứ tự lead vì đoán được. Trang công khai chỉ có thông tin của lead và hai nút:
+**Đã liên hệ** (nút chính, xanh) và **Liên hệ không được** (nút phụ, đỏ). Bấm nút ghi `contact_state` + `contact_state_at`
+rồi hiện lại trang với trạng thái mới; có thể bấm lại để đổi. Nhân viên đã đăng nhập và có quyền xem lead thì được chuyển thẳng sang
+form đầy đủ trong Odoo (cũng có hai nút này ở đầu form, cột trạng thái ở danh sách và bộ lọc "Chưa liên hệ"). Trang công khai gửi
+`X-Robots-Tag: noindex`, `Referrer-Policy: no-referrer`, `Cache-Control: no-store`.
+
+Lưu ý bảo mật: ai nhận được link đều xem được SĐT khách và đổi được trạng thái, nên đừng đăng link ra ngoài nhóm Zalo nhận tin. Lead
+cũ (tạo trước khi có mã) được cấp mã khi lần đầu cần tới. Link kiểu cũ `/lead/<số>` (tin Zalo đã gửi trước đây) vẫn dùng được nhưng
+bắt đăng nhập. Chữ đậm dùng `styles` của zca-js: bridge chỉ nhận danh sách trắng (hiện chỉ `bold`) và kiểm tra phạm vi.
 
 ## Thêm loại dữ liệu mới
 

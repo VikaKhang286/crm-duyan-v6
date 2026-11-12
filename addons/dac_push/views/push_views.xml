@@ -146,7 +146,7 @@
         <field name="arch" type="xml">
             <kanban default_order="received_at desc, id desc" create="0" sample="1">
                 <field name="customer_name"/><field name="phone"/><field name="form_type"/><field name="site"/>
-                <field name="items"/><field name="source_info"/><field name="received_at"/><field name="phone_only"/>
+                <field name="items"/><field name="source_info"/><field name="received_at"/><field name="phone_only"/><field name="contact_state"/>
                 <templates>
                     <t t-name="card">
                         <div class="dac_ui_kcard">
@@ -157,7 +157,12 @@
                                     <span t-else=""><field name="phone"/></span>
                                     <div class="dac_ui_ksub"><field name="form_type"/> · <field name="site"/></div>
                                 </div>
-                                <div class="dac_ui_kside" t-if="record.phone_only.raw_value"><span class="dac_ui_pill is-warn">Chỉ có SĐT</span></div>
+                                <div class="dac_ui_kside">
+                                    <span t-if="record.contact_state.raw_value == 'contacted'" class="dac_ui_pill is-ok">Đã liên hệ</span>
+                                    <span t-elif="record.contact_state.raw_value == 'unreachable'" class="dac_ui_pill is-danger">Không liên hệ được</span>
+                                    <span t-elif="record.phone_only.raw_value" class="dac_ui_pill is-warn">Chỉ có SĐT</span>
+                                    <span t-else="" class="dac_ui_pill is-warn">Chưa liên hệ</span>
+                                </div>
                             </div>
                             <div t-if="record.customer_name.raw_value and record.phone.raw_value" class="dac_ui_kline"><i class="fa fa-phone" title="Điện thoại"/> <field name="phone"/></div>
                             <div t-if="record.items.raw_value" class="dac_ui_kline"><i class="fa fa-tag" title="Hạng mục"/> <field name="items"/></div>
@@ -175,6 +180,7 @@
         <field name="name">dac.web.lead.list</field><field name="model">dac.web.lead</field>
         <field name="arch" type="xml"><list create="0">
             <field name="received_at"/>
+            <field name="contact_state" widget="badge" decoration-success="contact_state == 'contacted'" decoration-danger="contact_state == 'unreachable'" decoration-warning="contact_state == 'new'"/>
             <field name="customer_name"/>
             <field name="phone" widget="phone"/>
             <field name="items"/>
@@ -191,6 +197,8 @@
             <field name="items"/><field name="source_info"/><field name="page_url"/>
             <filter name="last_24h" string="24 giờ qua" domain="[('received_at','&gt;=', (datetime.datetime.now() - datetime.timedelta(hours=24)).strftime('%Y-%m-%d %H:%M:%S'))]"/>
             <filter name="phone_only" string="Chỉ để lại SĐT" domain="[('phone_only','=',True)]"/>
+            <filter name="not_contacted" string="Chưa liên hệ" domain="[('contact_state','=','new')]"/>
+            <filter name="unreachable" string="Liên hệ không được" domain="[('contact_state','=','unreachable')]"/>
             <separator/>
             <filter name="quote" string="Báo giá" domain="[('form_type','=','quote')]"/>
             <filter name="callback" string="Gọi lại" domain="[('form_type','=','callback')]"/>
@@ -204,7 +212,11 @@
     </record>
     <record id="web_lead_form" model="ir.ui.view">
         <field name="name">dac.web.lead.form</field><field name="model">dac.web.lead</field>
-        <field name="arch" type="xml"><form create="0"><sheet>
+        <field name="arch" type="xml"><form create="0"><header>
+            <button name="action_mark_contacted" type="object" string="Đã liên hệ" class="btn-primary" invisible="contact_state == 'contacted'"/>
+            <button name="action_mark_unreachable" type="object" string="Liên hệ không được" class="btn-danger" invisible="contact_state == 'unreachable'"/>
+            <field name="contact_state" widget="statusbar"/>
+        </header><sheet>
             <div class="dac_ui_hero">
                 <div class="dac_ui_hero_icon is-brand"><i class="fa fa-user" role="img" aria-label="Khách hàng"/></div>
                 <div class="dac_ui_hero_body">

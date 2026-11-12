@@ -1,6 +1,6 @@
 {
     'name': 'Lead Website — Push DAC Odoo',
-    'version': '18.0.1.1.0',
+    'version': '18.0.1.2.1',
     'category': '1. Duy An ERP',
     'summary': 'Nhận dữ liệu đẩy từ duyan.vn (plugin Push DAC Odoo) và báo vào Zalo',
     'description': """
@@ -16,6 +16,7 @@ Thêm loại dữ liệu mới: kế thừa dac.push.event và viết method _ha
         'security/ir.model.access.csv',
         'data/push_data.xml',
         'views/push_views.xml',
+        'views/lead_public_templates.xml',
     ],
     'installable': True,
     'application': False,

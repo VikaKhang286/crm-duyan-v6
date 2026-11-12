@@ -1,10 +1,12 @@
 import re
+import secrets
 from urllib.parse import urlsplit
 
 from odoo import api, fields, models
 
 from .push_event import clean
 
+CONTACT_STATES = [('new', 'Chưa liên hệ'), ('contacted', 'Đã liên hệ'), ('unreachable', 'Liên hệ không được')]
 FORM_TYPES = [('callback', 'Gọi lại'), ('quote', 'Báo giá'), ('bee_form', 'Bee Form'),
               ('elementor', 'Elementor'), ('other', 'Khác')]
 
@@ -13,6 +15,15 @@ class WebLead(models.Model):
     _name = 'dac.web.lead'
     _description = 'Lead từ form website'
     _order = 'received_at desc, id desc'
+    _sql_constraints = [('access_token_unique', 'unique(access_token)', 'Mã truy cập lead phải là duy nhất.')]
+
+    @api.model
+    def _new_access_token(self):
+        """Mã ngẫu nhiên khó đoán (72 bit) cho link công khai; không thuần số để không đụng route /lead/<id> cũ."""
+        while True:
+            token = secrets.token_urlsafe(9)
+            if not token.isdigit():
+                return token
 
     event_id = fields.Many2one('dac.push.event', string='Sự kiện', ondelete='set null', index=True, readonly=True)
     site = fields.Char(string='Website', index=True)
@@ -33,6 +44,11 @@ class WebLead(models.Model):
     phone_only = fields.Boolean(string='Chỉ để lại số điện thoại', compute='_compute_phone_only', store=True)
     submitted_at = fields.Char(string='Thời điểm gửi (trên web)')
     received_at = fields.Datetime(string='Nhận lúc', default=fields.Datetime.now, readonly=True)
+    contact_state = fields.Selection(CONTACT_STATES, string='Trạng thái liên hệ', default='new', required=True, index=True, copy=False)
+    contact_state_at = fields.Datetime(string='Cập nhật liên hệ lúc', readonly=True, copy=False)
+    access_token = fields.Char(string='Mã truy cập link', default=lambda self: self._new_access_token(), index=True,
+        copy=False, readonly=True, groups='base.group_system',
+        help='Ai có link chứa mã này đều xem được lead và đánh dấu liên hệ mà không cần đăng nhập.')
 
     @api.depends('customer_name', 'phone')
     def _compute_display_name(self):
@@ -45,12 +61,32 @@ class WebLead(models.Model):
             lead.phone_only = bool(lead.phone) and not any(
                 (lead.customer_name, lead.email, lead.company_name, lead.items, lead.message, lead.extra_info))
 
+    def _get_access_token(self):
+        """Mã truy cập của lead; lead cũ (tạo trước khi có mã) được cấp mã ngay lần đầu cần tới."""
+        self.ensure_one()
+        # sudo(): luồng webhook/cron/khách chưa đăng nhập không có quyền đọc-ghi trường mã (chỉ system); đây không phải override create/write
+        lead = self.sudo()
+        if not lead.access_token:
+            lead.write({'access_token': self._new_access_token()})
+        return lead.access_token
+
+    def _set_contact_state(self, state):
+        """Ghi trạng thái liên hệ + thời điểm; dùng chung cho nút trong Odoo và nút trên trang công khai."""
+        assert state in dict(CONTACT_STATES)
+        self.write({'contact_state': state, 'contact_state_at': fields.Datetime.now()})
+
+    def action_mark_contacted(self):
+        self._set_contact_state('contacted')
+
+    def action_mark_unreachable(self):
+        self._set_contact_state('unreachable')
+
     def _short_link(self):
-        """Link rút gọn tới lead, không có scheme cho gọn (Zalo tự nhận ra thành link): crm.duyan.vn/lead/736."""
+        """Link công khai rút gọn, không có scheme cho gọn (Zalo tự nhận ra thành link): crm.duyan.vn/lead/<mã ngẫu nhiên>."""
         self.ensure_one()
         # sudo(): đọc tham số hệ thống trong luồng webhook/cron (không có user)
         base = self.env['ir.config_parameter'].sudo().get_param('web.base.url', '')
-        return '%s/lead/%s' % (urlsplit(base).netloc or 'crm.duyan.vn', self.id)
+        return '%s/lead/%s' % (urlsplit(base).netloc or 'crm.duyan.vn', self._get_access_token())
 
     def _zalo_message(self):
         """Tin Zalo gọn: tiêu đề in đậm, tên (nếu có), số điện thoại, yêu cầu, ghi chú và link xem chi tiết.

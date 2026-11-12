@@ -82,7 +82,8 @@ class TestPushEvents(TransactionCase):
         self.assertEqual(text[:styles[0]['len']], 'Khách yêu cầu tư vấn')
         self.assertEqual(self.channel.message_ids.styles, styles)
         base = self.env['ir.config_parameter'].sudo().get_param('web.base.url')
-        self.assertTrue(text.endswith('Xem chi tiết: %s/lead/%s' % (base.split('://')[-1], lead.id)))
+        self.assertTrue(text.endswith('Xem chi tiết: %s/lead/%s' % (base.split('://')[-1], lead.sudo().access_token)))
+        self.assertNotIn('/lead/%s' % lead.id, text, 'link does not use the guessable sequential id')
         self.assertNotIn('http', text.splitlines()[-1], 'link is shown without a scheme to stay short')
 
     def test_phone_only_form_is_valid_and_reads_cleanly(self):
@@ -221,3 +222,84 @@ class TestPushController(HttpCase):
         response = self.url_open('/lead/%d' % lead.id, allow_redirects=False)
         self.assertIn(response.status_code, (302, 303))
         self.assertEqual(response.headers['Location'].split('?')[0].rsplit('/odoo/', 1)[-1], 'action-dac_push.web_lead_action/%d' % lead.id)
+
+
+    def _lead_with_token(self, event_id):
+        body = json.dumps(envelope(event_id, name='Chị Hoa', phone='0933939856', message='Gọi giúp em <b>gấp</b>')).encode()
+        self.post(body, sign(body))
+        return self.env['dac.web.lead'].search([], order='id desc', limit=1)
+
+    def test_public_link_shows_only_the_lead_without_login(self):
+        lead = self._lead_with_token('pub1')
+        token = lead.sudo().access_token
+        self.assertTrue(token and not token.isdigit())
+        page = self.url_open('/lead/%s' % token)
+        self.assertEqual(page.status_code, 200)
+        html = page.text
+        self.assertTrue(html.startswith('<!DOCTYPE html>'))
+        self.assertEqual(html.count('DOCTYPE'), 1)
+        self.assertIn('0933939856', html)
+        self.assertIn('Chị Hoa', html)
+        self.assertIn('Đã liên hệ', html)
+        self.assertIn('Liên hệ không được', html)
+        self.assertNotIn('<b>gấp</b>', html, 'customer text is escaped')
+        self.assertNotIn('/web/assets', html, 'standalone page, no Odoo backend assets')
+        self.assertIn('noindex', page.headers['X-Robots-Tag'])
+
+    def test_public_buttons_set_contact_state(self):
+        lead = self._lead_with_token('pub2')
+        token = lead.sudo().access_token
+        self.assertEqual(lead.contact_state, 'new')
+        done = self.url_open('/lead/%s/contact' % token, data={'result': 'contacted'}, allow_redirects=False)
+        self.assertEqual(done.status_code, 303)
+        lead.invalidate_recordset()
+        self.assertEqual((lead.contact_state, bool(lead.contact_state_at)), ('contacted', True))
+        self.url_open('/lead/%s/contact' % token, data={'result': 'unreachable'})
+        lead.invalidate_recordset()
+        self.assertEqual(lead.contact_state, 'unreachable')
+        self.assertIn('Liên hệ không được —', self.url_open('/lead/%s' % token).text)
+
+    def test_public_link_rejects_unknown_tokens_and_bad_results(self):
+        lead = self._lead_with_token('pub3')
+        token = lead.sudo().access_token
+        self.assertEqual(self.url_open('/lead/does-not-exist').status_code, 404)
+        self.assertEqual(self.url_open('/lead/does-not-exist/contact', data={'result': 'contacted'}).status_code, 404)
+        self.assertEqual(self.url_open('/lead/%s/contact' % token, data={'result': 'hack'}).status_code, 400)
+        self.assertEqual(self.url_open('/lead/%s/contact' % token, data={'other': '1'}).status_code, 400)
+        lead.invalidate_recordset()
+        self.assertEqual(lead.contact_state, 'new')
+
+    def test_logged_in_staff_are_sent_to_the_full_form(self):
+        lead = self._lead_with_token('pub4')
+        self.authenticate('admin', 'admin')
+        response = self.url_open('/lead/%s' % lead.sudo().access_token, allow_redirects=False)
+        self.assertIn(response.status_code, (302, 303))
+        self.assertTrue(response.headers['Location'].endswith('action-dac_push.web_lead_action/%d' % lead.id))
+
+    def test_old_leads_without_token_get_one_on_demand_and_tokens_are_unique(self):
+        lead = self._lead_with_token('pub5')
+        self.env.cr.execute('UPDATE dac_web_lead SET access_token = NULL WHERE id = %s', [lead.id])
+        lead.invalidate_recordset()
+        token = lead._get_access_token()
+        self.assertTrue(token)
+        self.assertEqual(lead._get_access_token(), token, 'stable once issued')
+        other = self._lead_with_token('pub6')
+        self.assertNotEqual(other.sudo().access_token, token)
+
+    def test_migration_gives_every_old_lead_its_own_token(self):
+        import importlib.util
+        import pathlib
+        path = pathlib.Path(__file__).resolve().parents[1] / 'migrations' / '18.0.1.2.1' / 'pre-migration.py'
+        spec = importlib.util.spec_from_file_location('dac_push_pre_migration', path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        first, second = self._lead_with_token('mig1'), self._lead_with_token('mig2')
+        # DB thật 1.2.0 không có ràng buộc này (không tạo được); DDL của PostgreSQL rollback cùng giao dịch test
+        self.env.cr.execute('ALTER TABLE dac_web_lead DROP CONSTRAINT IF EXISTS dac_web_lead_access_token_unique')
+        self.env.cr.execute('UPDATE dac_web_lead SET access_token = %s WHERE id IN %s', ['SHARED-TOKEN', (first.id, second.id)])
+        self.env.cr.execute('UPDATE dac_web_lead SET access_token = NULL WHERE id = %s', [self._lead_with_token('mig3').id])
+        module.migrate(self.env.cr, '18.0.1.2.0')
+        self.env.cr.execute('SELECT count(*), count(DISTINCT access_token), count(access_token) FROM dac_web_lead')
+        total, distinct, filled = self.env.cr.fetchone()
+        self.assertEqual((total, filled), (total, total), 'no lead is left without a token')
+        self.assertEqual(distinct, total, 'every token is unique')
