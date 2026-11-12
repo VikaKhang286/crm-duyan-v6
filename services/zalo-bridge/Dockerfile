@@ -1,5 +1,6 @@
-# Ghim đúng bản Node đã chạy ổn trên production. Bản 24.22.3 (kéo tự động khi dùng tag trôi nổi node:24-bookworm-slim)
-# làm kết nối Zalo bị đóng ngay sau khi khởi động (2026-11-12); chỉ nâng khi đã thử trên bridge thật.
+# Ghim đúng bản Node đã chạy ổn trên production (tránh tag trôi nổi tự kéo bản mới). Ngày 2026-11-12 image build với Node 24.22.3
+# bị Zalo đóng kết nối ngay sau khi khởi động, còn 24.22.2 thì ổn; chưa xác minh được nguyên nhân (có thể do Node, có thể do
+# một kết nối khác đang chiếm phiên lúc đó) nên chỉ nâng Node khi đã thử trên bridge thật.
 FROM node:24.22.2-bookworm-slim
 WORKDIR /app
 COPY package.json package-lock.json ./

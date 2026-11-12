@@ -58,6 +58,7 @@ export function buildContent(payload) {
   return { msg: payload.text, ...(styles.length ? { styles } : {}), ...(mentions.length ? { mentions } : {}) };
 }
 
+const DUPLICATE_CONNECTION = 3000; // CloseReason.DuplicateConnection của zca-js
 const THREAD_CACHE_MS = 5 * 60 * 1000;
 const THREAD_LIMIT = 50;
 const fold = (value) => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase();
@@ -71,8 +72,8 @@ export function matchThreads(threads, query, limit = THREAD_LIMIT) {
 }
 
 export class Bridge {
-  constructor({ zalo, store, dataDir, odooUrl, token, fetchImpl = fetch, sendTimeoutMs = 25000 }) {
-    Object.assign(this, { zalo, store, dataDir, odooUrl, token, fetchImpl, sendTimeoutMs });
+  constructor({ zalo, store, dataDir, odooUrl, token, fetchImpl = fetch, sendTimeoutMs = 25000, reconnectBaseMs = 30000, reconnectMaxMs = 900000 }) {
+    Object.assign(this, { zalo, store, dataDir, odooUrl, token, fetchImpl, sendTimeoutMs, reconnectBaseMs, reconnectMaxMs });
     this.state = 'disconnected'; this.api = null; this.qr = null; this.accountId = null;
     this.accountName = null; this.accountAvatar = null;
     this.loginTask = null; this.flushing = false; this.generation = 0; this.abortQR = null;
@@ -189,18 +190,37 @@ export class Bridge {
     });
     api.listener.onConnected(() => {
       if (this.api !== api) return;
-      this.state = 'connected';
+      this.state = 'connected'; this.reconnectAttempts = 0;
       // One bounded server-provided recent-history batch; no claim of a full Zalo archive export.
       api.listener.requestOldMessages(0);
     });
-    api.listener.onClosed(() => { if (this.api === api) this.state = 'disconnected'; });
+    api.listener.onClosed((code) => {
+      if (this.api !== api) return;
+      this.state = 'disconnected';
+      this.scheduleReconnect(api, code);
+    });
     api.listener.onError(() => { if (this.api === api) this.state = 'error'; });
     this.state = 'connected';
-    api.listener.start();
+    api.listener.start({ retryOnClose: true }); // zca-js tự thử lại các mã đóng tạm thời; mã còn lại do scheduleReconnect
     void this.loadAccountProfile(api);
   }
+  // Zalo đóng kết nối (mạng rớt, hoặc "có kết nối khác đang mở" - mã 3000): tự nối lại với thời gian chờ tăng dần.
+  // Mã 3000 chờ lâu hơn để không giành phiên liên tục với người đang dùng Zalo bằng cùng tài khoản.
+  scheduleReconnect(api, code) {
+    const attempt = this.reconnectAttempts = (this.reconnectAttempts || 0) + 1;
+    const base = code === DUPLICATE_CONNECTION ? this.reconnectBaseMs * 10 : this.reconnectBaseMs;
+    const delay = Math.min(base * 2 ** Math.min(attempt - 1, 4), this.reconnectMaxMs);
+    clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      if (this.api !== api) return; // đã đăng xuất hoặc đổi tài khoản
+      try { api.listener.start({ retryOnClose: true }); }
+      catch { this.scheduleReconnect(api, 0); }
+    }, delay);
+    this.reconnectTimer.unref?.();
+  }
   async logout() {
-    ++this.generation; this.abortQR?.(); this.api?.listener.stop();
+    ++this.generation; this.abortQR?.(); clearTimeout(this.reconnectTimer); this.reconnectTimer = null; this.api?.listener.stop();
     this.api = null; this.accountId = null; this.accountName = null; this.accountAvatar = null;
     this.qr = null; this.state = 'disconnected';
     // Keep a cancelled login task reserved until it settles, preventing a new login racing its cleanup.

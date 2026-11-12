@@ -247,3 +247,56 @@ test('group members: names from the group info, missing names looked up, self ex
   await assert.rejects(bridge.listGroupMembers('5001'), /not_connected/);
   store.close();
 });
+
+function fakeListener() {
+  const handlers = {};
+  return { handlers, starts: [], stops: 0,
+    on() {}, requestOldMessages() {},
+    onConnected(cb) { handlers.connected = cb; }, onClosed(cb) { handlers.closed = cb; }, onError(cb) { handlers.error = cb; },
+    start(options) { this.starts.push(options); }, stop() { this.stops += 1; } };
+}
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+test('a closed Zalo connection is reopened automatically with growing waits; duplicate-connection waits longer', async () => {
+  const listener = fakeListener();
+  const { bridge, store } = fixture({ reconnectBaseMs: 10, reconnectMaxMs: 80 });
+  const api = { listener, getOwnId: () => 'assistant', getUserInfo: async () => ({ changed_profiles: {} }), getContext: () => ({}) };
+  await bridge.attach(api);
+  assert.deepEqual(listener.starts, [{ retryOnClose: true }]);
+  listener.handlers.closed(1006, 'abnormal');
+  assert.equal(bridge.state, 'disconnected');
+  await wait(40);
+  assert.equal(listener.starts.length, 2, 'reopened after the first wait');
+  listener.handlers.closed(1006, 'abnormal again');
+  await wait(15);
+  assert.equal(listener.starts.length, 2, 'second wait is longer than the first');
+  await wait(30);
+  assert.equal(listener.starts.length, 3);
+  listener.handlers.connected();
+  assert.equal(bridge.state, 'connected');
+  assert.equal(bridge.reconnectAttempts, 0, 'a successful connection resets the backoff');
+  listener.handlers.closed(3000, 'duplicate');
+  await wait(40);
+  assert.equal(listener.starts.length, 3, 'duplicate connection waits ten times longer, so we do not fight another session');
+  await wait(100);
+  assert.equal(listener.starts.length, 4);
+  store.close();
+});
+
+test('logout cancels a pending reconnect and a replaced account is never reopened', async () => {
+  const first = fakeListener(); const second = fakeListener();
+  const { bridge, store } = fixture({ reconnectBaseMs: 10, reconnectMaxMs: 20 });
+  const make = (listener) => ({ listener, getOwnId: () => 'assistant', getUserInfo: async () => ({ changed_profiles: {} }), getContext: () => ({}) });
+  await bridge.attach(make(first));
+  first.handlers.closed(1006, 'x');
+  await bridge.logout();
+  await wait(40);
+  assert.equal(first.starts.length, 1, 'no reconnect after logout');
+  const replaced = fakeListener();
+  await bridge.attach(make(replaced));
+  replaced.handlers.closed(1006, 'x');
+  await bridge.attach(make(second));
+  await wait(40);
+  assert.equal(replaced.starts.length, 1, 'the old account listener is not reopened');
+  store.close();
+});
