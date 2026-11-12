@@ -1,13 +1,13 @@
 import logging
 import re
 import secrets
-from datetime import timedelta, timezone
+from datetime import timedelta
 from urllib.parse import urlsplit
 
 from odoo import api, fields, models
 
 from .push_event import clean
-from .working_time import TZ, add_working_minutes, latest_summary_slot, next_summary_slot
+from .working_time import add_working_minutes, latest_summary_slot, next_summary_slot
 
 _logger = logging.getLogger(__name__)
 REMIND_AFTER_MINUTES = 30  # phút làm việc chờ trước khi nhắc người nhận lead
@@ -145,7 +145,6 @@ class WebLead(models.Model):
         if not leads:
             return
         event_type = self.env.ref('dac_push.event_type_web_lead_created')
-        today = slot.replace(tzinfo=timezone.utc).astimezone(TZ).date()
 
         def delivered_channels(lead):
             return lead.zalo_message_ids.filtered(lambda m: m.state in ('sent', 'queued')).channel_id.filtered('active')
@@ -154,11 +153,8 @@ class WebLead(models.Model):
         for channel in leads.mapped(delivered_channels):
             mine = leads.filtered(lambda lead: channel in delivered_channels(lead))
             lines = ['Còn %d khách chưa liên hệ:' % len(mine)]
-            for index, lead in enumerate(mine[:SUMMARY_MAX_LEADS], 1):
-                received = lead.received_at.replace(tzinfo=timezone.utc).astimezone(TZ)
-                stamp = received.strftime('%H:%M') + ('' if received.date() == today else received.strftime(' %d/%m'))
-                who = ' - '.join(part for part in (lead.phone or 'chưa có SĐT', lead.customer_name) if part)
-                lines.append('%d. %s (%s) %s' % (index, who, stamp, lead._short_link()))
+            # Khách chờ lâu nhất ở trên cùng (leads đã sắp theo received_at tăng dần); mỗi dòng chỉ "số: link rút gọn"
+            lines.extend('%s: %s' % (lead.phone or 'chưa có SĐT', lead._short_link(compact=True)) for lead in mine[:SUMMARY_MAX_LEADS])
             if len(mine) > SUMMARY_MAX_LEADS:
                 lines.append('… và %d khách nữa (xem trong Odoo → Lead website)' % (len(mine) - SUMMARY_MAX_LEADS))
             text, mentions = channel._with_mentions('\n'.join(lines), channel._mention_members(event_type), leading=True)
@@ -203,12 +199,18 @@ class WebLead(models.Model):
         token = self._get_access_token()
         return '%s-%s' % (digits, token) if 6 <= len(digits) <= 15 else token
 
-    def _short_link(self):
-        """Link công khai rút gọn, không có scheme cho gọn (Zalo tự nhận ra thành link): crm.duyan.vn/lead/<sđt>-<mã>."""
+    def _short_link(self, compact=False):
+        """Link công khai rút gọn, không có scheme cho gọn (Zalo tự nhận ra thành link): crm.duyan.vn/lead/<sđt>-<mã>.
+
+        `compact=True`: crm.duyan.vn/l/<mã> — dùng ở nơi số điện thoại đã hiện ngay bên cạnh (tin nhắc tổng).
+        """
         self.ensure_one()
         # sudo(): đọc tham số hệ thống trong luồng webhook/cron (không có user)
         base = self.env['ir.config_parameter'].sudo().get_param('web.base.url', '')
-        return '%s/lead/%s' % (urlsplit(base).netloc or 'crm.duyan.vn', self._link_slug())
+        host = urlsplit(base).netloc or 'crm.duyan.vn'
+        if compact:
+            return '%s/l/%s' % (host, self._get_access_token())
+        return '%s/lead/%s' % (host, self._link_slug())
 
     def _zalo_message(self):
         """Tin Zalo gọn: tiêu đề in đậm, tên (nếu có), số điện thoại, yêu cầu, ghi chú và link xem chi tiết.

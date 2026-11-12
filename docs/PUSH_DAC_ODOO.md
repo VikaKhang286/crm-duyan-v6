@@ -80,7 +80,8 @@ Ba lớp, đều dừng ngay khi có người bấm **Đã liên hệ / Liên h�
    `acked_at` / `acked_uid` và **không nhắc thêm nữa** (kể cả nhắc tổng). Người không được tag thả cảm xúc thì không tính; nếu tin
    nhắc không tag ai thì ai thả cũng tính. Thả cảm xúc lên tin tổng không tính (tin tổng phải còn nhắc đến khi lead được chốt).
 3. **Nhắc tổng** vào các mốc **8:00, 11:30, 14:00, 17:00** (thứ 2–thứ 7): một tin (không phải reply) `@người_1 @người_2 Còn N khách chưa
-   liên hệ:` kèm từng dòng `số – tên (giờ nhận) link`, tối đa 15 dòng. Gồm mọi lead đã nhận trước mốc, còn "Chưa liên hệ", chưa
+   liên hệ:` kèm từng dòng `số điện thoại: link`, khách chờ lâu nhất ở trên cùng, tối đa 15 dòng. Link rút gọn `crm.duyan.vn/l/<mã>`
+   (cùng trang với `/lead/<sđt>-<mã>`; số điện thoại đã hiện ngay cạnh nên không lặp lại trong link). Gồm mọi lead đã nhận trước mốc, còn "Chưa liên hệ", chưa
    `acked_at`, không quá 7 ngày (kể cả khách điền form buổi tối / Chủ nhật: vào mốc 8:00 kế tiếp). Mỗi mốc xử lý một lần
    (tham số `dac_push.last_summary_slot`); lần chạy đầu tiên chỉ ghi nhận mốc, không gửi; mốc bị lỡ quá 2 giờ (Odoo ngừng) thì bỏ.
 

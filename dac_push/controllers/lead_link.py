@@ -31,7 +31,7 @@ class LeadLinkController(http.Controller):
                 return lead
         return None
 
-    @http.route('/lead/<string:token>', type='http', auth='public', methods=['GET'], sitemap=False)
+    @http.route(['/lead/<string:token>', '/l/<string:token>'], type='http', auth='public', methods=['GET'], sitemap=False)
     def lead_public(self, token, done=None, **kwargs):
         """Trang công khai (không cần đăng nhập): chỉ thông tin lead + 2 nút. Nhân viên đã đăng nhập có quyền xem
         thì được chuyển thẳng sang form đầy đủ trong Odoo."""
