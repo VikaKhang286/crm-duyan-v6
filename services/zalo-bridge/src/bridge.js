@@ -85,8 +85,28 @@ export function normalizeReaction(reaction) {
   if (!ids.length) return null;
   const threadId = String(reaction.threadId);
   return {
-    key: `${threadId}:${data.uidFrom}:${data.actionId || data.msgId || data.ts}:${ids[0]}`,
-    event: { thread_id: threadId, reactor_uid: String(data.uidFrom), icon: content.rIcon.slice(0, 20), message_ids: ids, timestamp: Number(data.ts) || Date.now() },
+    key: `reaction:${threadId}:${data.uidFrom}:${data.actionId || data.msgId || data.ts}:${ids[0]}`,
+    event: { kind: 'reaction', thread_id: threadId, reactor_uid: String(data.uidFrom), icon: content.rIcon.slice(0, 20), message_ids: ids, timestamp: Number(data.ts) || Date.now() },
+  };
+}
+
+// Tin trả lời (reply/quote) của người khác trong nhóm lên một tin do chính tài khoản đã gửi. Tin trả lời lên tin của người khác
+// bị bỏ ngay tại đây, không chuyển sang Odoo. `quote` là dữ liệu để bot có thể trả lời lại đúng tin này.
+export function normalizeReply(message, accountId) {
+  const data = message?.data;
+  if (!message || message.isSelf || message.type !== 1 || !message.threadId || !data?.quote) return null;
+  if (typeof data.content !== 'string' || !data.content.trim() || !data.msgId || !data.cliMsgId) return null;
+  if (!/^\d{1,30}$/.test(String(data.uidFrom ?? '')) || !accountId || String(data.quote.ownerId) !== String(accountId)) return null;
+  const quoted = data.quote.globalMsgId;
+  if (quoted === undefined || quoted === null || quoted === '') return null;
+  const threadId = String(message.threadId);
+  const messageId = idKey(data.msgId);
+  return {
+    key: `reply:${threadId}:${messageId}`,
+    event: { kind: 'reply', thread_id: threadId, sender_uid: String(data.uidFrom), message_id: messageId, quoted_message_id: idKey(quoted),
+      text: data.content.slice(0, 500), timestamp: Number(data.ts) || Date.now() },
+    quote: { threadId, msgId: messageId, body: { msgId: String(data.msgId), content: data.content, msgType: data.msgType || 'webchat',
+      propertyExt: data.propertyExt, cliMsgId: String(data.cliMsgId), ts: String(data.ts), ttl: Number(data.ttl) || 0, uidFrom: String(data.uidFrom) } },
   };
 }
 
@@ -228,14 +248,21 @@ export class Bridge {
           if (!this.echoShapes.has(shape)) { this.echoShapes.add(shape); console.log(`Zalo echo shape: ${shape}`); } // chỉ kiểu dữ liệu, không có nội dung
         }
       } catch { /* Không lưu được dữ liệu trả lời thì tin nhắc nhở vẫn gửi, chỉ không có khung trích dẫn. */ }
+      try {
+        const reply = normalizeReply(message, this.accountId);
+        if (!reply) return;
+        this.store.rememberQuote(reply.quote.threadId, reply.quote.msgId, reply.quote.body); // để bot trả lời lại đúng tin này
+        this.store.enqueueGroupEvent(this.accountId, reply.key, reply.event);
+        void this.flushGroupEvents();
+      } catch { /* Mất một tin trả lời thì lead đó chỉ bị nhắc thêm; không ảnh hưởng luồng khác. */ }
     });
     api.listener.on('reaction', (reaction) => {
       if (this.api !== api) return;
       try {
         const normalized = normalizeReaction(reaction);
         if (!normalized) return;
-        this.store.enqueueReaction(this.accountId, normalized.key, normalized.event);
-        void this.flushReactions();
+        this.store.enqueueGroupEvent(this.accountId, normalized.key, normalized.event);
+        void this.flushGroupEvents();
       } catch { /* Reaction chỉ để biết người được nhắc đã xem; mất một cái thì chỉ có thêm một lần nhắc. */ }
     });
     api.listener.on('old_messages', (messages, type) => {
@@ -295,20 +322,20 @@ export class Bridge {
     } catch { /* Keep the persisted batch for retry; do not log message bodies or tokens. */ }
     finally { this.flushing = false; }
   }
-  async flushReactions() {
-    if (this.flushingReactions || !this.accountId) return;
-    this.flushingReactions = true;
+  async flushGroupEvents() {
+    if (this.flushingGroupEvents || !this.accountId) return;
+    this.flushingGroupEvents = true;
     try {
-      const rows = this.store.pendingReactions(this.accountId);
+      const rows = this.store.pendingGroupEvents(this.accountId);
       if (!rows.length) return;
-      const response = await this.fetchImpl(`${this.odooUrl}/dac_zalo/bridge/reactions`, {
+      const response = await this.fetchImpl(`${this.odooUrl}/dac_zalo/bridge/group_events`, {
         method: 'POST', redirect: 'error', signal: AbortSignal.timeout(30000),
         headers: { Authorization: `Bearer ${this.token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ account_id: this.accountId, reactions: rows.map((row) => JSON.parse(row.body)) }),
+        body: JSON.stringify({ account_id: this.accountId, events: rows.map((row) => JSON.parse(row.body)) }),
       });
-      if (response.ok && (await response.json()).accepted === true) this.store.acknowledgeReactions(rows);
+      if (response.ok && (await response.json()).accepted === true) this.store.acknowledgeGroupEvents(rows);
     } catch { /* Giữ lại để thử lại (Odoo đang nâng cấp / chưa có endpoint). */ }
-    finally { this.flushingReactions = false; }
+    finally { this.flushingGroupEvents = false; }
   }
   // Friends + groups of the logged-in account, cached to avoid hammering Zalo (unofficial API).
   async listThreads() {
@@ -378,8 +405,8 @@ export class Bridge {
     // Echo không có chữ dạng chuỗi (tin có định dạng): dùng chữ đã gửi và coi là tin văn bản thường
     const savedText = saved && typeof saved.content !== 'string' ? this.store.text(payload.thread_id, idKey(payload.quote_message_id)) : null;
     const quote = !saved ? null
-      : typeof saved.content === 'string' ? { ...saved, uidFrom: payload.account_id }
-        : savedText ? { ...saved, content: savedText, msgType: 'webchat', propertyExt: undefined, uidFrom: payload.account_id } : null;
+      : typeof saved.content === 'string' ? { ...saved, uidFrom: saved.uidFrom || payload.account_id }
+        : savedText ? { ...saved, content: savedText, msgType: 'webchat', propertyExt: undefined, uidFrom: saved.uidFrom || payload.account_id } : null;
     const content = buildContent(payload, quote); // kiểm tra kiểu chữ trước khi giữ chỗ request_id
     if (payload.account_id !== this.accountId) throw new Error('wrong_account');
     if (!this.api || this.state !== 'connected') throw new Error('not_connected');

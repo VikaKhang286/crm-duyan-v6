@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, rm, readFile, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { Bridge, authorized, normalizeMessage, matchThreads, buildContent, quoteFromEcho, idKey, normalizeReaction } from '../src/bridge.js';
+import { Bridge, authorized, normalizeMessage, matchThreads, buildContent, quoteFromEcho, idKey, normalizeReaction, normalizeReply } from '../src/bridge.js';
 import { Store } from '../src/store.js';
 
 const TOKEN = 'test-secret-that-is-longer-than-thirty-two-characters';
@@ -358,8 +358,8 @@ test('a styled message whose echo has no string content is quoted with the text 
 test('reactions of other group members are normalised; own, removed, direct and malformed ones are ignored', () => {
   const reaction = { isSelf: false, isGroup: true, threadId: 'G1', data: { actionId: 'a1', msgId: 'r1', uidFrom: '111', ts: '1780000000500', content: { rIcon: '/-strong', rType: 0, source: 6, rMsg: [{ gMsgID: '7123456789012345678', cMsgID: '5', msgType: 1 }] } } };
   const normalized = normalizeReaction(reaction);
-  assert.deepEqual(normalized.event, { thread_id: 'G1', reactor_uid: '111', icon: '/-strong', message_ids: [idKey('7123456789012345678')], timestamp: 1780000000500 });
-  assert.match(normalized.key, /^G1:111:a1:/);
+  assert.deepEqual(normalized.event, { kind: 'reaction', thread_id: 'G1', reactor_uid: '111', icon: '/-strong', message_ids: [idKey('7123456789012345678')], timestamp: 1780000000500 });
+  assert.match(normalized.key, /^reaction:G1:111:a1:/);
   for (const bad of [{ ...reaction, isSelf: true }, { ...reaction, isGroup: false },
     { ...reaction, data: { ...reaction.data, content: { ...reaction.data.content, rIcon: '' } } },
     { ...reaction, data: { ...reaction.data, uidFrom: 'abc' } },
@@ -368,22 +368,47 @@ test('reactions of other group members are normalised; own, removed, direct and 
   }
 });
 
-test('reactions are sent to their own endpoint, kept when Odoo refuses and removed once accepted', async () => {
+test('group events are sent to their own endpoint, kept when Odoo refuses and removed once accepted', async () => {
   const calls = [];
   let accept = false;
   const fetchImpl = async (url, options) => { calls.push([url, JSON.parse(options.body)]); return { ok: accept, json: async () => ({ accepted: accept }) }; };
   const { bridge, store } = fixture({ fetchImpl });
-  const event = { thread_id: 'G1', reactor_uid: '111', icon: '/-strong', message_ids: ['7001'], timestamp: 1 };
-  store.enqueueReaction('assistant', 'k1', event);
-  store.enqueueReaction('assistant', 'k1', event); // trùng khóa: chỉ một
-  await bridge.flushReactions();
-  assert.equal(calls[0][0], 'https://odoo.invalid/dac_zalo/bridge/reactions');
-  assert.deepEqual(calls[0][1], { account_id: 'assistant', reactions: [event] });
-  assert.equal(store.pendingReactions('assistant').length, 1, 'refused: kept for the next try');
+  const event = { kind: 'reaction', thread_id: 'G1', reactor_uid: '111', icon: '/-strong', message_ids: ['7001'], timestamp: 1 };
+  store.enqueueGroupEvent('assistant', 'k1', event);
+  store.enqueueGroupEvent('assistant', 'k1', event); // trùng khóa: chỉ một
+  await bridge.flushGroupEvents();
+  assert.equal(calls[0][0], 'https://odoo.invalid/dac_zalo/bridge/group_events');
+  assert.deepEqual(calls[0][1], { account_id: 'assistant', events: [event] });
+  assert.equal(store.pendingGroupEvents('assistant').length, 1, 'refused: kept for the next try');
   accept = true;
-  await bridge.flushReactions();
-  assert.equal(store.pendingReactions('assistant').length, 0);
-  await bridge.flushReactions();
+  await bridge.flushGroupEvents();
+  assert.equal(store.pendingGroupEvents('assistant').length, 0);
+  await bridge.flushGroupEvents();
   assert.equal(calls.length, 2, 'nothing pending: no request');
+  store.close();
+});
+
+test('only replies to the account own messages are forwarded, and the reply itself can be quoted back', async () => {
+  const reply = { isSelf: false, type: 1, threadId: 'G1', data: { msgId: '900200', cliMsgId: '1780000000700', uidFrom: '111', ts: '1780000000701', ttl: 0, msgType: 'webchat',
+    content: 'Đã gọi rồi', quote: { ownerId: 'assistant', globalMsgId: 700123, cliMsgId: 5, ts: 1, msg: 'x', attach: '', fromD: '', ttl: 0, cliMsgType: 1 } } };
+  const normalized = normalizeReply(reply, 'assistant');
+  assert.deepEqual(normalized.event, { kind: 'reply', thread_id: 'G1', sender_uid: '111', message_id: '900200', quoted_message_id: '700123', text: 'Đã gọi rồi', timestamp: 1780000000701 });
+  assert.equal(normalized.key, 'reply:G1:900200');
+  for (const bad of [{ ...reply, isSelf: true }, { ...reply, type: 0 },
+    { ...reply, data: { ...reply.data, quote: { ...reply.data.quote, ownerId: '222' } } },
+    { ...reply, data: { ...reply.data, quote: undefined } },
+    { ...reply, data: { ...reply.data, content: '  ' } }, { ...reply, data: { ...reply.data, content: { a: 1 } } },
+    { ...reply, data: { ...reply.data, uidFrom: 'x' } }, { ...reply, data: { ...reply.data, cliMsgId: undefined } }, null]) {
+    assert.equal(normalizeReply(bad, 'assistant'), null);
+  }
+  assert.equal(normalizeReply(reply, 'someone-else'), null, 'the quoted message must be ours');
+  // bot cảm ơn bằng cách trả lời đúng tin đó: khung trích dẫn mang người gửi thật (không phải tài khoản bot)
+  const sent = [];
+  const { bridge, store } = fixture();
+  bridge.api = { sendMessage: async (content) => { sent.push(content); return { message: { msgId: 'm1' } }; }, getUserInfo: async () => ({}) };
+  store.rememberQuote(normalized.quote.threadId, normalized.quote.msgId, normalized.quote.body);
+  const result = await bridge.send({ ...payload, request_id: 'th1', thread_id: 'G1', thread_type: 'group', text: 'Em xin cảm ơn ạ', quote_message_id: '900200' });
+  assert.equal(result.quoted, true);
+  assert.deepEqual(sent[0].quote, { msgId: '900200', content: 'Đã gọi rồi', msgType: 'webchat', cliMsgId: '1780000000700', ts: '1780000000701', ttl: 0, uidFrom: '111' });
   store.close();
 });

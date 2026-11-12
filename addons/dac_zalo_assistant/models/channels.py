@@ -101,12 +101,13 @@ class ZaloChannel(models.Model):
             channel.last_sent_at = max(sent.mapped('sent_at')) if sent else False
             channel.failed_count = len(channel.message_ids.filtered(lambda m: m.state in ('failed', 'uncertain')))
 
-    def _queue(self, text, key, event_type=False, styles=None, mentions=None, reply_to=None):
+    def _queue(self, text, key, event_type=False, styles=None, mentions=None, reply_to=None, quote_message_id=None):
         """Đưa tin vào hàng đợi gửi của riêng kênh này. Idempotent theo key.
 
         `styles`: danh sách {'start', 'len', 'style': 'bold'} (vị trí tính theo ký tự của `text`).
         `mentions`: danh sách {'pos', 'len', 'uid'} nhắc tên thành viên nhóm (xem `_with_mentions`).
         `reply_to`: tin đã gửi trước đó trong cùng hội thoại; tin mới hiện dưới dạng "trả lời" tin đó trên Zalo.
+        `quote_message_id`: mã Zalo của một tin bất kỳ (vd tin của nhân viên) mà bridge còn giữ dữ liệu, để trả lời đúng tin đó.
         """
         self.ensure_one()
         messages = self.env['dac.zalo.channel.message']
@@ -117,6 +118,7 @@ class ZaloChannel(models.Model):
             'channel_id': self.id, 'event_key': key, 'text': text[:MAX_TEXT],
             'event_type_id': event_type.id if event_type else False, 'state': 'queued',
             'styles': styles or False, 'mentions': mentions or False, 'reply_to_id': reply_to.id if reply_to else False,
+            'quote_message_id': quote_message_id or False,
         })
 
     def _mention_members(self, event_type):
@@ -281,6 +283,8 @@ class ZaloChannelMessage(models.Model):
     text = fields.Text(string='Nội dung', required=True, readonly=True)
     styles = fields.Json(string='Định dạng chữ', readonly=True, help='Các đoạn in đậm: [{"start", "len", "style": "bold"}].')
     mentions = fields.Json(string='Nhắc tên', readonly=True, help='Các lượt nhắc tên thành viên nhóm: [{"pos", "len", "uid"}].')
+    quote_message_id = fields.Char(string='Trả lời tin có mã Zalo', readonly=True, copy=False,
+        help='Mã Zalo của tin (do người khác gửi) mà tin này trả lời.')
     reply_to_id = fields.Many2one('dac.zalo.channel.message', string='Trả lời tin', readonly=True, ondelete='set null',
         help='Tin này hiện trên Zalo dưới dạng trả lời tin đã gửi trước đó.')
     state = fields.Selection([('queued', 'Chờ gửi'), ('sent', 'Đã gửi'), ('failed', 'Lỗi'),
@@ -309,6 +313,23 @@ class ZaloChannelMessage(models.Model):
             except Exception:  # noqa: BLE001 — cron không được raise; không log nội dung tin
                 message.write({'state': 'failed', 'error_message': 'Không xử lý được; quản trị viên cần kiểm tra.'})
 
+    def _on_reply(self, reply):
+        """Móc cho addon khác: có người trả lời (reply) tin này. `reply`: dict {thread_id, sender_uid, message_id, text, ...}."""
+        return None
+
+    @api.model
+    def _ingest_replies(self, account_id, replies):
+        """Nhận lô tin trả lời từ bridge (đã xác thực); chỉ xét tin trả lời lên tin trợ lý đã gửi vào nhóm."""
+        config = self.env['dac.zalo.config']._config()
+        if not config.assistant_uid or config.assistant_uid != account_id:
+            return
+        for item in replies:
+            if item['sender_uid'] == account_id:
+                continue
+            for message in self.search([('channel_id.thread_id', '=', item['thread_id']), ('channel_id.thread_type', '=', 'group'),
+                                        ('external_message_id', '=', item['quoted_message_id']), ('state', '=', 'sent')]):
+                message._on_reply(item)
+
     def _on_reaction(self, reaction):
         """Móc cho addon khác: một thành viên vừa thả cảm xúc lên tin này (`reaction` là dac.zalo.channel.reaction)."""
         return None
@@ -329,7 +350,7 @@ class ZaloChannelMessage(models.Model):
             payload['styles'] = self.styles
         if self.mentions:
             payload['mentions'] = self.mentions
-        quoted_id = self.reply_to_id.external_message_id if self.reply_to_id.state == 'sent' else False
+        quoted_id = self.quote_message_id or (self.reply_to_id.external_message_id if self.reply_to_id.state == 'sent' else False)
         if quoted_id:
             payload['quote_message_id'] = quoted_id
         try:

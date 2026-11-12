@@ -6,6 +6,7 @@ from urllib.parse import urlsplit
 
 from odoo import api, fields, models
 
+from .contact_intent import THANKS_TEXT, means_contacted
 from .push_event import clean
 from .working_time import add_working_minutes, latest_summary_slot, next_summary_slot
 
@@ -65,6 +66,8 @@ class WebLead(models.Model):
         string='Tin Zalo đã báo lead', readonly=True, copy=False)
     reminder_message_ids = fields.Many2many('dac.zalo.channel.message', 'dac_web_lead_reminder_message_rel', 'lead_id', 'message_id',
         string='Tin nhắc nhở đã gửi', readonly=True, copy=False)
+    summary_message_ids = fields.Many2many('dac.zalo.channel.message', 'dac_web_lead_summary_message_rel', 'lead_id', 'message_id',
+        string='Tin nhắc tổng có số này', readonly=True, copy=False)
     acked_at = fields.Datetime(string='Người được nhắc đã xem lúc', readonly=True, copy=False,
         help='Một trong những người được nhắc tên đã thả cảm xúc lên tin nhắc nhở: không nhắc thêm nữa.')
     acked_uid = fields.Char(string='Mã Zalo người đã xem', readonly=True, copy=False)
@@ -158,7 +161,8 @@ class WebLead(models.Model):
             if len(mine) > SUMMARY_MAX_LEADS:
                 lines.append('… và %d khách nữa (xem trong Odoo → Lead website)' % (len(mine) - SUMMARY_MAX_LEADS))
             text, mentions = channel._with_mentions('\n'.join(lines), channel._mention_members(event_type), leading=True)
-            channel._queue(text, 'lead-summary:%s:%s' % (fields.Datetime.to_string(slot), channel.id), event_type, mentions=mentions)
+            summary = channel._queue(text, 'lead-summary:%s:%s' % (fields.Datetime.to_string(slot), channel.id), event_type, mentions=mentions)
+            mine.write({'summary_message_ids': [(4, summary.id)]})  # để trả lời tin tổng cũng chốt được các số trong đó
             queued = True
         if queued:
             self.env['dac.zalo.channel']._trigger_send()
@@ -298,3 +302,20 @@ class ZaloChannelMessageLead(models.Model):
         if tagged and reaction.uid not in tagged:
             return  # người ngoài danh sách được nhắc thả cảm xúc: chưa tính là đã có người nhận việc
         leads._acknowledge(reaction.uid)
+
+    def _on_reply(self, reply):
+        """Nhân viên trả lời (reply) tin báo lead / nhắc riêng / nhắc tổng bằng "đã liên hệ", "đã gọi"... → chốt các lead của tin đó
+        là đã liên hệ, rồi bot trả lời lại đúng tin của nhân viên đó để cảm ơn."""
+        super()._on_reply(reply)
+        if not means_contacted(reply.get('text')):
+            return
+        # sudo(): luồng nhận tin từ bridge (máy) không có user; chỉ đổi trạng thái liên hệ của lead gắn với tin được trả lời
+        leads = self.env['dac.web.lead'].sudo().search(['|', '|', ('zalo_message_ids', 'in', self.id),
+                                                        ('reminder_message_ids', 'in', self.id), ('summary_message_ids', 'in', self.id)])
+        if not leads:
+            return  # trả lời một tin không liên quan tới lead
+        for lead in leads.filtered(lambda l: l.contact_state == 'new'):
+            lead._set_contact_state('contacted')
+        self.channel_id._queue(THANKS_TEXT, 'lead-thanks:%s:%s' % (reply['message_id'], self.channel_id.id), self.event_type_id,
+                               quote_message_id=reply['message_id'])
+        self.env['dac.zalo.channel']._trigger_send()

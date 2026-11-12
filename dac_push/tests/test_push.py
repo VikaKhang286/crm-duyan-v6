@@ -251,6 +251,61 @@ class TestPushEvents(TransactionCase):
             Lead._cron_summary_uncontacted()
         self.assertEqual(len(self.channel.message_ids), before + 2, 'the next morning slot lists the number again')
 
+    def test_contacted_intent_ignores_accents_case_and_negations(self):
+        from ..models.contact_intent import means_contacted
+        for text in ('đã liên hệ', 'Đã liên hệ ạ', 'da lien he', 'DA LIEN HE a', 'đả liên hệ', 'đã gọi', 'Da goi roi', 'gọi rồi', 'liên hệ rồi',
+                     'đã call', 'đã nhắn tin', 'đã gọi điện cho khách rồi', 'Em đã liên hệ, khách hẹn chiều', 'ok đã gọi nhé'):
+            self.assertTrue(means_contacted(text), text)
+        for text in ('chưa liên hệ', 'chua goi', 'không liên hệ được', 'ko lien he duoc', 'đã gọi nhưng khách không nghe máy', 'liên hệ',
+                     'gọi giúp em', 'ok', 'cảm ơn', 'đã nhận', 'đã xem', '', 'đã', 'đã ' + 'blah ' * 30 + 'gọi'):
+            self.assertFalse(means_contacted(text), text)
+
+    def _reply(self, message, text, reply_id='9001', sender='111'):
+        self.env['dac.zalo.config']._config().write({'active': True, 'assistant_uid': 'bot-push'})
+        self.env['dac.zalo.channel.message']._ingest_replies('bot-push', [{
+            'thread_id': 'G-push', 'sender_uid': sender, 'message_id': reply_id, 'quoted_message_id': message.external_message_id, 'text': text}])
+
+    def test_reply_contacted_to_the_lead_message_marks_it_and_the_bot_thanks_by_quoting(self):
+        lead = self._lead_with_sent_message('rp1')
+        original = lead.zalo_message_ids.filtered(lambda m: m.channel_id == self.channel)
+        before = self.channel.message_ids
+        self._reply(original, 'Da goi roi a')
+        self.assertEqual(lead.contact_state, 'contacted')
+        thanks = self.channel.message_ids - before
+        self.assertEqual((thanks.text, thanks.quote_message_id, thanks.mentions), ('Em xin cảm ơn ạ', '9001', False))
+        self._reply(original, 'Da goi roi a')  # cùng tin trả lời được gửi lại (bridge thử lại): không cảm ơn hai lần
+        self.assertEqual(len(self.channel.message_ids - before), 1)
+
+    def test_reply_to_a_summary_marks_every_number_in_it(self):
+        first = self._lead_with_sent_message('rp2')
+        first.received_at = self._vn('2026-11-12 08:30')  # nằm trước mốc 11:30 của tin tổng giả định
+        second = self._lead_at('rp3', '2026-11-12 09:00')
+        second.zalo_message_ids.write({'state': 'sent', 'external_message_id': 'zm-rp3'})
+        other = self._lead_at('rp4', '2026-11-12 09:10')
+        other.zalo_message_ids.write({'state': 'sent', 'external_message_id': 'zm-rp4'})
+        before = self.channel.message_ids
+        self.env['dac.web.lead']._send_summary(self._vn('2026-11-12 11:30'))
+        summary = (self.channel.message_ids - before)
+        summary.write({'state': 'sent', 'external_message_id': 'zm-summary'})
+        self.assertEqual(first.summary_message_ids.filtered(lambda m: m.channel_id == self.channel), summary, 'the lead remembers which summary listed it')
+        other._set_contact_state('unreachable')  # đã chốt từ trước: giữ nguyên, không bị ghi đè
+        self._reply(summary, 'đã liên hệ hết rồi ạ')
+        self.assertEqual((first.contact_state, second.contact_state, other.contact_state), ('contacted', 'contacted', 'unreachable'))
+
+    def test_reply_to_a_reminder_and_unrelated_replies(self):
+        self.env['dac.zalo.config']._config().write({'active': True, 'assistant_uid': 'bot-push'})
+        lead, reminder = self._reminded_lead('rp5')
+        before = self.channel.message_ids
+        self._reply(reminder, 'chưa gọi được', '9101')
+        self._reply(reminder, 'ok em xem', '9102')
+        self.assertEqual((lead.contact_state, self.channel.message_ids), ('new', before), 'no intent: nothing happens, the bot stays quiet')
+        stranger = self.channel._queue('Tin thường', 'unit:plain', self.env.ref('dac_push.event_type_web_lead_created'))
+        stranger.write({'state': 'sent', 'external_message_id': 'zm-plain'})
+        self._reply(stranger, 'đã gọi', '9103')
+        self.assertEqual(self.channel.message_ids, before | stranger, 'a reply to a message that is not about a lead is ignored')
+        self._reply(reminder, 'Đã gọi', '9104')
+        self.assertEqual(lead.contact_state, 'contacted')
+
     def test_working_time_skips_lunch_nights_and_sundays(self):
         from datetime import datetime, timezone
         from ..models.working_time import TZ, add_working_minutes

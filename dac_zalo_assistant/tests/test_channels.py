@@ -200,6 +200,28 @@ class TestZaloChannels(TransactionCase):
         self.assertFalse(Reaction.search([('message_id', '=', message.id)]))
         self.assertTrue(Reaction._ingest('bot-test', [item]))
 
+    def test_replies_reach_the_hook_only_for_sent_assistant_messages_and_never_from_the_bot(self):
+        message = self.channels._notify('unit.lead', 'Có khách mới', 'lead:reply-hook')
+        reply = {'thread_id': 'G1', 'sender_uid': '111', 'message_id': '9100', 'quoted_message_id': '7100', 'text': 'Đã gọi'}
+        seen = []
+        probe = lambda rec, item: seen.append((rec.id, item['message_id']))
+        with patch.object(type(message), '_on_reply', probe):
+            self.env['dac.zalo.channel.message']._ingest_replies('bot-test', [reply])
+            self.assertEqual(seen, [], 'message is still queued')
+            message.write({'state': 'sent', 'external_message_id': '7100'})
+            self.env['dac.zalo.channel.message']._ingest_replies('bot-test', [{**reply, 'thread_id': 'G-other'}, {**reply, 'sender_uid': 'bot-test'},
+                                                                              {**reply, 'quoted_message_id': '1'}])
+            self.env['dac.zalo.channel.message']._ingest_replies('someone-else', [reply])
+            self.assertEqual(seen, [])
+            self.env['dac.zalo.channel.message']._ingest_replies('bot-test', [reply])
+        self.assertEqual(seen, [(message.id, '9100')])
+
+    def test_message_can_quote_a_message_of_someone_else_by_its_zalo_id(self):
+        thanks = self.group._queue('Cảm ơn', 'unit:thanks', quote_message_id='9100')
+        with patch.object(type(self.config), '_bridge_request', return_value={'delivery': 'sent', 'message_id': 'zt', 'quoted': True}) as bridge:
+            thanks._send(self.config)
+        self.assertEqual(bridge.call_args.args[1]['quote_message_id'], '9100')
+
     def test_no_mentions_without_rule_for_event_or_for_private_chats(self):
         an = self._members(self.group, ('111', 'An'))
         self._rule(self.group, self.other_event, an)
@@ -299,12 +321,20 @@ class TestZaloReactionEndpoint(HttpCase):
         message = channel._queue('x', 'unit:react', event)
         message.write({'state': 'sent', 'external_message_id': '8001'})
         self.env.cr.flush()
-        good = {'account_id': 'bot-test', 'reactions': [{'thread_id': 'GR1', 'reactor_uid': '111', 'icon': '/-strong', 'message_ids': ['8001']}]}
+        reaction = {'kind': 'reaction', 'thread_id': 'GR1', 'reactor_uid': '111', 'icon': '/-strong', 'message_ids': ['8001']}
+        good = {'account_id': 'bot-test', 'events': [reaction]}
         post = lambda body, token='test-secret-over-32-characters-long-for-zalo': self.url_open(
-            '/dac_zalo/bridge/reactions', data=json.dumps(body), headers={'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json'})
+            '/dac_zalo/bridge/group_events', data=json.dumps(body), headers={'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json'})
         self.assertEqual(post(good, 'wrong').status_code, 401)
-        self.assertEqual(post({'account_id': 'bot-test', 'reactions': 'x'}).status_code, 400)
-        self.assertEqual(post({'account_id': 'bot-test', 'reactions': [{'thread_id': 'GR1'}]}).status_code, 400)
-        response = post(good)
+        self.assertEqual(post({'account_id': 'bot-test', 'events': 'x'}).status_code, 400)
+        self.assertEqual(post({'account_id': 'bot-test', 'events': [{'kind': 'reaction', 'thread_id': 'GR1'}]}).status_code, 400)
+        self.assertEqual(post({'account_id': 'bot-test', 'events': [{'kind': 'other'}]}).status_code, 400)
+        self.assertEqual(post({'account_id': 'bot-test', 'events': [{'kind': 'reply', 'thread_id': 'GR1', 'sender_uid': '1'}]}).status_code, 400)
+        reply = {'kind': 'reply', 'thread_id': 'GR1', 'sender_uid': '111', 'message_id': '9001', 'quoted_message_id': '8001', 'text': 'Đã gọi'}
+        seen = []
+        from unittest.mock import patch
+        with patch.object(type(message), '_on_reply', lambda rec, item: seen.append((rec.id, item['sender_uid'], item['text']))):
+            response = post({'account_id': 'bot-test', 'events': [reaction, reply]})
         self.assertEqual((response.status_code, response.json()), (200, {'accepted': True}))
+        self.assertEqual(seen, [(message.id, '111', 'Đã gọi')], 'a reply to the assistant message reaches the hook')
         self.assertEqual(self.env['dac.zalo.channel.reaction'].search_count([('message_id', '=', message.id), ('uid', '=', '111')]), 1)

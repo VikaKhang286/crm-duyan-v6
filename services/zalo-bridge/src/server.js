@@ -40,7 +40,7 @@ const server = createServer(async (req, res) => {
 });
 server.requestTimeout = 35000;
 await bridge.restore();
-const timer = setInterval(() => { void bridge.flush(); void bridge.flushReactions(); }, 2000);
+const timer = setInterval(() => { void bridge.flush(); void bridge.flushGroupEvents(); }, 2000);
 server.listen(Number(process.env.PORT || 8095), process.env.HOST || '127.0.0.1');
 for (const signal of ['SIGTERM', 'SIGINT']) process.on(signal, () => {
   clearInterval(timer); bridge.api?.listener.stop(); server.close(() => { store.close(); process.exit(0); });

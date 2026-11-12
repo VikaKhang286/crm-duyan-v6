@@ -12,20 +12,21 @@ export class Store {
       CREATE TABLE IF NOT EXISTS inbox (key TEXT PRIMARY KEY, account TEXT NOT NULL, body TEXT NOT NULL, created INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS outbox (id TEXT PRIMARY KEY, fingerprint TEXT NOT NULL, state TEXT NOT NULL, message_id TEXT);
       CREATE TABLE IF NOT EXISTS quotes (thread_id TEXT NOT NULL, msg_id TEXT NOT NULL, body TEXT NOT NULL, created INTEGER NOT NULL, PRIMARY KEY (thread_id, msg_id));
-      CREATE TABLE IF NOT EXISTS reactions (key TEXT PRIMARY KEY, account TEXT NOT NULL, body TEXT NOT NULL, created INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS group_events (key TEXT PRIMARY KEY, account TEXT NOT NULL, body TEXT NOT NULL, created INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS sent_texts (thread_id TEXT NOT NULL, msg_id TEXT NOT NULL, text TEXT NOT NULL, created INTEGER NOT NULL, PRIMARY KEY (thread_id, msg_id));`);
   }
-  // Reaction (thả cảm xúc) của thành viên nhóm: hàng đợi riêng, gửi sang Odoo qua endpoint riêng. Giữ tối đa 3 ngày / 1000 mục.
-  enqueueReaction(account, key, event) {
-    this.db.prepare('DELETE FROM reactions WHERE created < ?').run(Date.now() - 3 * 24 * 3600 * 1000);
-    if (this.db.prepare('SELECT count(*) AS n FROM reactions').get().n >= 1000) return;
-    this.db.prepare('INSERT OR IGNORE INTO reactions VALUES (?, ?, ?, ?)').run(key, account, JSON.stringify(event), Date.now());
+  // Sự kiện trong nhóm liên quan tới tin của bot (thả cảm xúc, trả lời tin): hàng đợi riêng, gửi sang Odoo qua endpoint riêng.
+  // Giữ tối đa 3 ngày / 1000 mục.
+  enqueueGroupEvent(account, key, event) {
+    this.db.prepare('DELETE FROM group_events WHERE created < ?').run(Date.now() - 3 * 24 * 3600 * 1000);
+    if (this.db.prepare('SELECT count(*) AS n FROM group_events').get().n >= 1000) return;
+    this.db.prepare('INSERT OR IGNORE INTO group_events VALUES (?, ?, ?, ?)').run(key, account, JSON.stringify(event), Date.now());
   }
-  pendingReactions(account) {
-    return this.db.prepare('SELECT key, body FROM reactions WHERE account=? ORDER BY created, rowid LIMIT 50').all(account);
+  pendingGroupEvents(account) {
+    return this.db.prepare('SELECT key, body FROM group_events WHERE account=? ORDER BY created, rowid LIMIT 50').all(account);
   }
-  acknowledgeReactions(rows) {
-    for (const row of rows) this.db.prepare('DELETE FROM reactions WHERE key=?').run(row.key);
+  acknowledgeGroupEvents(rows) {
+    for (const row of rows) this.db.prepare('DELETE FROM group_events WHERE key=?').run(row.key);
   }
   // Dữ liệu tin do chính tài khoản gửi (lấy từ echo của Zalo) để sau này trả lời đúng tin đó. Giữ 30 ngày.
   rememberQuote(threadId, msgId, body) {

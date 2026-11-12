@@ -68,7 +68,7 @@ bắt đăng nhập. Chữ đậm dùng `styles` của zca-js: bridge chỉ nh�
 
 ## Nhắc nhở lead chưa được liên hệ
 
-Ba lớp, đều dừng ngay khi có người bấm **Đã liên hệ / Liên hệ không được** trên trang lead hoặc trong Odoo.
+Bốn lớp, đều dừng ngay khi có người bấm **Đã liên hệ / Liên hệ không được** trên trang lead hoặc trong Odoo.
 
 1. **Nhắc riêng sau 30 phút làm việc** (`remind_due_at`). Giờ làm việc (`models/working_time.py`): thứ 2–thứ 7, 8:00–12:00 và 13:30–17:30,
    giờ Việt Nam; nghỉ trưa, ngoài giờ và Chủ nhật không tính (11:50 → 13:50; 20:00 → tính từ 8:00 sáng hôm sau). Quá hạn mà vẫn
@@ -93,9 +93,19 @@ Kỹ thuật "trả lời tin": bridge ghi lại dữ liệu mọi tin do chính
 đậm đến dưới dạng khác chuỗi nên phần chữ lấy từ bản bridge đã gửi) trong bảng `quotes` 30 ngày; `/send` nhận thêm `quote_message_id`
 (= `message_id` bridge đã trả khi gửi tin gốc). Không tìm thấy dữ liệu tin gốc thì vẫn gửi nhắc, không có khung trích dẫn, phản hồi `quoted: false`.
 
-Kỹ thuật "thả cảm xúc": bridge nghe sự kiện `reaction` của zca-js (bỏ qua của chính tài khoản, của chat riêng và lượt gỡ cảm xúc), xếp vào
-hàng đợi riêng (bảng `reactions`, giữ 3 ngày) và gửi `POST /dac_zalo/bridge/reactions` (cùng bí mật với `/events`). Odoo lưu ở
-`dac.zalo.channel.reaction` (một dòng cho mỗi người mỗi tin) rồi gọi móc `dac.zalo.channel.message._on_reaction`; `dac_push` dùng móc này.
+4. **Nhân viên trả lời (reply) tin của bot** — tin báo lead, nhắc riêng hoặc nhắc tổng — bằng câu kiểu "đã liên hệ", "đã gọi", "gọi rồi",
+   "da lien he", "đã call", "nhắn tin rồi"... thì **mọi lead của tin đó** (tin tổng: tất cả các số trong tin) được chốt là *Đã liên hệ*
+   (lead đã chốt từ trước giữ nguyên) và bot **trả lời lại đúng tin của nhân viên**: `Em xin cảm ơn ạ`. Nhận diện không phân biệt
+   dấu/hoa thường (`models/contact_intent.py`): cần một từ hoàn tất (đã/rồi/xong) + một hành động (liên hệ, gọi, call, lh, nhắn tin, alo...)
+   và **không có từ phủ định** (chưa, không, ko, k...): "chưa gọi", "không liên hệ được", "đã gọi nhưng khách không nghe máy" bị bỏ
+   qua, bot im lặng. Câu dài quá 25 từ cũng bỏ qua. Trả lời tin không liên quan tới lead thì bỏ qua.
+
+Kỹ thuật "thả cảm xúc" và "trả lời tin": bridge nghe sự kiện `reaction` và tin nhóm có `quote` của zca-js. Bỏ qua của chính tài khoản, của chat
+riêng, lượt gỡ cảm xúc, và **mọi tin trả lời lên tin không phải của bot** (không chuyển sang Odoo). Sự kiện hợp lệ vào hàng đợi riêng
+(bảng `group_events`, giữ 3 ngày) rồi `POST /dac_zalo/bridge/group_events` (cùng bí mật với `/events`, `kind` = `reaction` | `reply`).
+Odoo lưu reaction ở `dac.zalo.channel.reaction` (một dòng cho mỗi người mỗi tin) và gọi các móc
+`dac.zalo.channel.message._on_reaction` / `_on_reply`; `dac_push` dùng hai móc này. Để cảm ơn bằng cách trả lời đúng tin của nhân viên,
+bridge giữ dữ liệu tin trả lời đó (bảng `quotes`) và `/send` nhận `quote_message_id` = mã tin của nhân viên.
 
 ## Chọn nơi nhận lead và nhắc tên
 
