@@ -107,6 +107,23 @@ Odoo lưu reaction ở `dac.zalo.channel.reaction` (một dòng cho mỗi ngư�
 `dac.zalo.channel.message._on_reaction` / `_on_reply`; `dac_push` dùng hai móc này. Để cảm ơn bằng cách trả lời đúng tin của nhân viên,
 bridge giữ dữ liệu tin trả lời đó (bảng `quotes`) và `/send` nhận `quote_message_id` = mã tin của nhân viên.
 
+## Khi hệ thống lỗi hoặc đang deploy: thử lại và cảnh báo
+
+| Chặng | Thử lại | Hết lượt thì |
+|---|---|---|
+| Website → Odoo (plugin WordPress) | sau 1, 5, 30 phút (lỗi mạng, 5xx, 408, 429, 503) | nhật ký plugin ghi "Lỗi", nút "Gửi lại" |
+| Odoo xử lý sự kiện (tạo lead) | cron 2 phút/lần, sau 2, 5, 15, 30, 60 phút (`EVENT_RETRY_MINUTES`); xử lý idempotent theo mã sự kiện | trạng thái "Lỗi xử lý", cảnh báo một lần, nút "Xử lý lại" |
+| Odoo → Zalo (hàng đợi `dac.zalo.channel.message`) | sau 2, 5, 10, 20, 30, 60, 60 phút (`SEND_RETRY_MINUTES`, tổng ~3 giờ) | trạng thái "Lỗi", cảnh báo một lần, nút thử lại trong "Tin cần kiểm tra" |
+| Bridge → Odoo (thả cảm xúc, trả lời) | hàng đợi trên đĩa, 2 giây/lần, giữ 3 ngày | — |
+
+Tin "cần kiểm tra gửi" (bridge gửi nhưng không xác nhận) **không bao giờ tự gửi lại** để tránh gửi trùng; chỉ cảnh báo. Nhắc riêng quá hạn
+trong lúc hệ thống treo được gửi bù khi cron chạy lại; nhắc tổng lỡ quá 2 giờ thì bỏ mốc đó.
+
+**Cảnh báo hệ thống**: loại thông báo `system.alert` ("Cảnh báo hệ thống", nhóm Hệ thống). Hội thoại nào đăng ký loại này (form hội thoại →
+Thông báo nhận) sẽ nhận một tin `⚠️ Hệ thống: ...` khi có tin Zalo hoặc dữ liệu website hết lượt thử lại. Mỗi lỗi chỉ báo một lần; tin cảnh báo
+không tự gây cảnh báo mới. Mặc định chưa hội thoại nào đăng ký. Lưu ý: nếu chính bridge/Zalo đang hỏng thì tin cảnh báo cũng chờ trong
+hàng đợi và đi ra khi Zalo hoạt động lại.
+
 ## Lead thử nghiệm và nhóm thử nghiệm
 
 Lead có **tên là "test"** (không phân biệt hoa/thường và dấu; "test 2" cũng tính, "Tester" thì không) hoặc **số điện thoại 0999999999**

@@ -1,10 +1,13 @@
 import json
 import logging
 import re
+from datetime import timedelta
 
 from odoo import _, api, fields, models
 
 _logger = logging.getLogger(__name__)
+# Xử lý lỗi (vd cơ sở dữ liệu va chạm lúc nâng cấp) thì tự xử lý lại sau từng khoảng này (phút); hết lượt mới để người bấm tay
+EVENT_RETRY_MINUTES = (2, 5, 15, 30, 60)
 _CTRL = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f]')
 
 
@@ -43,6 +46,10 @@ class PushEvent(models.Model):
         ('failed', 'Lỗi xử lý'), ('ignored', 'Không có bộ xử lý')], default='received', required=True, index=True)
     error_message = fields.Char(string='Lỗi', readonly=True)
     handled_at = fields.Datetime(readonly=True)
+    attempts = fields.Integer(string='Số lần xử lý lỗi', readonly=True, copy=False)
+    next_attempt_at = fields.Datetime(string='Tự xử lý lại lúc', readonly=True, copy=False, index=True,
+        help='Trống khi đã xử lý xong hoặc đã hết lượt tự thử lại (lúc đó cần bấm "Xử lý lại").')
+    alerted = fields.Boolean(string='Đã cảnh báo', readonly=True, copy=False)
     _sql_constraints = [('source_event_unique', 'unique(source, event_id)', 'Sự kiện này đã được nhận.')]
 
     @api.model
@@ -72,13 +79,41 @@ class PushEvent(models.Model):
             try:
                 with self.env.cr.savepoint():
                     handler()
-                event.write({'state': 'processed', 'error_message': False, 'handled_at': fields.Datetime.now()})
+                event.write({'state': 'processed', 'error_message': False, 'handled_at': fields.Datetime.now(), 'next_attempt_at': False})
             except Exception as exc:  # noqa: BLE001 — lưu lỗi để xử lý lại, không làm mất gói dữ liệu
                 _logger.exception('dac.push.event %s xử lý lỗi', event.id)
-                event.write({'state': 'failed', 'error_message': clean(exc, 200), 'handled_at': fields.Datetime.now()})
+                attempts = event.attempts + 1
+                event.write({'state': 'failed', 'error_message': clean(exc, 200), 'handled_at': fields.Datetime.now(), 'attempts': attempts,
+                             'next_attempt_at': fields.Datetime.now() + timedelta(minutes=EVENT_RETRY_MINUTES[attempts - 1])
+                             if attempts <= len(EVENT_RETRY_MINUTES) else False})
 
     def action_reprocess(self):
         self.filtered(lambda e: e.state in ('failed', 'ignored'))._dispatch()
+
+    @api.model
+    def _cron_reprocess_failed(self):
+        """Tự xử lý lại sự kiện lỗi đến hạn (xử lý idempotent theo mã sự kiện nên an toàn), rồi cảnh báo các sự kiện đã hết lượt. Không raise."""
+        try:
+            due = self.search([('state', '=', 'failed'), ('next_attempt_at', '!=', False),
+                               ('next_attempt_at', '<=', fields.Datetime.now())], order='next_attempt_at', limit=20)
+            due._dispatch()
+        except Exception:  # noqa: BLE001
+            _logger.exception('Không tự xử lý lại được sự kiện lỗi')
+        try:
+            with self.env.cr.savepoint():
+                self._alert_exhausted()
+        except Exception:  # noqa: BLE001
+            _logger.exception('Không tạo được cảnh báo sự kiện lỗi')
+
+    @api.model
+    def _alert_exhausted(self):
+        stuck = self.search([('state', '=', 'failed'), ('next_attempt_at', '=', False), ('alerted', '=', False)])
+        if not stuck:
+            return
+        text = ('⚠️ Hệ thống: %d dữ liệu từ website chưa xử lý được (đã tự thử lại nhiều lần), có thể chưa có lead tương ứng.\n'
+                'Vào Odoo → Lead website → Sự kiện nhận từ website, chọn mục lỗi rồi bấm "Xử lý lại".' % len(stuck))
+        self.env['dac.zalo.channel']._notify('system.alert', text, 'alert-push:%s' % max(stuck.ids))
+        stuck.write({'alerted': True})
 
 
 class PushEventSystem(models.Model):

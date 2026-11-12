@@ -81,17 +81,51 @@ class TestZaloChannels(TransactionCase):
         message.action_retry()
         self.assertEqual(message.state, 'uncertain', 'Retry is for explicit failures only')
 
-    def test_bridge_error_backs_off_then_fails_after_five_attempts(self):
+    def test_bridge_error_backs_off_for_hours_then_fails(self):
+        from datetime import timedelta
+        from odoo import fields
+        from odoo.addons.dac_zalo_assistant.models.channels import SEND_RETRY_MINUTES
+        self.assertGreaterEqual(sum(SEND_RETRY_MINUTES[:-1]), 150, 'retries span about three hours')
         message = self.channels._notify('unit.lead', 'x', 'lead:7')
+        waits = []
         with patch.object(type(self.config), '_bridge_request', side_effect=UserError('down')):
-            self.env['dac.zalo.channel.message']._cron_process()
-            self.assertEqual((message.state, message.attempts), ('queued', 1))
-            self.assertTrue(message.next_attempt_at)
-            message.write({'attempts': 4, 'next_attempt_at': False})
-            self.env['dac.zalo.channel.message']._cron_process()
-        self.assertEqual(message.state, 'failed')
+            for attempt in range(1, len(SEND_RETRY_MINUTES) + 1):
+                before = fields.Datetime.now()
+                message.write({'next_attempt_at': False})
+                self.env['dac.zalo.channel.message']._cron_process()
+                self.assertEqual(message.attempts, attempt)
+                if message.state == 'queued':
+                    waits.append(round((message.next_attempt_at - before) / timedelta(minutes=1)))
+        self.assertEqual(waits, list(SEND_RETRY_MINUTES[:-1]))
+        self.assertEqual(message.state, 'failed', 'out of attempts')
         message.action_retry()
         self.assertEqual((message.state, message.attempts), ('queued', 0))
+
+    def test_failed_messages_raise_one_system_alert_for_the_channels_that_ask_for_it(self):
+        alert_type = self.env.ref('dac_zalo_assistant.event_type_system_alert')
+        admin_chat = self.channels.create({'name': 'Quản trị', 'thread_id': 'U-admin', 'thread_type': 'user',
+                                           'event_type_ids': [(6, 0, alert_type.ids)]})
+        Message = self.env['dac.zalo.channel.message']
+        Message.search([('state', 'in', ('failed', 'uncertain'))]).write({'alerted': True})  # lỗi cũ có sẵn trong DB thử
+        Message._cron_process()
+        self.assertFalse(admin_chat.message_ids, 'nothing new failed: no alert')
+        bad = self.channels._notify('unit.lead', 'x', 'lead:alert1')
+        bad.write({'state': 'failed'})
+        odd = self.channels._notify('unit.other', 'y', 'lead:alert2') or self.group._queue('y', 'lead:alert2b', self.event)
+        odd.write({'state': 'uncertain'})
+        with patch.object(type(self.config), '_bridge_request', return_value={'delivery': 'sent', 'message_id': 'za1'}):
+            Message._cron_process()
+        alert = admin_chat.message_ids
+        self.assertEqual(len(alert), 1)
+        self.assertIn('1 tin không gửi được', alert.text)
+        self.assertIn('1 tin cần kiểm tra', alert.text)
+        self.assertTrue((bad | odd).mapped('alerted') == [True, True])
+        with patch.object(type(self.config), '_bridge_request', return_value={'delivery': 'sent', 'message_id': 'za2'}):
+            Message._cron_process()
+        self.assertEqual(len(admin_chat.message_ids), 1, 'each failure is reported once')
+        alert.write({'state': 'failed'})  # chính tin cảnh báo lỗi: không gây cảnh báo mới
+        Message._cron_process()
+        self.assertEqual(len(admin_chat.message_ids), 1, 'an alert never alerts about itself')
 
     def test_not_sent_until_assistant_is_confirmed(self):
         self.config.assistant_uid = False

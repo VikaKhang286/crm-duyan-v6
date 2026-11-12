@@ -1,6 +1,6 @@
 {
     'name': 'Trợ lý DAC qua Zalo',
-    'version': '18.0.2.13.0',
+    'version': '18.0.2.14.0',
     'category': '1. Duy An ERP',
     'summary': 'Hội thoại, thông báo nghiệp vụ Zalo, đích nhận thông báo (nhóm/chat, nhắc tên @tag) và AI tương thích OpenAI',
     'license': 'LGPL-3',

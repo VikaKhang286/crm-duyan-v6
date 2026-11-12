@@ -8,6 +8,8 @@ from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
 MAX_TEXT = 12000
+# Gửi lỗi (bridge mất kết nối, Zalo từ chối...) thì thử lại sau từng khoảng này (phút); hết lượt mới chuyển "Lỗi". Tổng ~3 giờ.
+SEND_RETRY_MINUTES = (2, 5, 10, 20, 30, 60, 60, 60)
 MAX_MENTIONS = 30  # bridge từ chối quá 30 lượt nhắc tên trong một tin
 THREAD_TYPES = [('group', 'Nhóm'), ('user', 'Chat riêng')]
 
@@ -302,6 +304,8 @@ class ZaloChannelMessage(models.Model):
     sent_at = fields.Datetime(string='Gửi lúc', readonly=True)
     external_message_id = fields.Char(readonly=True)
     error_message = fields.Char(string='Lỗi', readonly=True)
+    alerted = fields.Boolean(string='Đã cảnh báo', readonly=True, copy=False,
+        help='Tin lỗi đã được đưa vào một cảnh báo hệ thống (loại thông báo "Cảnh báo hệ thống").')
     _sql_constraints = [('event_unique', 'unique(event_key)', 'Tin này đã được xếp hàng.')]
 
     @api.model
@@ -320,6 +324,33 @@ class ZaloChannelMessage(models.Model):
                     message._send(config)
             except Exception:  # noqa: BLE001 — cron không được raise; không log nội dung tin
                 message.write({'state': 'failed', 'error_message': 'Không xử lý được; quản trị viên cần kiểm tra.'})
+        try:
+            with self.env.cr.savepoint():
+                self._alert_failures()
+        except Exception:  # noqa: BLE001 — cron không được raise
+            _logger.exception('Không tạo được cảnh báo tin Zalo lỗi')
+
+    @api.model
+    def _alert_failures(self):
+        """Tin đã hết lượt thử lại (Lỗi) hoặc cần kiểm tra gửi: báo một lần vào các hội thoại đăng ký "Cảnh báo hệ thống".
+
+        Không đăng ký hội thoại nào thì không gửi gì (tin vẫn nằm ở "Tin cần kiểm tra"). Tin cảnh báo không tự gây cảnh báo.
+        """
+        alert_type = self.env.ref('dac_zalo_assistant.event_type_system_alert', raise_if_not_found=False)
+        if not alert_type:
+            return
+        bad = self.search([('state', 'in', ('failed', 'uncertain')), ('alerted', '=', False), ('event_type_id', '!=', alert_type.id)])
+        if not bad:
+            return
+        failed, uncertain = len(bad.filtered(lambda m: m.state == 'failed')), len(bad.filtered(lambda m: m.state == 'uncertain'))
+        parts = []
+        if failed:
+            parts.append('%d tin không gửi được lên Zalo sau nhiều lần thử' % failed)
+        if uncertain:
+            parts.append('%d tin cần kiểm tra xem đã gửi chưa' % uncertain)
+        text = '⚠️ Hệ thống: %s.\nVào Odoo → Trợ lý Zalo → Tin cần kiểm tra để xem và gửi lại.' % '; '.join(parts)
+        self.env['dac.zalo.channel']._notify('system.alert', text, 'alert-msg:%s' % max(bad.ids))
+        bad.write({'alerted': True})
 
     def _on_reply(self, reply):
         """Móc cho addon khác: có người trả lời (reply) tin này. `reply`: dict {thread_id, sender_uid, message_id, text, ...}."""
@@ -365,8 +396,9 @@ class ZaloChannelMessage(models.Model):
             result = config._bridge_request('/send', payload)
         except UserError as error:
             attempts = self.attempts + 1
-            self.write({'attempts': attempts, 'state': 'failed' if attempts >= 5 else 'queued',
-                'error_message': str(error)[:200], 'next_attempt_at': fields.Datetime.now() + timedelta(minutes=2 ** attempts)})
+            wait = SEND_RETRY_MINUTES[min(attempts, len(SEND_RETRY_MINUTES)) - 1]
+            self.write({'attempts': attempts, 'state': 'failed' if attempts >= len(SEND_RETRY_MINUTES) else 'queued',
+                'error_message': str(error)[:200], 'next_attempt_at': fields.Datetime.now() + timedelta(minutes=wait)})
             return
         if result.get('delivery') == 'sent':
             if quoted_id and result.get('quoted') is False:

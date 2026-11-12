@@ -515,6 +515,45 @@ class TestPushEvents(TransactionCase):
         event.action_reprocess()
         self.assertEqual(event.state, 'processed')
 
+    def test_failed_events_are_retried_automatically_then_alerted_once(self):
+        from unittest.mock import patch
+        from ..models.push_event import EVENT_RETRY_MINUTES
+        calls = {'n': 0}
+
+        def flaky(rec):
+            calls['n'] += 1
+            if calls['n'] <= 2:
+                raise ValueError('boom')
+        type(self.events)._handle_unit_retry = flaky
+        self.addCleanup(lambda: delattr(type(self.events), '_handle_unit_retry'))
+        event, _ = self.events._receive(envelope('rt-1', 'unit.retry'))
+        self.assertEqual((event.state, event.attempts), ('failed', 1))
+        self.assertTrue(event.next_attempt_at and event.next_attempt_at > fields.Datetime.now())
+        self.events._cron_reprocess_failed()
+        self.assertEqual(calls['n'], 1, 'not due yet: the cron leaves it alone')
+        event.next_attempt_at = fields.Datetime.now() - timedelta(minutes=1)
+        self.events._cron_reprocess_failed()
+        self.assertEqual((event.state, event.attempts, calls['n']), ('failed', 2, 2), 'second failure schedules a later retry')
+        event.next_attempt_at = fields.Datetime.now() - timedelta(minutes=1)
+        self.events._cron_reprocess_failed()
+        self.assertEqual((event.state, bool(event.next_attempt_at), calls['n']), ('processed', False, 3), 'the third try succeeds')
+        # không bao giờ thành công: hết lượt thì dừng tự thử lại và cảnh báo đúng một lần
+        type(self.events)._handle_unit_never = lambda rec: (_ for _ in ()).throw(ValueError('always'))
+        self.addCleanup(lambda: delattr(type(self.events), '_handle_unit_never'))
+        alert_channel = self.env['dac.zalo.channel'].create({
+            'name': 'Quản trị', 'thread_id': 'U-push-admin', 'thread_type': 'user',
+            'event_type_ids': [(6, 0, self.env.ref('dac_zalo_assistant.event_type_system_alert').ids)]})
+        stuck, _ = self.events._receive(envelope('rt-2', 'unit.never'))
+        for _ in EVENT_RETRY_MINUTES:
+            stuck.next_attempt_at = fields.Datetime.now() - timedelta(minutes=1)
+            self.events._cron_reprocess_failed()
+        self.assertEqual((stuck.state, stuck.attempts, bool(stuck.next_attempt_at)), ('failed', len(EVENT_RETRY_MINUTES) + 1, False))
+        self.assertEqual(len(alert_channel.message_ids), 1)
+        self.assertIn('1 dữ liệu từ website chưa xử lý được', alert_channel.message_ids.text)
+        self.events._cron_reprocess_failed()
+        self.assertEqual(len(alert_channel.message_ids), 1, 'reported once')
+        self.assertTrue(stuck.alerted)
+
     def test_hostile_text_is_cleaned_and_truncated(self):
         event, _ = self.events._receive(envelope('h1', name='A\x00\x07B' + 'x' * 500, message='m' * 5000))
         lead = self.env['dac.web.lead'].search([('event_id', '=', event.id)])
