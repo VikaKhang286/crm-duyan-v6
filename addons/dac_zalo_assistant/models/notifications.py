@@ -144,6 +144,29 @@ class ZaloNotificationConfig(models.Model):
     notification_delivery_cursor = fields.Integer(default=0, readonly=True)
 
 
+class ZaloEventType(models.Model):
+    """Registry of business events that can be delivered through Zalo.
+
+    ``dac_push`` seeds this registry during module upgrades.  Keep the model in
+    the Zalo module (which is loaded before ``dac_push``) so its data files do
+    not depend on a model that has not been registered yet.
+    """
+    _name = 'dac.zalo.event.type'
+    _description = 'Loại sự kiện Zalo'
+    _order = 'sequence, name, id'
+
+    name = fields.Char(string='Tên sự kiện', required=True, translate=True)
+    code = fields.Char(string='Mã sự kiện', required=True, index=True)
+    group_name = fields.Char(string='Nhóm sự kiện', index=True)
+    description = fields.Text(string='Mô tả', translate=True)
+    sequence = fields.Integer(string='Thứ tự', default=10)
+    active = fields.Boolean(default=True)
+
+    _sql_constraints = [
+        ('code_unique', 'unique(code)', 'Mã sự kiện Zalo phải là duy nhất.'),
+    ]
+
+
 class ZaloEventState(models.Model):
     _name = 'dac.zalo.event.state'
     _description = 'Mốc theo dõi sự kiện trợ lý Zalo'

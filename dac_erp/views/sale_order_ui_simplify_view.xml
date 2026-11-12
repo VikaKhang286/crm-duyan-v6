@@ -322,7 +322,7 @@
                     </div>
                     <div class="dac-v6-design-approval-card"
                          groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager,base.group_system"
-                         invisible="workflow_review_state != 'deposit' or not design_done or design_review_state in ['approved', 'revision']">
+                         invisible="1">
                         <field name="design_review_state" invisible="1"/>
                         <field name="design_done" invisible="1"/>
                         <strong><field name="design_task_title" nolabel="1" readonly="1"/></strong>
@@ -341,25 +341,23 @@
                                 <field name="deadline_date_display"/>
                                 <templates>
                                     <t t-name="card">
-                                        <button name="action_open_design_collaboration" type="object" class="dac-v6-design-task-open">
                                         <div t-attf-class="dac-task-card-inner dac-task-state-#{record.state.raw_value}">
                                             <div class="dac-task-card-header">
-                                                <span class="dac-task-name"><i t-if="record.state.raw_value === 'done'" class="fa fa-check me-2"/><t t-esc="record.name.value"/></span>
-                                                <span t-attf-class="dac-v6-design-task-status is-#{record.design_review_state.raw_value}">
+                                                <button name="action_open_design_collaboration" type="object" class="dac-v6-design-task-card-link"><i t-if="record.state.raw_value === 'done'" class="fa fa-check me-2"/><t t-esc="record.name.value"/></button>
+                                                <button t-if="record.design_review_state.raw_value === 'pending'" name="action_approve_design" type="object" class="dac-v6-design-task-approve" groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager,base.group_system"><i class="fa fa-check"/> Duyệt thiết kế</button>
+                                                <button t-else="" name="action_open_design_collaboration" type="object" t-attf-class="dac-v6-design-task-status is-#{record.design_review_state.raw_value}">
                                                     <i class="fa fa-circle"/>
-                                                    <t t-if="record.design_review_state.raw_value === 'pending'">Chờ Sale duyệt</t>
-                                                    <t t-elif="['approved', 'done'].includes(record.design_review_state.raw_value)">Thiết kế xong</t>
+                                                    <t t-if="['approved', 'done'].includes(record.design_review_state.raw_value)">Thiết kế xong</t>
                                                     <t t-elif="record.design_review_state.raw_value === 'revision'">Cần chỉnh sửa</t>
                                                     <t t-else="">Đang thiết kế</t>
-                                                </span>
+                                                </button>
                                             </div>
-                                            <div class="dac-task-production-meta">
+                                            <button name="action_open_design_collaboration" type="object" class="dac-v6-design-task-card-meta">
                                                 <span>Nhận: <b t-esc="record.assigned_user_id.value || 'Chưa giao'"/></span>
                                                 <span>Sale giao: <b t-esc="record.sale_user_id.value || '—'"/></span>
                                                 <span>Hạn: <b t-esc="record.deadline_date_display.value"/></span>
-                                            </div>
+                                            </button>
                                         </div>
-                                        </button>
                                     </t>
                                 </templates>
                             </kanban>

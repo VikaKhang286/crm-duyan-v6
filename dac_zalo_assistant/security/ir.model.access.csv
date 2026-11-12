@@ -18,5 +18,7 @@ access_pref_system,Zalo admin preferences,model_dac_zalo_preference,base.group_s
 access_notification_user,Zalo own notifications,model_dac_zalo_notification,base.group_user,1,0,0,0
 access_notification_manager,Zalo manager notifications,model_dac_zalo_notification,dac_erp.group_dac_erp_manager,1,0,0,0
 access_notification_system,Zalo admin notifications,model_dac_zalo_notification,base.group_system,1,1,1,1
+access_event_type_manager,Zalo manager event types,model_dac_zalo_event_type,dac_erp.group_dac_erp_manager,1,0,0,0
+access_event_type_system,Zalo admin event types,model_dac_zalo_event_type,base.group_system,1,1,1,1
 access_watch_manager,Zalo manager event status,model_dac_zalo_event_state,dac_erp.group_dac_erp_manager,1,0,0,0
 access_watch_system,Zalo admin event status,model_dac_zalo_event_state,base.group_system,1,1,1,1

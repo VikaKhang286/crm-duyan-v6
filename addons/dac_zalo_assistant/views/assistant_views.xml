@@ -28,6 +28,8 @@
                                 <strong>Đã kết nối tài khoản Zalo</strong>
                                 <span invisible="not assistant_name">: <field name="assistant_name" nolabel="1"/></span>
                             </div>
+                            <!-- Extension point used by dac_push for connection-specific cards. -->
+                            <div name="connection_cards"/>
                             <group string="Tài khoản Zalo" col="2" groups="base.group_system" invisible="not assistant_uid">
                                 <field name="assistant_avatar" widget="image" nolabel="1"
                                        options="{'size': [88, 88]}" class="oe_avatar"/>

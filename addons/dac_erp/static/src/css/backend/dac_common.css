@@ -1589,17 +1589,38 @@ html body.o_web_client .dac-design-order-file .dac-design-final-file-source .o_s
 }
 .dac-v6-design-task-open:hover .dac-task-card-inner { border-color: #b9c9df; box-shadow: 0 2px 8px rgba(41, 71, 113, .08); }
 .dac-v6-design-task-open .dac-task-name { color: #315f9f; }
+.dac-v6-design-task-card-link,
+.dac-v6-design-task-card-meta {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+.dac-v6-design-task-card-link { color: #315f9f; font-weight: 800; }
+.dac-v6-design-task-card-meta { display: flex; gap: 18px; width: 100%; margin-top: 14px; }
+.dac-v6-design-task-approve {
+  flex: 0 0 auto;
+  padding: 9px 14px;
+  border: 1px solid #eba900;
+  border-radius: 13px;
+  background: #ffc629;
+  color: #3f3206;
+  font-weight: 800;
+}
+.dac-v6-design-task-approve:hover { background: #ffc107; }
 .dac-v6-design-task-status {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   flex: 0 0 auto;
-  padding: 9px 14px;
-  border-radius: 22px;
+  padding: 6px 10px;
+  min-height: 0 !important;
+  border-radius: 20px !important;
   background: #eff1f5;
   color: #67748a;
-  font-size: 12px;
-  font-weight: 800;
+  font-size: 12px !important;
+  font-weight: 800 !important;
 }
 .dac-v6-design-task-status .fa { font-size: 9px; }
 .dac-v6-design-task-status.is-in_progress { background: #eaf2ff; color: #2d73eb; }

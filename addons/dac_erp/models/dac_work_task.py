@@ -78,6 +78,13 @@ class DacWorkTask(models.Model):
         if not self.order_id:
             raise ValidationError('Task này chưa được liên kết với đơn hàng.')
         return self.order_id.action_open_design_collaboration()
+
+    def action_approve_design(self):
+        """Approve the linked order directly from the pending Design task."""
+        self.ensure_one()
+        if not self.order_id:
+            raise ValidationError('Task này chưa được liên kết với đơn hàng.')
+        return self.order_id.action_approve_design()
     design_revision_display = fields.Char(
         related='order_id.design_revision_display', string='Bản vẽ', readonly=True,
     )
