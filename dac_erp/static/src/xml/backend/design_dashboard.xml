@@ -2,22 +2,67 @@
 <templates xml:space="preserve">
   <t t-name="dac_erp.DesignDashboard" owl="1">
     <div class="dac-viewport"><main class="o_dac_manager_dashboard dac-theme-design dac-design-v6">
-      <header class="design-v6-header"><div><div class="design-v6-breadcrumb">DAC Sản xuất &amp; Vận hành / Thiết kế</div><h1>Dashboard Thiết kế</h1><p>Góc nhìn vai trò Thiết kế: deadline, ưu tiên, file và task cần hoàn thành.</p></div><div class="design-v6-actions"><button class="btn design-v6-btn design-v6-btn-light" t-on-click="openDesignCalendar"><i class="fa fa-calendar-o"/> Lịch thiết kế</button><button class="btn design-v6-btn design-v6-btn-primary" t-on-click="openCreateDesignTask"><i class="fa fa-plus"/> Task thiết kế</button></div></header>
+      <header class="design-v6-header"><div><div class="design-v6-breadcrumb">DAC / Nhân viên Thiết kế</div><h1>Tổng quan</h1><p>Thống kê đơn thiết kế và công việc được giao cho bạn.</p></div><div class="design-v6-actions"><button class="btn design-v6-btn design-v6-btn-light" t-on-click="openDesignCalendar"><i class="fa fa-calendar-o"/> Lịch thiết kế</button></div></header>
       <t t-if="state.loading"><div class="design-v6-loading"><i class="fa fa-spinner fa-pulse"/> Đang tải dữ liệu thiết kế…</div></t>
       <t t-elif="state.error"><div class="alert alert-danger"><t t-esc="state.error"/></div></t>
       <t t-else="">
         <section class="design-v6-kpis">
-          <article class="design-v6-kpi"><span>Tổng việc</span><strong><t t-esc="taskStats.total || 0"/></strong><small><t t-esc="taskStats.in_progress || 0"/> đang xử lý</small></article>
-          <article class="design-v6-kpi design-v6-kpi-danger"><span>Quá hạn</span><strong><t t-esc="taskStats.overdue || 0"/></strong><small>Cần ưu tiên</small></article>
-          <article class="design-v6-kpi"><span>Sắp đến hạn</span><strong><t t-esc="taskStats.due_soon || 0"/></strong><small>Trong 48 giờ</small></article>
-          <article class="design-v6-kpi"><span>Hoàn thành tháng</span><strong><t t-esc="taskStats.done_month || 0"/></strong><small class="design-v6-positive"><t t-esc="taskStats.on_time_rate || 0"/>% đúng hạn</small></article>
+          <article class="design-v6-kpi" t-on-click="() => this.setFilter('total')"><span>Đơn thiết kế</span><strong><t t-esc="designOrderCount"/></strong><small><t t-esc="taskStats.total || 0"/> task được giao</small><button type="button">Xem task <i class="fa fa-angle-right"/></button></article>
+          <article class="design-v6-kpi design-v6-kpi-warning" t-on-click="() => this.setFilter('in_progress')"><span>Cần làm</span><strong><t t-esc="todoCount"/></strong><small><t t-esc="todoCount"/> đơn · <t t-esc="todoCount"/> task</small><button type="button">Xem task <i class="fa fa-angle-right"/></button></article>
+          <article class="design-v6-kpi design-v6-kpi-danger" t-on-click="() => this.setFilter('overdue')"><span>Quá hạn</span><strong><t t-esc="taskStats.overdue || 0"/></strong><small><t t-esc="taskStats.overdue || 0"/> đơn · <t t-esc="taskStats.overdue || 0"/> task</small><button type="button">Xem task <i class="fa fa-angle-right"/></button></article>
+          <article class="design-v6-kpi" t-on-click="() => this.setFilter('waiting')"><span>Chờ Sale duyệt</span><strong><t t-esc="designDistribution.waiting || 0"/></strong><small><t t-esc="designDistribution.waiting || 0"/> đơn · <t t-esc="designDistribution.waiting || 0"/> task</small><button type="button">Xem task <i class="fa fa-angle-right"/></button></article>
+          <article class="design-v6-kpi design-v6-kpi-success" t-on-click="() => this.setFilter('done')"><span>Thiết kế xong</span><strong><t t-esc="completedDesignOrderCount"/></strong><small><t t-esc="completedDesignOrderCount"/> đơn · <t t-esc="completedDesignTasks.length"/> task</small><button type="button">Xem task <i class="fa fa-angle-right"/></button></article>
+          <article class="design-v6-kpi design-v6-kpi-danger" t-on-click="() => this.setFilter('revision')"><span>Cần chỉnh sửa</span><strong><t t-esc="designDistribution.revision || 0"/></strong><small><t t-esc="designDistribution.revision || 0"/> đơn · <t t-esc="designDistribution.revision || 0"/> task</small><button type="button">Xem task <i class="fa fa-angle-right"/></button></article>
         </section>
-        <section class="design-v6-board">
-          <article class="design-v6-panel design-v6-priority"><div class="design-v6-panel-head"><div><h2>Việc thiết kế ưu tiên</h2><p>Bấm đơn để mở trang chi tiết.</p></div></div><div class="design-v6-task-list">
-            <t t-if="designTasks.length"><t t-foreach="designTasks.slice(0, 8)" t-as="task" t-key="task.id"><button class="design-v6-task" t-on-click="() => this.openTaskOrOrder(task)"><span t-attf-class="design-v6-task-mark #{task.is_overdue ? 'is-overdue' : ''}"><t t-if="task.is_overdue">!</t><t t-elif="task.priority === 'urgent'">!</t><t t-else=""><t t-esc="task.days_left !== false ? task.days_left : '•'"/></t></span><span class="design-v6-task-copy"><strong><t t-esc="task.order_number || task.order_name || task.name"/><t t-if="task.order_title"> · <t t-esc="task.order_title"/></t></strong><small t-if="task.is_overdue">Quá hạn<t t-if="task.description"> · <t t-esc="task.description"/></t></small><small t-else="">Deadline <t t-esc="task.deadline_str || 'chưa đặt'"/><t t-if="task.description"> · <t t-esc="task.description"/></t></small></span><i class="fa fa-angle-right"/></button></t></t>
-            <div t-else="" class="design-v6-empty"><span><i class="fa fa-paint-brush"/></span><strong>Chưa có việc thiết kế</strong><p>Task mới được giao sẽ xuất hiện tại đây.</p></div>
-          </div></article>
-          <article class="design-v6-panel design-v6-distribution"><div class="design-v6-panel-head"><div><h2>Phân bổ trạng thái</h2><p><t t-esc="designDistribution.total || 0"/> task thiết kế trong tháng</p></div></div><div class="design-v6-chart-wrap"><div class="design-v6-donut" t-att-style="'background:' + distributionStyle"><div><strong><t t-esc="designDistribution.total || 0"/></strong><span>task</span></div></div><div class="design-v6-legend"><div><i class="is-designing"/><span>Đang thiết kế</span><strong><t t-esc="designDistribution.designing || 0"/></strong></div><div><i class="is-waiting"/><span>Chờ duyệt</span><strong><t t-esc="designDistribution.waiting || 0"/></strong></div><div><i class="is-revision"/><span>Cần sửa</span><strong><t t-esc="designDistribution.revision || 0"/></strong></div><div><i class="is-ready"/><span>Sẵn sàng SX</span><strong><t t-esc="designDistribution.ready || 0"/></strong></div></div></div></article>
+        <section class="design-v6-board design-v6-workspace">
+          <article class="design-v6-panel design-v6-task-panel">
+            <div class="design-v6-panel-head"><div><h2><t t-esc="activeFilterLabel"/></h2><p><t t-esc="taskListDescription"/></p></div></div>
+            <div class="design-v6-panel-filter">
+              <div class="design-v6-filter-tabs">
+                <button t-att-class="state.filter === 'total' ? 'is-active' : ''" t-on-click="() => this.setFilter('total')">Tất cả <b><t t-esc="taskStats.total || 0"/></b></button>
+                <button t-att-class="state.filter === 'in_progress' ? 'is-active' : ''" t-on-click="() => this.setFilter('in_progress')">Cần làm <b><t t-esc="todoCount"/></b></button>
+                <button t-att-class="state.filter === 'draft' ? 'is-active' : ''" t-on-click="() => this.setFilter('draft')">Chưa thực hiện <b><t t-esc="notStartedCount"/></b></button>
+                <button t-att-class="state.filter === 'working' ? 'is-active' : ''" t-on-click="() => this.setFilter('working')">Đang làm <b><t t-esc="inProgressCount"/></b></button>
+                <button t-att-class="state.filter === 'revision' ? 'is-active' : ''" t-on-click="() => this.setFilter('revision')">Cần chỉnh sửa <b><t t-esc="designDistribution.revision || 0"/></b></button>
+                <button t-att-class="state.filter === 'waiting' ? 'is-active' : ''" t-on-click="() => this.setFilter('waiting')">Chờ Sale duyệt <b><t t-esc="designDistribution.waiting || 0"/></b></button>
+                <button t-att-class="state.filter === 'done' ? 'is-active' : ''" t-on-click="() => this.setFilter('done')">Thiết kế xong <b><t t-esc="completedDesignTasks.length"/></b></button>
+                
+              </div>
+              <div class="design-v6-search"><i class="fa fa-search"/><input type="text" placeholder="Tìm task, mã đơn, khách hàng…" t-model="state.search"/></div>
+            </div>
+            <div class="design-v6-viewing"><span>Đang xem: <strong><t t-esc="activeFilterLabel"/></strong> · <t t-esc="filteredDesignTasks.length"/> task / <t t-esc="filteredDesignTasks.length"/> đơn</span><button t-if="state.filter !== 'total'" t-on-click="() => this.setFilter('total')">Hiện tất cả</button></div>
+            <div class="design-v6-task-list design-v6-task-list-rich">
+              <t t-if="filteredDesignTasks.length"><t t-foreach="filteredDesignTasks.slice(0, 8)" t-as="task" t-key="task.id"><button class="design-v6-task" t-on-click="() => this.openTaskOrOrder(task)"><span class="design-v6-task-content"><span class="design-v6-task-top"><span class="design-v6-task-copy"><strong><t t-esc="task.order_title || task.order_number || task.name"/></strong><small><t t-esc="task.order_number || task.order_name"/><t t-if="task.description"> · <t t-esc="task.description"/></t></small></span><i class="fa fa-angle-right"/></span><span class="design-v6-task-bottom"><em t-att-class="getTaskStatusClass(task)"><i class="fa fa-circle"/> <t t-esc="getTaskStatusLabel(task)"/></em><span class="design-v6-task-date"><i class="fa fa-calendar"/> <t t-esc="formatTaskDate(task.deadline_str)"/></span></span></span></button></t></t>
+              <div t-else="" class="design-v6-empty"><span><i class="fa fa-paint-brush"/></span><strong>Chưa có task thiết kế</strong><p>Task được giao sẽ xuất hiện tại đây.</p></div>
+            </div>
+            <div class="design-v6-task-footer"><t t-esc="filteredDesignTasks.length"/> / <t t-esc="taskStats.total || 0"/> task được giao</div>
+          </article>
+          <aside class="design-v6-panel design-v6-notification-panel">
+            <div class="design-v6-panel-head">
+              <h2>Thông báo</h2>
+              <button type="button" class="design-v6-notification-check" title="Đánh dấu tất cả đã đọc" t-on-click="markAllNotificationsRead"><svg class="icon " width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4L19 6"></path></svg></button>
+            </div>
+            <div class="design-v6-notification-tabs">
+              <button t-att-class="state.notificationTab === 'all' ? 'is-active' : ''" t-on-click="() => this.setNotificationTab('all')">Tất cả</button>
+              <button t-att-class="state.notificationTab === 'unread' ? 'is-active' : ''" t-on-click="() => this.setNotificationTab('unread')">Chưa đọc <b t-if="unreadNotificationCount"><t t-esc="unreadNotificationCount"/></b></button>
+            </div>
+            <div class="design-v6-notification-list">
+              <t t-foreach="visibleNotificationItems" t-as="item" t-key="item.key">
+                <button t-attf-class="design-v6-notification #{!isNotificationRead(item.key) ? 'is-unread' : 'is-read'}" t-on-click="() => this.openNotification(item)">
+                  <span t-attf-class="design-v6-notification-icon #{item.alert ? 'is-alert' : item.kind} #{item.avatar_tone || ''}"><t t-if="item.initials"><t t-esc="item.initials"/></t><i t-else="" t-att-class="item.alert ? 'fa fa-exclamation-triangle' : 'fa fa-cube'"/></span>
+                  <span class="design-v6-notification-text"><strong><t t-esc="item.title"/></strong>
+                    <span> “<t t-esc="item.detail"/>” · <b><t t-esc="item.time"/></b></span>
+                  </span>
+                  <i class="design-v6-unread"/>
+                </button>
+              </t>
+              <div t-if="!visibleNotificationItems.length" class="design-v6-notification-empty">
+                  <svg class="icon " width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"></path></svg>
+                  <strong>Đã đọc hết thông báo</strong>
+                  <p>Trao đổi, đơn mới và cảnh báo sẽ hiện tại đây.</p>          
+              </div>
+            </div>
+          </aside>
         </section>
       </t>
     </main></div>

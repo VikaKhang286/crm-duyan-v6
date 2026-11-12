@@ -3299,6 +3299,21 @@
   overflow: visible !important;
 }
 
+/* The Design workspace has its own order header inside the form. */
+.o_control_panel.dac-sale-order-control-panel-design {
+  display: none !important;
+}
+
+/* Also cover nested action URLs: the task workspace always owns its header. */
+.o_action_manager:has(.dac-design-collaboration-workspace) .o_control_panel {
+  display: none !important;
+}
+
+/* Sale order screens render their own in-form header; remove Odoo's panel. */
+.o_action_manager:has(.dac-sale-form) .o_control_panel {
+  display: none !important;
+}
+
 .o_control_panel.dac-sale-order-control-panel-active .o_control_panel_main,
 .o_control_panel.dac-sale-order-control-panel-active .o_control_panel_actions,
 .o_control_panel.dac-sale-order-control-panel-active .o_control_panel_navigation {

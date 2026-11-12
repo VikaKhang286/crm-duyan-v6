@@ -320,21 +320,38 @@
                                readonly="workflow_review_state == 'production'"
                                options="{'target': '_blank'}"/>
                     </div>
+                    <div class="dac-v6-design-approval-card"
+                         groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager,base.group_system"
+                         invisible="workflow_review_state != 'deposit' or not design_done or design_review_state in ['approved', 'revision']">
+                        <field name="design_review_state" invisible="1"/>
+                        <field name="design_done" invisible="1"/>
+                        <strong><field name="design_task_title" nolabel="1" readonly="1"/></strong>
+                        <div class="dac-v6-design-approval-meta">Preview đã được Thiết kế gửi. Kiểm tra và duyệt để nhận file thiết kế.</div>
+                        <button name="action_approve_design" type="object" class="dac-v6-design-approval-button"><i class="fa fa-check"/> Duyệt thiết kế</button>
+                    </div>
                     <div class="dac-v6-task-flow-panel" invisible="workflow_review_state != 'deposit'">
                         <field name="design_task_display_ids" nolabel="1">
                             <kanban create="false" delete="true" quick_create="false" limit="100">
                                 <field name="name"/>
                                 <field name="state"/>
                                 <field name="quick_state"/>
+                                <field name="design_review_state"/>
                                 <field name="assigned_user_id"/>
                                 <field name="sale_user_id"/>
                                 <field name="deadline_date_display"/>
                                 <templates>
                                     <t t-name="card">
+                                        <button name="action_open_design_collaboration" type="object" class="dac-v6-design-task-open">
                                         <div t-attf-class="dac-task-card-inner dac-task-state-#{record.state.raw_value}">
                                             <div class="dac-task-card-header">
                                                 <span class="dac-task-name"><i t-if="record.state.raw_value === 'done'" class="fa fa-check me-2"/><t t-esc="record.name.value"/></span>
-                                                <field name="quick_state" widget="selection" class="dac-task-state-select" nolabel="1"/>
+                                                <span t-attf-class="dac-v6-design-task-status is-#{record.design_review_state.raw_value}">
+                                                    <i class="fa fa-circle"/>
+                                                    <t t-if="record.design_review_state.raw_value === 'pending'">Chờ Sale duyệt</t>
+                                                    <t t-elif="['approved', 'done'].includes(record.design_review_state.raw_value)">Thiết kế xong</t>
+                                                    <t t-elif="record.design_review_state.raw_value === 'revision'">Cần chỉnh sửa</t>
+                                                    <t t-else="">Đang thiết kế</t>
+                                                </span>
                                             </div>
                                             <div class="dac-task-production-meta">
                                                 <span>Nhận: <b t-esc="record.assigned_user_id.value || 'Chưa giao'"/></span>
@@ -342,6 +359,7 @@
                                                 <span>Hạn: <b t-esc="record.deadline_date_display.value"/></span>
                                             </div>
                                         </div>
+                                        </button>
                                     </t>
                                 </templates>
                             </kanban>
@@ -406,27 +424,24 @@
                             <field name="priority"/>
                             <field name="state"/>
                             <field name="quick_state"/>
+                            <field name="design_review_state"/>
                             <field name="assigned_user_id"/>
                             <field name="sale_user_id"/>
                             <field name="deadline_date_display"/>
                             <field name="design_revision_display"/>
                             <templates>
                                 <t t-name="card">
+                                    <button name="action_open_design_collaboration" type="object" class="dac-v6-design-task-open">
                                     <div t-attf-class="dac-task-card-inner dac-task-state-#{record.state.raw_value} dac-task-priority-#{record.priority.raw_value}">
                                         <div class="dac-task-card-header">
                                             <span class="dac-task-name"><i t-if="record.state.raw_value === 'done'" class="fa fa-check me-2"/><t t-esc="record.name.value"/></span>
-                                            <div class="dropdown dac-task-state-menu">
-                                                <button name="dac_task_state_menu" type="button" class="btn dropdown-toggle dac-task-state-trigger" data-bs-toggle="dropdown" aria-expanded="false">
-                                                    <t t-if="record.state.raw_value === 'draft'">Chưa làm</t>
-                                                    <t t-elif="record.state.raw_value === 'in_progress'">Đang làm</t>
-                                                    <t t-else="">Hoàn thành</t>
-                                                </button>
-                                                <div class="dropdown-menu dropdown-menu-end">
-                                                    <button name="action_set_card_state" type="object" class="dropdown-item" context="{'dac_card_state': 'draft'}">Chưa làm</button>
-                                                    <button name="action_set_card_state" type="object" class="dropdown-item" context="{'dac_card_state': 'in_progress'}">Đang làm</button>
-                                                    <button name="action_set_card_state" type="object" class="dropdown-item" context="{'dac_card_state': 'done'}">Hoàn thành</button>
-                                                </div>
-                                            </div>
+                                            <span t-attf-class="dac-v6-design-task-status is-#{record.design_review_state.raw_value}">
+                                                <i class="fa fa-circle"/>
+                                                <t t-if="record.design_review_state.raw_value === 'pending'">Chờ Sale duyệt</t>
+                                                <t t-elif="['approved', 'done'].includes(record.design_review_state.raw_value)">Thiết kế xong</t>
+                                                <t t-elif="record.design_review_state.raw_value === 'revision'">Cần chỉnh sửa</t>
+                                                <t t-else="">Đang thiết kế</t>
+                                            </span>
                                         </div>
                                         <div class="dac-task-production-meta">
                                             <span>Nhận: <b t-esc="record.assigned_user_id.value || 'Chưa giao'"/></span>
@@ -434,6 +449,7 @@
                                             <span>Hạn: <b t-esc="record.deadline_date_display.value"/></span>
                                         </div>
                                     </div>
+                                    </button>
                                 </t>
                             </templates>
                         </kanban>
@@ -639,6 +655,12 @@
                 <xpath expr="//div[@id='conversation-floating-widget']" position="replace"/>
                 <xpath expr="//div[hasclass('o-chatter-group')]" position="attributes">
                     <attribute name="class" add="d-none" separator=" "/>
+                </xpath>
+                <xpath expr="//aside[hasclass('dac-v6-sticky-rail')]" position="attributes">
+                    <attribute name="invisible">is_design_user</attribute>
+                </xpath>
+                <xpath expr="//section[hasclass('dac-v6-products-card')]" position="attributes">
+                    <attribute name="invisible">is_design_user</attribute>
                 </xpath>
             </field>
         </record>

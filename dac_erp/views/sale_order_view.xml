@@ -20,13 +20,13 @@
             <field name="arch" type="xml">
                 <form string="Báo giá" class="dac-sale-form" edit="true" create="true">
                     <header>
-                        <div class="dac-control-panel-bar">
+                        <div class="dac-control-panel-bar" invisible="is_design_user">
                             <div class="dac-control-panel-top-row">
                             <div class="dac-control-panel-main">
                                 <div class="dac-control-panel-heading-group">
                                     <div class="dac-control-panel-title-group">
                                         <button name="action_open_sales_list"
-                                                type="object" invisible="user_id_design or user_id_production"
+                                                type="object" invisible="is_design_user or is_production_user"
                                                 class="btn btn-light dac-order-back-btn"
                                                 title="Quay lại danh sách đơn"
                                                 aria-label="Quay lại danh sách đơn">
@@ -169,6 +169,74 @@
                         </div>
                     </header>
                     <sheet>
+                        <!-- Workspace view shown only to the exact Thiết kế role. -->
+                        <div class="dac-design-order-workspace" invisible="not is_design_user">
+                            <a href="/dac/design/navigation/orders"
+                                    class="dac-design-order-back dac-design-back-orders">
+                                <i class="fa fa-angle-left"/> Danh sách đơn hàng
+                            </a>
+                            <div class="dac-design-order-breadcrumb">DAC / Thiết kế / Đơn hàng</div>
+                            <h1 class="dac-design-order-title"><field name="order_number" readonly="1"/></h1>
+                            <div class="dac-design-order-subtitle">
+                                <field name="partner_id" readonly="1" options="{'no_open': True}"/>
+                            </div>
+
+                            <section class="dac-design-order-card dac-design-order-brief dac-design-order-brief-full">
+                                <div class="dac-design-order-card-header"><span><i class="fa fa-file-text-o"/> Mô tả thiết kế</span></div>
+                                <div class="dac-design-order-card-body">
+                                    <field name="order_summary" nolabel="1" readonly="1"
+                                           placeholder="Chưa có mô tả đơn hàng." widget="text"/>
+                                </div>
+                            </section>
+
+                            <section class="dac-design-order-task-summary">
+                                <strong><field name="design_task_title" readonly="1"/></strong>
+                                <button name="action_open_design_collaboration" type="object" class="dac-design-order-assets-link">
+                                    <i class="fa fa-comment-o"/> Xem trao đổi &amp; bản thiết kế
+                                </button>
+                            </section>
+
+                            <section class="dac-design-order-card dac-design-order-information">
+                                <div class="dac-design-order-card-header dac-design-order-information-header">
+                                    <span><i class="fa fa-cube"/> Thông tin đơn hàng</span>
+                                    <span class="dac-design-order-stage"><i class="fa fa-circle"/> Thiết kế/Cọc</span>
+                                </div>
+                                <div class="dac-design-order-meta-grid">
+                                    <div class="dac-design-order-meta-item">
+                                        <span>Mã đơn hàng</span>
+                                        <field name="order_number" readonly="1" nolabel="1"/>
+                                    </div>
+                                    <div class="dac-design-order-meta-item">
+                                        <span>Tên khách hàng</span>
+                                        <field name="partner_id" readonly="1" nolabel="1" options="{'no_open': True}"/>
+                                    </div>
+                                    <div class="dac-design-order-meta-item">
+                                        <span>Sale phụ trách</span>
+                                        <field name="user_id" readonly="1" nolabel="1" options="{'no_open': True}"/>
+                                    </div>
+                                    <div class="dac-design-order-meta-item">
+                                        <span>Hạn hoàn thành đơn</span>
+                                        <field name="design_deadline" readonly="1" nolabel="1"/>
+                                    </div>
+                                </div>
+                                <div class="dac-design-order-lines-heading">
+                                    <span>Các dòng sản phẩm</span>
+                                    <field name="product_line_count" readonly="1" nolabel="1"/>
+                                </div>
+                                <div class="dac-design-order-lines-table">
+                                    <field name="order_line" nolabel="1" readonly="1" mode="list" widget="dac_readonly_x2many">
+                                        <list create="0" edit="0" delete="0" open_form_view="false">
+                                            <field name="product_id" string="Sản phẩm"/>
+                                            <field name="description" string="Nội dung" optional="show"/>
+                                            <field name="material_id" string="Chất liệu" optional="show"/>
+                                            <field name="cart_dimension_id" string="Kích thước" optional="show"/>
+                                            <field name="product_uom_qty" string="Số lượng"/>
+                                        </list>
+                                    </field>
+                                </div>
+                            </section>
+                        </div>
+
                         <field name="has_paid_deposit_invoice" invisible="1"/>
                         <field name="deposit_invoice_count" invisible="1"/>
                         <field name="total_invoice_count" invisible="1"/>
@@ -179,7 +247,7 @@
                         <field name="customer_address_manual" invisible="1"/>
                         <field name="customer_address_manual_set" invisible="1"/>
                         <!-- KHỐI 1: HEADER & THÔNG TIN CỐT LÕI (Chia 3 nhóm Box riêng biệt) -->
-                        <div class="row align-items-stretch dac-core-info-row">
+                        <div class="row align-items-stretch dac-core-info-row" invisible="is_design_user">
 
                             <!-- Cột 1: Khách hàng + Chi tiết Chứng từ (xếp dọc) -->
                             <div class="d-flex flex-md-row flex-column gap-3">
@@ -254,7 +322,7 @@
 
                         <field name="has_deposit" invisible="1"/>
 
-                        <div class="dac-action-bar-flags" invisible="order_state_custom == 'quotation'">
+                        <div class="dac-action-bar-flags" invisible="order_state_custom == 'quotation' or is_design_user">
                             <div class="dac-toggle-field">
                                 <field name="is_priority"
                                        string="Ưu tiên"
@@ -274,7 +342,7 @@
                         <!-- KHỐI 3: CÁC TAB CHỨC NĂNG (Tiến trình) -->
                         <notebook>
                             <!-- TAB 1: SẢN PHẨM (Luôn hiện) -->
-                            <page string="Nội dung đơn hàng">
+                            <page string="Nội dung đơn hàng" invisible="is_design_user">
                                 <div class="dac-order-lines-panel">
                                     <field name="order_line" widget="section_and_note_one2many" mode="list,kanban" 
                                            readonly="state == 'cancel'"

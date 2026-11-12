@@ -31,6 +31,33 @@ class SaleOrder(models.Model):
         """Open the native new quotation page from custom order lists."""
         return self.env.ref('dac_erp.action_new_cart_sale_order').read()[0]
 
+    def action_open_design_collaboration(self):
+        """Open the dedicated Design discussion and file workspace for this order."""
+        self.ensure_one()
+        action = self.env.ref('dac_erp.action_design_collaboration').sudo().read()[0]
+        action['res_id'] = self.id
+        action['target'] = 'current'
+        action['context'] = dict(self.env.context, form_view_initial_mode='edit')
+        return action
+
+    def action_open_design_assigned_orders(self):
+        """Return a designer to their assigned-order list, never the sale list."""
+        self.ensure_one()
+        action = self.env.ref('dac_erp.dac_sale_order_action_design_only').sudo().read()[0]
+        action['target'] = 'current'
+        return action
+
+    def action_select_design_preview(self):
+        """Fallback for the client-side preview attachment picker."""
+        return True
+
+    def action_open_design_overview(self):
+        """Return the designer to their dashboard overview."""
+        self.ensure_one()
+        action = self.env.ref('dac_erp.dac_design_dashboard_action').sudo().read()[0]
+        action['target'] = 'current'
+        return action
+
     def action_cancel(self):
         """Hủy trực tiếp một batch; giữ wizard chuẩn khi chỉ chọn một đơn."""
         if len(self) > 1:
@@ -907,6 +934,41 @@ class SaleOrder(models.Model):
     design_done_user_id = fields.Many2one(
         'res.users', string="Người xác nhận hoàn tất", readonly=True, copy=False
     )
+    design_review_state = fields.Selection(
+        [
+            ('in_progress', 'Đang thiết kế'),
+            ('pending', 'Chờ Sale duyệt'),
+            ('revision', 'Cần chỉnh sửa'),
+            ('approved', 'Đã duyệt'),
+            ('done', 'Thiết kế xong'),
+        ],
+        string='Duyệt thiết kế', default='in_progress', copy=False, tracking=True,
+    )
+    design_approved_date = fields.Datetime(
+        string='Thời điểm Sale duyệt thiết kế', readonly=True, copy=False,
+    )
+    design_approved_user_id = fields.Many2one(
+        'res.users', string='Người duyệt thiết kế', readonly=True, copy=False,
+    )
+    design_final_file = fields.Binary(
+        string='File thiết kế', attachment=True, copy=False,
+    )
+    design_final_file_filename = fields.Char(
+        string='Tên file thiết kế', copy=False,
+    )
+    design_final_file_sent = fields.Boolean(
+        string='Đã gửi file thiết kế', default=False, copy=False,
+    )
+    design_final_file_count = fields.Integer(
+        string='Số file thiết kế của lượt duyệt hiện tại', compute='_compute_design_final_files', store=False,
+    )
+    design_final_file_history_count = fields.Integer(
+        string='Tổng số phiên bản file thiết kế', compute='_compute_design_final_files', store=False,
+    )
+    design_final_files_html = fields.Html(
+        string='Danh sách file thiết kế', compute='_compute_design_final_files',
+        sanitize=False, store=False,
+    )
 
     # Deadline mặc định 3 ngày sau khi tạo đơn
     @api.onchange('user_id_design', 'design_assigned_date', 'is_priority_today')
@@ -1061,10 +1123,26 @@ class SaleOrder(models.Model):
     order_display_title = fields.Char(
         string='Tiêu đề đơn hàng', compute='_compute_order_display_title', store=False,
     )
+    design_task_title = fields.Char(
+        string='Tên task thiết kế', compute='_compute_design_task_title', store=False,
+    )
+    design_priority_display = fields.Selection(
+        [
+            ('normal', 'Không ưu tiên'),
+            ('priority', 'Ưu tiên'),
+            ('today', 'Trong ngày'),
+        ],
+        string='Ưu tiên', compute='_compute_design_priority_display', store=False,
+    )
     product_line_count = fields.Integer(
         string='Số dòng sản phẩm', compute='_compute_product_line_count', store=False,
     )
     internal_note_draft = fields.Text(string='Ghi chú nội bộ mới', copy=False)
+    design_preview_upload = fields.Binary(string='Ảnh preview thiết kế', attachment=False, copy=False)
+    design_preview_upload_filename = fields.Char(string='Tên ảnh preview thiết kế', copy=False)
+    design_preview_sent = fields.Boolean(
+        string='Đã gửi ảnh preview thiết kế', default=False, copy=False,
+    )
     internal_note_count = fields.Integer(
         string='Số ghi chú nội bộ', compute='_compute_sidebar_activity', store=False,
     )

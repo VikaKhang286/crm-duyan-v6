@@ -168,8 +168,10 @@ class SaleOrder(models.Model):
         ])
         active_domain = [
             ('task_type', '=', 'design'),
-            ('state', 'not in', ['done', 'cancelled']),
             ('order_id.order_state_custom', 'in', ['quotation', 'deposit']),
+            '|',
+                ('state', 'not in', ['done', 'cancelled']),
+                ('order_id.design_review_state', 'in', ['revision', 'done']),
         ]
         completed_domain = [
             ('task_type', '=', 'design'),
@@ -182,31 +184,65 @@ class SaleOrder(models.Model):
             completed_domain.append(('assigned_user_id', '=', uid))
         active = Task.search(active_domain, order='priority desc, id desc, deadline asc nulls last')
         completed_month = Task.search(completed_domain)
-        overdue = active.filtered(lambda t: t.deadline and t.deadline < now)
+        overdue = active.filtered(
+            lambda task: (
+                task.deadline
+                and task.deadline < now
+                and task.order_id.design_review_state not in ('pending', 'approved', 'done')
+            )
+        )
         due_soon = active.filtered(
             lambda t: t.deadline and now <= t.deadline <= now + timedelta(hours=48)
         )
         priority = active.filtered(lambda t: t.priority in ('high', 'urgent'))
-        designing = active.filtered(lambda t: t.state == 'in_progress')
-        waiting = active.filtered(lambda t: t.state == 'draft')
+        designing = active.filtered(
+            lambda task: task.order_id.design_review_state == 'in_progress'
+        )
+        # Kept as a separate list filter, although it is included in the
+        # completed-design aggregate below.
+        waiting = active.filtered(
+            lambda task: task.order_id.design_review_state == 'pending'
+        )
+        revision = active.filtered(
+            lambda task: task.order_id.design_review_state == 'revision'
+        )
+        completed_design = active.filtered(
+            # Design is already complete while it is waiting for Sale review.
+            lambda task: task.order_id.design_review_state in ('pending', 'approved', 'done')
+        )
         on_time_done = completed_month.filtered(
             lambda t: not t.deadline or t.write_date <= t.deadline
         )
         def _pack_design_task(task):
             deadline = task.deadline
-            is_overdue = bool(deadline and deadline < now)
+            is_overdue = bool(
+                deadline
+                and deadline < now
+                and task.order_id.design_review_state not in ('pending', 'approved', 'done')
+            )
             days_left = False if not deadline or is_overdue else max(0, int((deadline - now).total_seconds() / 86400))
             deadline_str = fields.Datetime.context_timestamp(self, deadline).strftime('%d/%m/%Y %H:%M') if deadline else False
+            product_line = task.order_id.order_line.filtered(
+                lambda line: not line.display_type and (line.product_id or line.name)
+            )[:1] if task.order_id else self.env['sale.order.line']
+            product_name = (
+                product_line.product_id.display_name
+                if product_line and product_line.product_id
+                else (product_line.name if product_line else '')
+            )
             return {
                 'id': task.id, 'name': task.name or '', 'state': task.state,
                 'priority': task.priority, 'deadline_str': deadline_str,
+                'design_review_state': task.order_id.design_review_state if task.order_id else 'in_progress',
                 'is_overdue': is_overdue, 'days_left': days_left,
                 'order_id': task.order_id.id if task.order_id else False,
                 'order_name': task.order_id.name if task.order_id else False,
                 'order_number': (task.order_id.order_number or False) if task.order_id else False,
                 'order_title': (task.order_id.order_title or False) if task.order_id else False,
                 'partner_name': task.order_id.partner_id.name if task.order_id else '',
-                'description': _first_line(task.description),
+                # Used by the notification panel to render a relative timestamp.
+                'notification_at': fields.Datetime.to_string(task.write_date) if task.write_date else False,
+                'description': product_name or _first_line(task.description),
             }
 
         design_order_domain = [('order_state_custom', 'in', ['quotation', 'deposit'])]
@@ -222,10 +258,22 @@ class SaleOrder(models.Model):
             if not unfinished:
                 continue
             deadline = order.design_deadline
-            is_overdue = bool(deadline and deadline < fields.Date.context_today(self))
+            is_overdue = bool(
+                deadline
+                and deadline < fields.Date.context_today(self)
+                and order.design_review_state not in ('pending', 'approved', 'done')
+            )
             days_left = False
             if deadline and not is_overdue:
                 days_left = max(0, (deadline - fields.Date.context_today(self)).days)
+            product_line = order.order_line.filtered(
+                lambda line: not line.display_type and (line.product_id or line.name)
+            )[:1]
+            product_name = (
+                product_line.product_id.display_name
+                if product_line and product_line.product_id
+                else (product_line.name if product_line else _('Chưa có sản phẩm'))
+            )
             priority_orders.append({
                 'id': order.id,
                 'order_id': order.id,
@@ -242,9 +290,11 @@ class SaleOrder(models.Model):
                     else ('high' if order.is_priority else 'normal')
                 ),
                 'deadline_str': deadline.strftime('%d/%m/%Y') if deadline else False,
+                'notification_at': fields.Datetime.to_string(order.write_date)
+                if order.write_date else False,
                 'is_overdue': is_overdue,
                 'days_left': days_left,
-                'description': _('còn %s task') % len(unfinished),
+                'description': product_name,
             })
         # Thứ tự nhóm là tuyệt đối; deadline chỉ dùng để sắp trong cùng nhóm.
         priority_rank = {'urgent': 0, 'high': 1, 'normal': 2}
@@ -254,23 +304,73 @@ class SaleOrder(models.Model):
             item['days_left'] if item['days_left'] is not False else 999999,
             -item['id'],
         ))
+
+        # Những trao đổi/duyệt thiết kế từ Sale hoặc Manager phải xuất hiện
+        # trong panel Thông báo của Designer, không chỉ nằm trong chatter.
+        reviewer_groups = self.env.ref('dac_erp.group_dac_erp_sale').ids + self.env.ref(
+            'dac_erp.group_dac_erp_manager'
+        ).ids
+        reviewer_users = self.env['res.users'].sudo().search([
+            ('groups_id', 'in', reviewer_groups),
+        ])
+        reviewer_partner_ids = reviewer_users.partner_id.ids
+        order_by_id = {order.id: order for order in design_orders}
+        design_notifications = []
+        if reviewer_partner_ids and order_by_id:
+            messages = self.env['mail.message'].sudo().search([
+                ('model', '=', 'sale.order'),
+                ('res_id', 'in', list(order_by_id)),
+                ('author_id', 'in', reviewer_partner_ids),
+                ('body', 'ilike', 'dac-internal-note-message'),
+            ], order='date desc, id desc', limit=20)
+            for message in messages:
+                order = order_by_id.get(message.res_id)
+                if not order:
+                    continue
+                body = _first_line(message.body)
+                if not body:
+                    continue
+                author = message.author_id.name or _('Sale')
+                task = order.task_ids.filtered(
+                    lambda task: task.task_type == 'design' and task.state != 'cancelled'
+                )[:1]
+                task_name = task.name or order.design_task_title or order.order_display_title
+                is_approval = body.startswith('Đã duyệt bản preview.')
+                design_notifications.append({
+                    'key': f'message-{message.id}',
+                    'order_id': order.id,
+                    'notification_at': fields.Datetime.to_string(message.date) if message.date else False,
+                    'title': (
+                        _('%s đã duyệt %s') % (author, task_name)
+                        if is_approval else
+                        _('%s đã gửi tin nhắn tại task %s') % (author, task_name)
+                    ),
+                    'detail': body,
+                    'kind': 'message',
+                    'open_task': True,
+                    'initials': ''.join(part[0] for part in author.split()[:2]).upper() or 'S',
+                    'avatar_tone': 'approval' if is_approval else 'message',
+                })
         return {
             'task_stats': {
-                'total': total_active_tasks,
-                'in_progress': total_in_progress_tasks,
+                'total': len(active),
+                'in_progress': len(designing),
                 'overdue': len(overdue),
                 'due_soon': len(due_soon),
                 'done_month': len(completed_month),
                 'on_time_rate': round(len(on_time_done) * 100 / len(completed_month)) if completed_month else 100,
             },
-            'design_tasks': priority_orders,
+            # Tab "Tất cả" phải phản ánh toàn bộ task thiết kế trong phạm vi dashboard,
+            # không chỉ các đơn được xếp ưu tiên.
+            'design_tasks': [_pack_design_task(task) for task in active],
             'design_distribution': {
                 'total': len(active) + len(completed_month),
                 'designing': len(designing),
                 'waiting': len(waiting),
-                'revision': len(priority),
-                'ready': len(completed_month),
+                'revision': len(revision),
+                'ready': len(completed_design),
             },
+            'design_notifications': design_notifications,
             'user_name': user.name,
         }
 

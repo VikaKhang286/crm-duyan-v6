@@ -23,12 +23,86 @@ class SaleOrderCompute(models.Model):
                 f'{order_code} · {customer_name}' if customer_name else order_code
             )
 
+    @api.depends_context('uid')
+    @api.depends('task_ids.name', 'task_ids.task_type', 'task_ids.state', 'task_ids.assigned_user_id')
+    def _compute_design_task_title(self):
+        """Show the design assignee the task name instead of the order heading."""
+        current_user = self.env.user
+        for order in self:
+            design_tasks = order.task_ids.filtered(
+                lambda task: task.task_type == 'design' and task.state != 'cancelled'
+            )
+            assigned_tasks = design_tasks.filtered(
+                lambda task: task.assigned_user_id == current_user
+            )
+            order.design_task_title = (assigned_tasks or design_tasks)[:1].name or order.order_display_title
+
+    @api.depends('is_priority', 'is_priority_today')
+    def _compute_design_priority_display(self):
+        for order in self:
+            if order.is_priority_today:
+                order.design_priority_display = 'today'
+            elif order.is_priority:
+                order.design_priority_display = 'priority'
+            else:
+                order.design_priority_display = 'normal'
+
     @api.depends('order_line', 'order_line.display_type')
     def _compute_product_line_count(self):
         for order in self:
             order.product_line_count = len(order.order_line.filtered(lambda line: not line.display_type))
 
-    @api.depends('message_ids.body', 'message_ids.date', 'message_ids.author_id', 'message_ids.tracking_value_ids')
+    @api.depends(
+        'message_ids.body', 'message_ids.date', 'message_ids.attachment_ids',
+        'message_ids.attachment_ids.name', 'design_review_state', 'design_approved_date',
+    )
+    def _compute_design_final_files(self):
+        """Render the versions handed over by Design as view/download rows."""
+        for order in self:
+            files = []
+            messages = order.message_ids.filtered(
+                lambda message: 'Đã gửi file thiết kế để bàn giao cho Sản xuất.' in (message.body or '')
+            ).sorted(key=lambda message: message.date or fields.Datetime.now())
+            for message in messages:
+                files.extend((attachment, message.date) for attachment in message.sudo().attachment_ids)
+
+            current_files = [
+                attachment for attachment, sent_at in files
+                if order.design_approved_date and sent_at and sent_at >= order.design_approved_date
+            ]
+            order.design_final_file_count = len(current_files)
+            order.design_final_file_history_count = len(files)
+            rows = []
+            for attachment, sent_at in files:
+                name = html_escape(attachment.name or 'File thiết kế')
+                is_current = bool(
+                    order.design_review_state == 'approved'
+                    and order.design_approved_date
+                    and sent_at
+                    and sent_at >= order.design_approved_date
+                )
+                status = 'Đã bàn giao · Sản xuất xem và tải được' if is_current else 'Phiên bản trước'
+                row_class = '' if is_current else ' is-previous'
+                url = f'/web/content/{attachment.id}'
+                rows.append(
+                    f'<article class="dac-design-final-file-row{row_class}">'
+                    '<span class="dac-design-final-file-icon"><i class="fa fa-file-o"></i></span>'
+                    '<span class="dac-design-final-file-copy">'
+                    f'<strong>{name}</strong><small>{status}</small></span>'
+                    f'<button type="button" class="dac-design-file-preview" data-file-url="{url}?download=false" '
+                    f'data-file-name="{name}" title="Xem file"><i class="fa fa-search"></i></button>'
+                    f'<a class="dac-design-file-download" href="{url}?download=true" target="_blank" title="Tải file">'
+                    '<i class="fa fa-download"></i></a>'
+                    '</article>'
+                )
+            order.design_final_files_html = Markup(''.join(rows))
+
+    @api.depends_context('uid')
+    @api.depends(
+        'message_ids.body', 'message_ids.date', 'message_ids.author_id',
+        'message_ids.tracking_value_ids', 'message_ids.attachment_ids',
+        'message_ids.attachment_ids.mimetype',
+    )
     def _compute_sidebar_activity(self):
         def _message_text(message):
             return re.sub(r'<[^>]+>', '', unescape(message.body or '')).strip()
@@ -38,23 +112,67 @@ class SaleOrderCompute(models.Model):
             internal_messages = messages.filtered(
                 lambda message: (
                     'dac-internal-note-message' in (message.body or '')
-                    and bool(_message_text(message))
+                    and (bool(_message_text(message)) or bool(message.attachment_ids))
                 )
             )
             order.internal_note_count = len(internal_messages)
 
             note_cards = []
-            for message in internal_messages[:20]:
+            # The conversation reads chronologically: oldest at the top,
+            # newest at the bottom.  Keep the latest 20 messages only.
+            display_messages = internal_messages[:20].sorted(
+                key=lambda message: message.date or fields.Datetime.now()
+            )
+            for message in display_messages:
                 body = _message_text(message)
                 author = message.author_id.name or 'Nội bộ'
                 time_label = fields.Datetime.context_timestamp(order, message.date).strftime('%d/%m/%Y %H:%M') if message.date else ''
+                is_designer = message.author_id == order.user_id_design.partner_id
+                # Each viewer sees their own side at right in pale yellow.
+                is_current_party = is_designer if order.is_design_user else not is_designer
+                card_side = 'self' if is_current_party else 'other'
+                avatar = html_escape((author or 'Nội bộ')[0].upper())
+                image_previews = []
+                for attachment in message.sudo().attachment_ids:
+                    if (attachment.mimetype or '').startswith('image/'):
+                        image_previews.append(
+                            '<div class="dac-v6-internal-image">'
+                            '<a href="/web/content/{}?download=false" target="_blank">'
+                            '<img src="/web/content/{}?download=false" alt="{}"/>'
+                            '</a>'
+                            '<button type="button" class="dac-v6-copy-image" '
+                            'data-image-url="/web/content/{}?download=false">'
+                            '<i class="fa fa-clone"></i> Copy ảnh</button>'
+                            '</div>'.format(
+                                attachment.id,
+                                attachment.id,
+                                html_escape(attachment.name or 'Ảnh preview'),
+                                attachment.id,
+                            )
+                        )
+                body_class = '' if body else ' class="d-none"'
                 note_cards.append(
-                    '<article class="dac-v6-internal-card">'
+                    f'<article class="dac-v6-internal-card dac-v6-internal-card--{card_side}">'
+                    f'<span class="dac-v6-internal-avatar">{avatar}</span>'
+                    '<div class="dac-v6-internal-bubble">'
                     f'<header><b>{html_escape(author)}</b><span>{html_escape(time_label)}</span></header>'
-                    f'<p>{html_escape(body)}</p>'
+                    f'<p{body_class}>{html_escape(body)}</p>'
+                    f'<div class="dac-v6-internal-images">{"".join(image_previews)}</div>'
+                    '</div>'
                     '</article>'
                 )
-            order.internal_notes_html = Markup(''.join(note_cards) or '<p class="dac-v6-empty-log">Chưa có trao đổi nội bộ.</p>')
+            empty_conversation_title = 'Trao đổi với Sale' if order.is_design_user else 'Trao đổi với Thiết kế'
+            empty_conversation_hint = (
+                'Gửi tin nhắn hoặc dán ảnh preview tại đây.'
+                if order.is_design_user else 'Gửi góp ý cho Thiết kế tại đây.'
+            )
+            order.internal_notes_html = Markup(''.join(note_cards) or (
+                '<div class="dac-v6-empty-log">'
+                '<i class="fa fa-comment-o" aria-hidden="true"></i>'
+                f'<strong>{empty_conversation_title}</strong>'
+                f'<span>{empty_conversation_hint}</span>'
+                '</div>'
+            ))
 
             history_items = []
             for message in messages.filtered(lambda item: item not in internal_messages)[:30]:

@@ -2,7 +2,7 @@
 <templates xml:space="preserve">
     <t t-name="Chameleon.NavBarV6" t-inherit="web.NavBar" t-inherit-mode="extension">
         <xpath expr="//header" position="replace">
-            <aside class="o_navbar dac_v6_shell" t-ref="root" aria-label="Điều hướng chính">
+            <aside t-attf-class="o_navbar dac_v6_shell {{ dacRole === 'design' ? 'dac_v6_shell_design' : '' }}" t-ref="root" aria-label="Điều hướng chính">
                 <nav class="o_main_navbar d-print-none" data-command-category="disabled">
                     <div class="dac_v6_brand">
                         <span class="dac_v6_brandmark">
@@ -12,7 +12,7 @@
                             <strong>Duy An ERP</strong>
                             <small>ERP / CRM · v6</small>
                         </span>
-                        <button class="dac_v6_tool_button" type="button"
+                        <button class="dac_v6_tool_button dac_v6_collapse_top" type="button"
                                 t-att-title="dacSidebarState.collapsed ? 'Mở rộng sidebar' : 'Thu gọn sidebar'"
                                 t-att-aria-label="dacSidebarState.collapsed ? 'Mở rộng sidebar' : 'Thu gọn sidebar'"
                                 t-on-click="toggleDacSidebar">
@@ -20,7 +20,7 @@
                         </button>
                     </div>
 
-                    <div t-attf-class="dac_v6_tools {{ dacMessagesVisible ? 'has-messages' : 'without-messages' }}" role="search">
+                    <div t-attf-class="dac_v6_tools {{ dacMessagesVisible ? 'has-messages' : 'without-messages' }} {{ dacRole === 'design' ? 'dac_v6_tools_design' : '' }}" role="search">
                         <label class="dac_v6_search">
                             <i class="fa fa-search" aria-hidden="true"/>
                             <input type="search" placeholder="Tìm kiếm" aria-label="Tìm kiếm toàn cục"
@@ -45,8 +45,8 @@
                     
                     <div class="o_navbar_breadcrumbs d-contents"/>
 
-                    <div class="dac_v6_navigation_grid">
-                        <div class="dac_v6_app_rail" aria-label="Ứng dụng">
+                    <div t-attf-class="dac_v6_navigation_grid {{ dacRole === 'design' ? 'dac_v6_navigation_grid_design' : '' }}">
+                        <div t-if="dacRole !== 'design'" class="dac_v6_app_rail" aria-label="Ứng dụng">
                             <button t-foreach="dacVisibleApps" t-as="app" t-key="app.id"
                                     type="button"
                                     t-attf-class="dac_v6_app_button {{ isDacAppActive(app) ? 'is-active' : '' }}"
@@ -62,10 +62,20 @@
                         </div>
 
                         <div class="dac_v6_section_panel" aria-label="Chức năng">
-                            <div class="dac_v6_section_heading" t-if="dacSidebarCurrentApp">
+                            <div t-if="dacRole === 'design'" class="dac_v6_design_workspace">
+                                <div class="dac_v6_design_workspace_label">Không gian làm việc</div>
+                                <button t-foreach="dacDesignWorkspaceItems" t-as="item" t-key="item.menu.id"
+                                        type="button"
+                                        t-attf-class="dac_v6_design_workspace_item {{ isDacSidebarMenuActive(item.menu) ? 'is-active' : '' }}"
+                                        t-on-click="() => this.onDacSidebarMenuSelection(item.menu)">
+                                    <i t-attf-class="fa {{ item.icon }}" aria-hidden="true"/>
+                                    <span t-esc="item.label"/>
+                                </button>
+                            </div>
+                            <div class="dac_v6_section_heading" t-if="dacRole !== 'design' and dacSidebarCurrentApp">
                                 <strong t-esc="dacMenuName(dacSidebarCurrentApp)"/>
                             </div>
-                            <div class="dac_v6_section_list">
+                            <div t-if="dacRole !== 'design'" class="dac_v6_section_list">
                                 <t t-foreach="dacVisibleCurrentAppSections" t-as="section" t-key="section.id">
                                     <t t-call="Chameleon.SidebarMenuItem">
                                         <t t-set="menu" t-value="section"/>
@@ -77,13 +87,17 @@
                     </div>
 
                     <div class="o_menu_systray d-flex flex-shrink-0 ms-auto" role="menu">
-                        
+
                         <t t-foreach="systrayItems" t-as="item" t-key="item.key">
                             <div t-att-data-index="item.index"/>
                             <ErrorHandler onError="error => this.handleItemError(error, item)">
                                 <t t-component="item.Component" t-props="item.props"/>
                             </ErrorHandler>
                         </t>
+                        <button t-if="dacRole === 'design'" class="dac_v6_collapse_bottom" type="button"
+                            title="Mở rộng sidebar" aria-label="Mở rộng sidebar" t-on-click="toggleDacSidebar">
+                        <i class="fa fa-angle-right"/>
+                    </button>
                     </div>
                 </nav>
                 <div t-if="dacSearchState.open" class="dac_v6_search_backdrop" t-on-click="closeDacSearchFromBackdrop">
@@ -150,7 +164,7 @@
                 </div>
             </aside>
         </xpath>
-    </t>
+        </t>
 
     <t t-name="Chameleon.BurgerIdentity" t-inherit="web.BurgerMenu" t-inherit-mode="extension">
         <xpath expr="//button[hasclass('o_mobile_menu_toggle')]" position="after">

@@ -12,6 +12,16 @@ import { useService } from "@web/core/utils/hooks";
 import { registry } from "@web/core/registry";
 
 const _DESIGN_H = "dac_design_list_h";
+const _DESIGN_READ_NOTIFICATIONS = "dac_design_read_notifications";
+
+function loadReadNotifications() {
+  try {
+    const value = JSON.parse(localStorage.getItem(_DESIGN_READ_NOTIFICATIONS) || "[]");
+    return Array.isArray(value) ? value : [];
+  } catch {
+    return [];
+  }
+}
 
 class DesignDashboard extends Component {
   setup() {
@@ -19,7 +29,7 @@ class DesignDashboard extends Component {
     this.action = useService("action");
     this.menu = useService("menu");
     this.notification = useService("notification");
-    this.state = useState({ loading: true, data: null, error: null, filter: null });
+    this.state = useState({ loading: true, data: null, error: null, filter: "total", search: "", readNotifications: loadReadNotifications(), notificationTab: "all" });
     this.designScrollRef = useRef("designScroll");
 
     onWillStart(async () => {
@@ -137,33 +147,99 @@ class DesignDashboard extends Component {
   get designTasks() {
     return this.state.data?.design_tasks || [];
   }
+  get designOrderCount() {
+    return this.designTasks.length;
+  }
+  get todoCount() {
+    return this.designTasks.filter((task) =>
+      task.design_review_state === 'in_progress' ||
+      task.design_review_state === 'revision'
+    ).length;
+  }
+  get notStartedCount() {
+    return this.designTasks.filter((task) =>
+      task.design_review_state === 'in_progress' && task.state === 'draft'
+    ).length;
+  }
+  get inProgressCount() {
+    return this.designTasks.filter((task) =>
+      task.design_review_state === 'in_progress' && task.state === 'in_progress'
+    ).length;
+  }
+  get completedDesignTasks() {
+    return this.designTasks.filter((task) =>
+      ['pending', 'approved', 'done'].includes(task.design_review_state)
+    );
+  }
+  get completedDesignOrderCount() {
+    return new Set(this.completedDesignTasks.map((task) => task.order_id).filter(Boolean)).size;
+  }
   get designDistribution() {
     return this.state.data?.design_distribution || {};
   }
   get distributionStyle() {
     const data = this.designDistribution;
-    const total = (data.designing || 0) + (data.waiting || 0) +
-      (data.revision || 0) + (data.ready || 0);
+    const total = (data.designing || 0) + (data.revision || 0) + (data.ready || 0);
     if (!total) return "conic-gradient(#eef1f5 0 100%)";
     const a = (data.designing || 0) * 100 / total;
-    const b = a + (data.waiting || 0) * 100 / total;
-    const c = b + (data.revision || 0) * 100 / total;
-    return `conic-gradient(#f4c440 0 ${a}%, #4f83e5 ${a}% ${b}%, #efa53a ${b}% ${c}%, #51aa72 ${c}% 100%)`;
+    const b = a + (data.revision || 0) * 100 / total;
+    return `conic-gradient(#f4c440 0 ${a}%, #efa53a ${a}% ${b}%, #51aa72 ${b}% 100%)`;
   }
   get overdueCount() {
     return this.designTasks.filter((t) => t.is_overdue).length;
   }
 
+  getTaskStatusLabel(task) {
+    if (task.is_overdue) return 'Quá hạn';
+    if (task.design_review_state === 'pending') return 'Chờ duyệt';
+    if (['approved', 'done'].includes(task.design_review_state)) return 'Thiết kế xong';
+    if (task.design_review_state === 'revision') return 'Cần chỉnh sửa';
+    if (task.state === 'draft') return 'Cần làm';
+    return 'Đang xử lý';
+  }
+
+  getTaskStatusClass(task) {
+    if (task.is_overdue) return 'is-overdue';
+    if (task.design_review_state === 'pending') return 'is-waiting';
+    if (['approved', 'done'].includes(task.design_review_state)) return 'is-ready';
+    if (task.design_review_state === 'revision') return 'is-revision';
+    if (task.state === 'draft') return 'is-todo';
+    return 'is-ready';
+  }
+
+  formatTaskDate(value) {
+    return value ? String(value).split(" ")[0] : "Chưa đặt";
+  }
+
   setFilter(key) {
-    this.state.filter = (key === 'total' || this.state.filter === key) ? null : key;
+    this.state.filter = key;
   }
 
   _applyFilter(tasks) {
     const f = this.state.filter;
-    if (f === 'overdue')  return tasks.filter(t => t.is_overdue);
-    if (f === 'due_soon') return tasks.filter(t => !t.is_overdue && t.days_left !== false && t.days_left <= 1);
-    if (f === 'urgent')   return tasks.filter(t => t.priority === 'urgent');
-    return tasks;
+    let result = tasks;
+    if (f === 'overdue') result = tasks.filter((task) => task.is_overdue);
+    // "Cần làm" là nhóm gộp: task mới/đang làm và task cần chỉnh sửa,
+    // bao gồm cả task quá hạn để không làm mất dữ liệu khỏi danh sách.
+    if (f === 'in_progress') result = tasks.filter((task) =>
+      task.design_review_state === 'in_progress' ||
+      task.design_review_state === 'revision'
+    );
+    if (f === 'draft') result = tasks.filter((task) =>
+      task.design_review_state === 'in_progress' && task.state === 'draft'
+    );
+    if (f === 'working') result = tasks.filter((task) =>
+      task.design_review_state === 'in_progress' && task.state === 'in_progress'
+    );
+    if (f === 'revision') result = tasks.filter((task) => task.design_review_state === 'revision');
+    if (f === 'waiting') result = tasks.filter((task) => task.design_review_state === 'pending');
+    if (f === 'done') result = this.completedDesignTasks;
+    const search = this.state.search.trim().toLowerCase();
+    if (search) {
+      result = result.filter((task) => [task.name, task.order_name, task.order_number, task.order_title, task.partner_name]
+        .filter(Boolean).join(" ").toLowerCase().includes(search));
+    }
+    return result;
   }
 
   get filteredDesignTasks() {
@@ -171,7 +247,123 @@ class DesignDashboard extends Component {
   }
 
   get filterLabel() {
-    return { overdue: 'Quá hạn', due_soon: 'Sắp đến hạn', urgent: 'Khẩn cấp' }[this.state.filter] || '';
+    return { total: 'Tất cả', in_progress: 'Cần làm', draft: 'Chưa thực hiện', working: 'Đang làm', overdue: 'Quá hạn', waiting: 'Chờ Sale duyệt', done: 'Thiết kế xong', revision: 'Cần chỉnh sửa' }[this.state.filter] || 'Tất cả';
+  }
+
+  get activeFilterLabel() {
+    return this.filterLabel;
+  }
+
+  get taskListDescription() {
+    return this.state.filter === 'in_progress'
+      ? 'Bao gồm task mới và task cần chỉnh sửa.'
+      : 'Danh sách task theo nhóm thống kê đang chọn.';
+  }
+
+  get notificationItems() {
+    const conversationItems = this.state.data?.design_notifications || [];
+    const taskItems = this.designTasks.slice(0, 5).map((task, index) => {
+      const isNewAssignment = task.state === "draft";
+      return {
+        key: task.id,
+        task,
+        alert: task.is_overdue,
+        kind: isNewAssignment ? "order" : (index % 2 ? "order" : "message"),
+        title: task.is_overdue
+          ? `${task.order_number || task.name} đã trễ hạn`
+          : (isNewAssignment
+            ? `Bạn có đơn thiết kế mới ${task.order_number || task.name}`
+            : `Có cập nhật ở ${task.order_number || task.name}`),
+        detail: task.is_overdue
+          ? `Deadline ${task.deadline_str || "chưa đặt"}. Cần ưu tiên xử lý.`
+          : (isNewAssignment
+            ? `Đơn ${task.order_number || task.name} vừa được giao cho bạn.`
+            : (task.description || "Task thiết kế đang được cập nhật.")),
+        time: this.formatNotificationTime(task.notification_at),
+      };
+    });
+    return [
+      ...conversationItems.map((item) => ({
+        ...item,
+        time: this.formatNotificationTime(item.notification_at),
+      })),
+      ...taskItems,
+    ].slice(0, 8);
+  }
+
+  formatNotificationTime(value) {
+    if (!value) return "Mới cập nhật";
+    const timestamp = new Date(`${value.replace(" ", "T")}Z`).getTime();
+    if (Number.isNaN(timestamp)) return "Mới cập nhật";
+    const minutes = Math.max(0, Math.floor((Date.now() - timestamp) / 60000));
+    if (minutes < 60) return `${Math.max(1, minutes)} phút`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours} giờ`;
+    return `${Math.floor(hours / 24)} ngày`;
+  }
+
+  get unreadNotificationCount() {
+    return this.notificationItems.filter((item) => !this.isNotificationRead(item.key)).length;
+  }
+
+  get visibleNotificationItems() {
+    return this.state.notificationTab === "unread"
+      ? this.notificationItems.filter((item) => !this.isNotificationRead(item.key))
+      : this.notificationItems;
+  }
+
+  setNotificationTab(tab) {
+    this.state.notificationTab = tab;
+  }
+
+  isNotificationRead(key) {
+    return this.state.readNotifications.includes(key);
+  }
+
+  markNotificationRead(key) {
+    if (!this.isNotificationRead(key)) {
+      // Gán mảng mới để OWL render lại đồng thời badge và tab "Chưa đọc".
+      this.state.readNotifications = [...this.state.readNotifications, key];
+      localStorage.setItem(
+        _DESIGN_READ_NOTIFICATIONS,
+        JSON.stringify(this.state.readNotifications)
+      );
+    }
+  }
+
+  async openNotification(item) {
+    if (!item) return;
+    this.markNotificationRead(item.key);
+    if (item.open_task && item.order_id) {
+      const action = await this.orm.call(
+        "sale.order",
+        "action_open_design_collaboration",
+        [[item.order_id]]
+      );
+      await this.action.doAction(action, { clearBreadcrumbs: true });
+      return;
+    }
+    if (item.order_id) {
+      await this.action.doAction({
+        type: "ir.actions.act_window",
+        res_model: "sale.order",
+        res_id: item.order_id,
+        views: [[false, "form"]],
+        target: "current",
+      });
+      return;
+    }
+    await this.openTaskOrOrder(item.task);
+  }
+
+  markAllNotificationsRead() {
+    this.state.readNotifications = [
+      ...new Set([...this.state.readNotifications, ...this.notificationItems.map((item) => item.key)]),
+    ];
+    localStorage.setItem(
+      _DESIGN_READ_NOTIFICATIONS,
+      JSON.stringify(this.state.readNotifications)
+    );
   }
 
   async openTaskOrOrder(task) {

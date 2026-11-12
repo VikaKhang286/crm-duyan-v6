@@ -340,6 +340,19 @@ patch(NavBar.prototype, {
         return sections;
     },
 
+    get dacDesignWorkspaceItems() {
+        if (this.dacRole !== "design") return [];
+        const items = [
+            [DAC_DESIGN_DASHBOARD_MENU_XMLID, "Tổng quan", "fa-bar-chart"],
+            ["dac_erp.menu_dac_task_calendar_design", "Lịch thiết kế", "fa-calendar-o"],
+            ["dac_erp.dac_sale_order_menu_design_only", "Đơn hàng được giao", "fa-shopping-cart"],
+            [DAC_ATTENDANCE_DASHBOARD_MENU_XMLID, "Chấm công", "fa-clock-o"],
+        ];
+        return items
+            .map(([xmlid, label, icon]) => ({ menu: this.dacMenuByXmlid(xmlid), label, icon }))
+            .filter(({ menu }) => menu && this.isDacMenuVisible(menu));
+    },
+
     dacVisibleMenuChildren(menu) {
         return (menu.childrenTree || []).filter((child) => this.isDacMenuVisible(child));
     },
