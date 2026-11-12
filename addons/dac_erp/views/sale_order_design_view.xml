@@ -39,11 +39,39 @@
             </field>
         </record>
 
+        <!-- Dedicated list for the Design workspace.  Production keeps the shared list above. -->
+        <record id="view_dac_sale_order_list_design_assigned" model="ir.ui.view">
+            <field name="name">dac.sale.order.list.design.assigned</field>
+            <field name="model">sale.order</field>
+            <field name="priority">4</field>
+            <field name="groups_id" eval="[(6, 0, [ref('dac_erp.group_dac_erp_design')])]"/>
+            <field name="arch" type="xml">
+                <list string="Đơn hàng được giao" default_order="date desc" delete="false" create="false" edit="false"
+                      decoration-warning="partner_vip_class == 'vip'"
+                      decoration-info="partner_vip_class == 'loyal'"
+                      decoration-danger="partner_vip_class == 'premium'"
+                      decoration-bf="partner_vip_class">
+                    <field name="partner_vip_class" invisible="1" optional="hide"/>
+                    <field name="name" optional="hide"/>
+                    <field name="company_id" invisible="1" optional="hide"/>
+                    <field name="currency_id" invisible="1" optional="hide"/>
+                    <field name="pricelist_id" invisible="1" optional="hide"/>
+                    <field name="order_number" string="Mã đơn" readonly="1"/>
+                    <field name="partner_id" widget="many2one" string="Khách hàng" options="{'no_open': True}" readonly="1"/>
+                    <field name="order_state_badge" widget="html" string="Trạng thái" readonly="1"/>
+                    <field name="design_priority_display" string="Ưu tiên" widget="badge" class="dac-design-priority-badge"
+                           decoration-muted="design_priority_display == 'normal'"
+                           decoration-warning="design_priority_display in ['priority', 'today']" readonly="1"/>
+                    <field name="design_deadline" string="Hạn hoàn thành" readonly="1"/>
+                </list>
+            </field>
+        </record>
+
         <record id="dac_sale_order_action_design_only" model="ir.actions.act_window">
             <field name="name">Đơn hàng - Thiết kế</field>
             <field name="res_model">sale.order</field>
             <field name="view_mode">list,form</field>
-            <field name="view_id" ref="view_dac_sale_order_list_design"/>
+            <field name="view_id" ref="view_dac_sale_order_list_design_assigned"/>
             <field name="search_view_id" ref="dac_sale_order_custom_search"/>
             <field name="context">{}</field>
             <field name="domain">
@@ -72,6 +100,123 @@
                 ]
             </field>
             <field name="groups_id" eval="[(4, ref('dac_erp.group_dac_erp_production'))]"/>
+        </record>
+
+        <record id="view_dac_sale_order_design_collaboration_form" model="ir.ui.view">
+            <field name="name">dac.sale.order.design.collaboration.form</field>
+            <field name="model">sale.order</field>
+            <field name="priority">99</field>
+            <field name="arch" type="xml">
+                <form string="Trao đổi &amp; bản thiết kế" class="dac-design-collaboration-form" create="false" edit="true" delete="false">
+                    <sheet>
+                        <field name="is_design_user" invisible="1"/>
+                        <field name="design_review_state" invisible="1"/>
+                        <field name="design_preview_sent" invisible="1"/>
+                        <field name="design_final_file_sent" invisible="1"/>
+                        <field name="design_final_file_filename" invisible="1"/>
+                        <field name="design_final_file_count" invisible="1"/>
+                        <div class="dac-design-collaboration-workspace">
+                            <a href="/dac/design/navigation/overview" class="dac-design-order-back dac-design-back-overview"><i class="fa fa-angle-left"/> Tổng quan</a>
+                            <div class="dac-design-order-breadcrumb">DAC / Thiết kế / Chi tiết task</div>
+                            <h1 class="dac-design-order-title"><field name="design_task_title" readonly="1"/></h1>
+                            <div class="dac-design-order-subtitle"><field name="order_number" readonly="1"/><span>·</span><field name="partner_id" readonly="1" options="{'no_open': True}"/></div>
+
+                            <div class="dac-design-order-statusbar">
+                                <span class="dac-design-order-status is-pending" invisible="design_done or design_review_state == 'revision'"><i class="fa fa-circle"/> Chưa thực hiện</span>
+                                <span class="dac-design-order-status is-revision" invisible="design_review_state != 'revision'"><i class="fa fa-circle"/> Cần chỉnh sửa</span>
+                                <span class="dac-design-order-status is-done" invisible="not design_done or design_review_state in ['approved', 'revision']"><i class="fa fa-circle"/> Thiết kế xong</span>
+                                <span class="dac-design-order-status is-done" invisible="design_review_state != 'approved'"><i class="fa fa-circle"/> Thiết kế xong</span>
+                                <span class="dac-design-order-deadline"><i class="fa fa-calendar"/> Hạn task: <field name="design_deadline" readonly="1"/></span>
+                                <span class="dac-design-order-review-status" invisible="not is_design_user or not design_done or design_review_state in ['approved', 'revision']"><i class="fa fa-circle"/> Thiết kế xong · Chờ Sale duyệt</span>
+                                <button name="action_submit_design_link" type="object" string="Thiết kế xong" class="dac-design-order-complete" groups="dac_erp.group_dac_erp_design,dac_erp.group_dac_erp_manager,base.group_system" invisible="not is_design_user or (design_done and design_review_state != 'revision') or order_state_custom not in ['deposit', 'production'] or not design_preview_sent"><i class="fa fa-check"/><span>Thiết kế xong</span></button>
+                                <button name="dac_disabled_design_submit" type="button" string="Thiết kế xong" class="dac-design-order-complete" groups="dac_erp.group_dac_erp_design,dac_erp.group_dac_erp_manager,base.group_system" disabled="1" invisible="not is_design_user or (design_done and design_review_state != 'revision') or order_state_custom not in ['deposit', 'production'] or design_preview_sent"><i class="fa fa-check"/><span>Thiết kế xong</span></button>
+                                <button name="action_continue_design_revision" type="object" class="dac-design-order-complete dac-design-order-complete-done" groups="dac_erp.group_dac_erp_design,dac_erp.group_dac_erp_manager,base.group_system" invisible="not is_design_user or design_review_state != 'approved'"><i class="fa fa-pencil"/> Chỉnh sửa tiếp</button>
+                            </div>
+
+                            <div class="dac-design-order-grid">
+                                <div class="dac-design-order-left-column">
+                                    <section class="dac-design-order-card dac-design-order-brief">
+                                        <div class="dac-design-order-card-header"><span><i class="fa fa-file-text-o"/> Mô tả thiết kế</span></div>
+                                        <div class="dac-design-order-card-body"><field name="order_summary" nolabel="1" readonly="1" placeholder="Chưa có mô tả đơn hàng." widget="text"/></div>
+                                    </section>
+                                    <section class="dac-design-order-card dac-design-order-file">
+                                        <field name="design_final_file_history_count" invisible="1"/>
+                                        <div class="dac-design-order-card-header">
+                                            <span><i class="fa fa-paperclip"/> File thiết kế</span>
+                                            <span class="dac-design-order-file-status" invisible="design_review_state == 'approved'"><i class="fa fa-circle"/> Chờ duyệt</span>
+                                            <span class="dac-design-order-file-status" invisible="design_review_state != 'approved' or design_final_file_count"><i class="fa fa-circle"/> Đã duyệt</span>
+                                            <span class="dac-design-order-file-status is-ready" invisible="design_review_state != 'approved' or not design_final_file_count"><i class="fa fa-circle"/> <field name="design_final_file_count" readonly="1" nolabel="1"/> file</span>
+                                        </div>
+                                        <div class="dac-design-order-card-body">
+                                            <p class="dac-design-order-file-waiting" invisible="design_review_state == 'approved' or design_final_file_history_count">File thiết kế được gửi sau khi Sale duyệt.</p>
+                                            <div class="dac-design-final-file" invisible="design_review_state != 'approved' and not design_final_file_history_count">
+                                                <field name="design_final_files_html" widget="html" nolabel="1" readonly="1"/>
+                                                <div class="dac-design-final-file-upload" invisible="not is_design_user or design_review_state != 'approved'">
+                                                    <div class="dac-design-final-file-picker">
+                                                        <field name="design_final_file" filename="design_final_file_filename" widget="binary" nolabel="1" class="dac-design-final-file-source"/>
+                                                        <div class="dac-design-final-file-picker-button" role="button" tabindex="0" title="Chọn file thiết kế"><i class="fa fa-paperclip"/></div>
+                                                        <span class="dac-design-final-file-name">Chọn file thiết kế...</span>
+                                                    </div>
+                                                    <button name="action_send_design_final_file" type="object" class="dac-design-final-file-send" invisible="not design_final_file"><i class="fa fa-paper-plane-o"/> Gửi file</button>
+                                                    <button name="dac_disabled_design_final_file_send" type="button" class="dac-design-final-file-send" disabled="1" invisible="design_final_file"><i class="fa fa-paper-plane-o"/> Gửi file</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </section>
+                                </div>
+                                <section class="dac-design-order-card dac-design-order-conversation">
+                                    <div class="dac-design-order-card-header"><span><i class="fa fa-comment-o"/> Trao đổi thiết kế</span><div class="dac-design-conversation-header-actions"><span class="dac-design-conversation-status is-working" invisible="design_done or design_review_state == 'revision'"><i class="fa fa-circle"/> Đang thiết kế</span><span class="dac-design-conversation-status is-revision" invisible="design_review_state != 'revision'"><i class="fa fa-circle"/> Cần chỉnh sửa</span><span class="dac-design-conversation-status is-waiting" invisible="not design_done or design_review_state in ['approved', 'revision']"><i class="fa fa-circle"/> Chờ Sale duyệt</span><span class="dac-design-conversation-status is-ready" invisible="design_review_state != 'approved'"><i class="fa fa-circle"/> Đã duyệt</span><button name="action_approve_design" type="object" class="dac-design-order-complete dac-design-order-approve" groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager,base.group_system" invisible="is_design_user or design_review_state != 'pending'"><i class="fa fa-check"/> Duyệt thiết kế</button></div></div>
+                                    <div class="dac-design-order-conversation-body"><field name="internal_notes_html" widget="html" nolabel="1" readonly="1"/></div>
+                                    <div class="dac-design-order-conversation-tip" invisible="not is_design_user or design_review_state in ['pending', 'approved']">Gửi ảnh preview rồi bấm Thiết kế xong.</div>
+                                    <div class="dac-design-order-conversation-compose">
+                                        <div class="d-flex align-items-center gap-2 w-100">
+                                            <field name="design_preview_upload" title="Đính kèm ảnh preview" widget="binary" nolabel="1" class="dac-design-chat-attach" invisible="not is_design_user or design_review_state == 'approved'"/>
+                                            <field name="internal_note_draft" nolabel="1" widget="text" placeholder="Nhắn tin hoặc dán ảnh..."/>
+                                            <button name="action_post_internal_note" type="object" class="dac-design-order-send" title="Gửi trao đổi" aria-label="Gửi trao đổi"><i class="fa fa-paper-plane-o"/></button>
+                                        </div>
+                                        <small invisible="not is_design_user or design_review_state == 'approved'">Ctrl / ⌘ V để dán ảnh · Enter để gửi · Shift + Enter để xuống dòng</small>
+                                        <small invisible="not is_design_user or design_review_state != 'approved'">Enter để gửi · Shift + Enter để xuống dòng</small>
+                                        <small invisible="is_design_user">Góp ý sẽ chuyển task sang Cần chỉnh sửa.</small>
+                                    </div>
+                                </section>
+                            </div>
+                            <section class="dac-design-order-card dac-design-order-information">
+                                <div class="dac-design-order-card-header dac-design-order-information-header">
+                                    <span><i class="fa fa-cube"/> Thông tin đơn hàng</span>
+                                    <span class="dac-design-order-stage"><i class="fa fa-circle"/> Thiết kế/Cọc</span>
+                                </div>
+                                <div class="dac-design-order-meta-grid">
+                                    <div class="dac-design-order-meta-item"><span>Mã đơn hàng</span><field name="order_number" readonly="1" nolabel="1"/></div>
+                                    <div class="dac-design-order-meta-item"><span>Tên khách hàng</span><field name="partner_id" readonly="1" nolabel="1" options="{'no_open': True}"/></div>
+                                    <div class="dac-design-order-meta-item"><span>Sale phụ trách</span><field name="user_id" readonly="1" nolabel="1" options="{'no_open': True}"/></div>
+                                    <div class="dac-design-order-meta-item"><span>Hạn hoàn thành đơn</span><field name="design_deadline" readonly="1" nolabel="1"/></div>
+                                </div>
+                                <div class="dac-design-order-lines-heading"><span>Các dòng sản phẩm</span><field name="product_line_count" readonly="1" nolabel="1"/></div>
+                                <div class="dac-design-order-lines-table">
+                                    <field name="order_line" nolabel="1" readonly="1" mode="list" widget="dac_readonly_x2many">
+                                        <list create="0" edit="0" delete="0" open_form_view="false">
+                                            <field name="product_id" string="Sản phẩm"/>
+                                            <field name="description" string="Nội dung" optional="show"/>
+                                            <field name="material_id" string="Chất liệu" optional="show"/>
+                                            <field name="cart_dimension_id" string="Kích thước" optional="show"/>
+                                            <field name="product_uom_qty" string="Số lượng"/>
+                                        </list>
+                                    </field>
+                                </div>
+                            </section>
+                        </div>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_design_collaboration" model="ir.actions.act_window">
+            <field name="name">Trao đổi &amp; bản thiết kế</field>
+            <field name="res_model">sale.order</field>
+            <field name="view_mode">form</field>
+            <field name="view_id" ref="view_dac_sale_order_design_collaboration_form"/>
+            <field name="context">{'form_view_initial_mode': 'edit'}</field>
+            <field name="groups_id" eval="[(4, ref('dac_erp.group_dac_erp_design')), (4, ref('dac_erp.group_dac_erp_sale')), (4, ref('dac_erp.group_dac_erp_manager'))]"/>
         </record>
 
         <record id="dac_design_root_menu" model="ir.ui.menu">

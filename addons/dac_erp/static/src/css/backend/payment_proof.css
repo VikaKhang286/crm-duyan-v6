@@ -1,0 +1,87 @@
+.dac-payment-proof-section {
+  margin: 8px 0 16px;
+  padding: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.dac-payment-proof-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 6px 0 12px;
+  color: #64748b;
+  font-size: 0.875rem;
+}
+
+.dac-payment-proof-image img {
+  width: 100%;
+  max-width: 100%;
+  max-height: 280px;
+  object-fit: contain;
+}
+
+.dac-payment-proof-card {
+  width: min(100%, 360px);
+  overflow: hidden;
+  padding: 0 0 14px;
+  border: 1px solid #dce3ec;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.dac-payment-proof-card .dac-payment-proof-image {
+  display: block;
+  width: 100%;
+  padding: 0;
+}
+
+.dac-payment-proof-name {
+  display: block;
+  overflow: hidden;
+  margin: 14px 16px 8px;
+  color: #273444;
+  font-size: 1rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dac-payment-proof-card-actions {
+  display: flex;
+  gap: 4px;
+  padding: 0 8px;
+}
+
+.dac-payment-proof-card-actions .btn-link {
+  padding: 4px 8px;
+  text-decoration: none;
+}
+
+.dac-payment-proof-download {
+  color: #a06d00 !important;
+}
+
+.dac-payment-proof-remove {
+  color: #d13b3b !important;
+}
+
+.dac-payment-proof-actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.dac-payment-proof-image .position-absolute {
+  display: none !important;
+}
+
+@media (max-width: 576px) {
+  .dac-payment-proof-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

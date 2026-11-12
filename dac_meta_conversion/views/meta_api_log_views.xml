@@ -1,0 +1,90 @@
+<odoo>
+    <record id="meta_api_log_search" model="ir.ui.view">
+        <field name="name">dac.meta.api.log.search</field>
+        <field name="model">dac.meta.api.log</field>
+        <field name="arch" type="xml">
+            <search string="Lịch sử API Meta">
+                <field name="order_reference"/>
+                <field name="order_id"/>
+                <field name="trace_id"/>
+                <field name="dataset_id"/>
+                <filter name="purchase" string="Gửi Purchase" domain="[('operation', '=', 'purchase')]"/>
+                <filter name="checks" string="Kiểm tra kết nối" domain="[('operation', '!=', 'purchase')]"/>
+                <separator/>
+                <filter name="success" string="Thành công" domain="[('state', '=', 'success')]"/>
+                <filter name="errors" string="Lỗi / chưa rõ kết quả" domain="[('state', 'in', ['rejected', 'network_error', 'uncertain'])]"/>
+                <filter name="with_test_code" string="Có mã kiểm tra" domain="[('is_test', '=', True)]"/>
+                <group expand="0" string="Nhóm theo">
+                    <filter name="group_order" string="Đơn hàng" context="{'group_by': 'order_id'}"/>
+                    <filter name="group_operation" string="Loại gọi API" context="{'group_by': 'operation'}"/>
+                    <filter name="group_state" string="Kết quả" context="{'group_by': 'state'}"/>
+                    <filter name="group_day" string="Ngày" context="{'group_by': 'started_at:day'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+    <record id="meta_api_log_list" model="ir.ui.view">
+        <field name="name">dac.meta.api.log.list</field>
+        <field name="model">dac.meta.api.log</field>
+        <field name="arch" type="xml">
+            <list create="0" edit="0" delete="0" decoration-success="state == 'success'" decoration-danger="state == 'rejected'" decoration-warning="state in ['network_error', 'uncertain']">
+                <field name="started_at"/>
+                <field name="operation"/>
+                <field name="order_reference"/>
+                <field name="attempt_number" optional="show"/>
+                <field name="state" widget="badge"/>
+                <field name="http_status"/>
+                <field name="events_received" string="Meta nhận" optional="show"/>
+                <field name="duration_ms" optional="hide"/>
+                <field name="is_test" string="Mã test" optional="show"/>
+                <field name="summary"/>
+                <field name="trace_id" optional="hide"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+            </list>
+        </field>
+    </record>
+    <record id="meta_api_log_form" model="ir.ui.view">
+        <field name="name">dac.meta.api.log.form</field>
+        <field name="model">dac.meta.api.log</field>
+        <field name="arch" type="xml">
+            <form create="0" edit="0" delete="0">
+                <sheet>
+                    <group>
+                        <group string="Lần gọi API">
+                            <field name="operation"/><field name="order_id"/><field name="order_reference"/>
+                            <field name="event_id"/><field name="attempt_number"/><field name="is_test"/>
+                            <field name="method"/><field name="endpoint"/><field name="dataset_id"/>
+                        </group>
+                        <group string="Kết quả từ Meta">
+                            <field name="state"/><field name="http_status"/><field name="events_received"/>
+                            <field name="started_at"/><field name="completed_at"/><field name="duration_ms"/>
+                            <field name="error_code"/><field name="error_subcode"/><field name="trace_id"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                    </group>
+                    <group><field name="summary"/></group>
+                    <notebook groups="base.group_system">
+                        <page string="Nội dung gửi đã che" name="request">
+                            <p class="text-muted">Khóa truy cập và định danh khách hàng được che trong nhật ký.</p>
+                            <field name="request_preview" nolabel="1"/>
+                            <group><field name="request_digest"/></group>
+                        </page>
+                        <page string="Phản hồi Meta đã che" name="response">
+                            <field name="response_preview" nolabel="1"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="action_meta_api_logs" model="ir.actions.act_window">
+        <field name="name">Lịch sử API Meta</field>
+        <field name="res_model">dac.meta.api.log</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="meta_api_log_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Chưa có lần gọi API Meta nào.</p>
+            <p>Bấm Kiểm tra thông tin trong phần kết nối để ghi nhật ký kiểm tra, hoặc tạo đơn khi đã bật gửi Purchase để theo dõi từng lần gửi.</p>
+        </field>
+    </record>
+</odoo>

@@ -11,7 +11,7 @@
         <t t-elif="state.error"><div class="alert alert-danger"><t t-esc="state.error"/></div></t>
         <t t-else="">
           <section class="prod-v6-kpis">
-            <article class="prod-v6-kpi"><span>Đơn trong xưởng</span><strong><t t-esc="productionStats.active || 0"/></strong><small><t t-esc="formatMoney(productionStats.active_value)"/> giá trị</small></article>
+            <article class="prod-v6-kpi"><span>Đơn trong xưởng</span><strong><t t-esc="productionStats.active || 0"/></strong><small><t t-esc="productionStats.active || 0"/> đang xử lý</small></article>
             <article class="prod-v6-kpi prod-v6-kpi-danger"><span>Quá hạn</span><strong><t t-esc="productionStats.overdue || 0"/></strong><small>Cần can thiệp</small></article>
             <article class="prod-v6-kpi"><span>Sắp hoàn thành</span><strong><t t-esc="productionStats.finishing_soon || 0"/></strong><small>Trong 48 giờ</small></article>
             <article class="prod-v6-kpi"><span>Đúng hạn tháng</span><strong><t t-esc="productionStats.on_time_rate || 0"/>%</strong><small class="prod-v6-positive"><i class="fa fa-arrow-up"/> Theo tiến độ hiện tại</small></article>

@@ -4,6 +4,13 @@ from odoo import models, fields, api
 
 class AccountPayment(models.Model):
     _inherit = 'account.payment'
+
+    dac_payment_proof_image = fields.Binary(
+        string='Hình ảnh chuyển khoản',
+        attachment=True,
+        copy=False,
+    )
+    dac_payment_proof_filename = fields.Char(string='Tên hình ảnh chuyển khoản', copy=False)
     
     # Computed fields để hiển thị thông tin liên quan
     related_invoice_count = fields.Integer(string='Số hóa đơn', compute='_compute_related_invoice_count')

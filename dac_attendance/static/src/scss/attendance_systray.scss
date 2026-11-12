@@ -28,7 +28,6 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    width: 100%;
     flex-shrink: 0;
     min-height: 46px;
     padding: 6px 6px 6px 12px;
@@ -201,6 +200,9 @@
 
 /* Sidebar thu gọn: giữ nút chấm công dưới dạng một status dot có thể bấm. */
 @media (min-width: 992px) {
+    .o_dac_attendance_box {
+        width: 100%;
+    }
     body.o_web_client.dac-v6-sidebar-collapsed {
         .o_dac_attendance_systray {
             width: 100%;

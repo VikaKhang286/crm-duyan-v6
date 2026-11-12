@@ -7,6 +7,7 @@ import { patch } from "@web/core/utils/patch";
 import { onMounted, onPatched, onWillUnmount } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
 import { registry } from "@web/core/registry";
+import { X2ManyField, x2ManyField } from "@web/views/fields/x2many/x2many_field";
 
 const SLOT_CLASS = "dac-sale-order-control-panel-slot";
 const ACTIVE_CLASS = "dac-sale-order-control-panel-active";
@@ -15,6 +16,19 @@ const STATE_CLASS_PREFIX = "dac-order-state-";
 const REVIEW_CLASS = "dac-workflow-review-mode";
 const SALE_ORDER_PHONE_SELECTOR = '.o_field_widget[name="phone"] input';
 let activeSaleOrderController = null;
+
+/** A view-only x2many table.  Odoo normally opens a readonly line on click. */
+class DacReadonlyX2ManyField extends X2ManyField {
+  setup() {
+    super.setup();
+    this.canOpenRecord = false;
+  }
+}
+
+registry.category("fields").add("dac_readonly_x2many", {
+  ...x2ManyField,
+  component: DacReadonlyX2ManyField,
+});
 
 registry.category("actions").add("dac_soft_reload_sale_order", async () => {
   await activeSaleOrderController?.model?.root?.load();
@@ -121,6 +135,17 @@ function getSourceBar(controller) {
 
 function getCurrentOrderState(controller) {
   return controller.model?.root?.data?.order_state_custom || null;
+}
+
+function isDesignOrderForm(controller) {
+  return Boolean(controller.model?.root?.data?.is_design_user);
+}
+
+function isDesignCollaborationForm(controller) {
+  return Boolean(
+    controller.el?.querySelector(".dac-design-collaboration-workspace")
+    || document.querySelector(".dac-design-collaboration-workspace")
+  );
 }
 
 function syncStateClass(target, state) {
@@ -230,12 +255,17 @@ patch(FormController.prototype, {
 
     this.notification = useService("notification");
     this.orm = useService("orm");
+    this.dacSearchAction = useService("action");
     this.dialog = useService("dialog");
     activeSaleOrderController = this;
     this.__dacSaleControlPanelRetries = 0;
 
     onMounted(() => {
       this.mountSaleOrderControlPanel();
+      this.bindDesignBreadcrumbActions();
+      this.bindDesignChatComposer();
+      this.bindDesignFilePreview();
+      this.bindDesignFinalFilePicker();
       this.bindSaleOrderPageTitle();
       this.syncSaleOrderPageTitle();
       this.syncSaleOrderDirtyState();
@@ -243,6 +273,10 @@ patch(FormController.prototype, {
 
     onPatched(() => {
       this.mountSaleOrderControlPanel();
+      this.bindDesignBreadcrumbActions();
+      this.bindDesignChatComposer();
+      this.bindDesignFilePreview();
+      this.bindDesignFinalFilePicker();
       this.syncSaleOrderPageTitle();
       this.syncSaleOrderDirtyState();
       this.syncSaleOrderEditControls();
@@ -253,6 +287,7 @@ patch(FormController.prototype, {
         activeSaleOrderController = null;
       }
       this.__dacTaskStatusSavePromptCleanup?.();
+      this.__dacDesignProductLinesCleanup?.();
       this.__dacSaleOrderPageTitleCleanup?.();
       this.cleanupSaleOrderControlPanel();
     });
@@ -261,7 +296,23 @@ patch(FormController.prototype, {
   mountSaleOrderControlPanel() {
     const controlPanel = getControlPanel(this);
     const sourceBar = getSourceBar(this);
-    if (!controlPanel || !sourceBar) {
+    if (!controlPanel) {
+      if (this.__dacSaleControlPanelRetries < 10) {
+        this.__dacSaleControlPanelRetries += 1;
+        window.setTimeout(() => this.mountSaleOrderControlPanel(), 100);
+      }
+      return;
+    }
+
+    if (isDesignCollaborationForm(this)) {
+      controlPanel.classList.remove(ACTIVE_CLASS);
+      controlPanel.classList.add("dac-sale-order-control-panel-design");
+      if (isDesignOrderForm(this)) this.bindDesignProductLinesReadonly();
+      return;
+    }
+
+    controlPanel.classList.remove("dac-sale-order-control-panel-design");
+    if (!sourceBar) {
       if (this.__dacSaleControlPanelRetries < 10) {
         this.__dacSaleControlPanelRetries += 1;
         window.setTimeout(() => this.mountSaleOrderControlPanel(), 100);
@@ -295,6 +346,278 @@ patch(FormController.prototype, {
     this.syncInternalNoteBadge();
     this.syncSaleOrderDirtyState();
     this.syncSaleOrderEditControls();
+  },
+
+  bindDesignProductLinesReadonly() {
+    if (this.__dacDesignProductLinesBound || !this.el) {
+      return;
+    }
+
+    const preventRowOpen = (event) => {
+      if (!isDesignOrderForm(this) || !event.target.closest(
+        ".dac-design-order-lines-table tbody tr.o_data_row"
+      )) {
+        return;
+      }
+      // The x2many list renderer opens a line form from its bubbling click
+      // handler even when the list is readonly.  This Design-only table is
+      // informational, so consume the event before that handler sees it.
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+    };
+
+    this.el.addEventListener("click", preventRowOpen, true);
+    this.__dacDesignProductLinesBound = true;
+    this.__dacDesignProductLinesCleanup = () => {
+      this.el?.removeEventListener("click", preventRowOpen, true);
+      this.__dacDesignProductLinesBound = false;
+    };
+  },
+
+  bindDesignChatComposer() {
+    this.bindDesignChatImageCopy();
+    const compose = this.el?.querySelector(".dac-design-order-conversation-compose") || document.querySelector(".dac-design-order-conversation-compose");
+    const input = compose?.querySelector("textarea");
+    if (!compose || !input || compose.dataset.dacChatBound) return;
+    compose.dataset.dacChatBound = "1";
+    const canAttachPreview = () => (
+      this.model.root.data.is_design_user
+      && this.model.root.data.design_review_state !== "approved"
+    );
+    const pendingImages = [];
+    const preview = document.createElement("div");
+    preview.className = "dac-design-chat-preview";
+    compose.prepend(preview);
+    const renderPreview = () => {
+      preview.replaceChildren();
+      pendingImages.forEach((image, index) => {
+        const item = document.createElement("div");
+        item.className = "dac-design-chat-preview-item";
+        const thumbnail = document.createElement("img");
+        thumbnail.src = image.data;
+        thumbnail.alt = image.name;
+        const filename = document.createElement("span");
+        filename.textContent = image.name;
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "dac-design-chat-preview-remove";
+        remove.setAttribute("aria-label", `Bỏ ${image.name}`);
+        remove.innerHTML = '<i class="fa fa-times"></i>';
+        remove.addEventListener("click", () => {
+          pendingImages.splice(index, 1);
+          renderPreview();
+        });
+        item.append(thumbnail, filename, remove);
+        preview.appendChild(item);
+      });
+    };
+    const send = async () => {
+      const text = input.value.trim();
+      if (!text && !pendingImages.length) return;
+      await this.model.root.update({ internal_note_draft: input.value });
+      const images = pendingImages.splice(0).map((image, index) => ({
+        name: image.name || `anh-preview-${Date.now()}-${index + 1}.png`, mimetype: image.type, data: image.data,
+      }));
+      renderPreview();
+      await this.orm.call("sale.order", "action_post_internal_note_with_images", [[this.model.root.resId], images]);
+      await this.model.root.load();
+    };
+    const addImages = (files) => {
+      if (!canAttachPreview()) return;
+      for (const file of [...files].filter((item) => item.type.startsWith("image/"))) {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const image = {
+            type: file.type,
+            name: file.name || `anh-preview-${Date.now()}.png`,
+            data: reader.result,
+          };
+          pendingImages.push(image);
+          renderPreview();
+        };
+        reader.readAsDataURL(file);
+      }
+    };
+    input.addEventListener("paste", (event) => {
+      const files = event.clipboardData?.files || [];
+      if ([...files].some((file) => file.type.startsWith("image/"))) {
+        event.preventDefault();
+        if (canAttachPreview()) addImages(files);
+      }
+    });
+    const attach = compose.querySelector(".dac-design-chat-attach");
+    // Native file controls are stripped from an Odoo form arch.  Create the
+    // input after the form is rendered so the attachment affordance always
+    // opens the operating-system file picker.
+    let fileInput = compose.querySelector(".dac-design-chat-file-input");
+    if (!fileInput && attach) {
+      fileInput = document.createElement("input");
+      fileInput.type = "file";
+      fileInput.accept = "image/*";
+      fileInput.className = "dac-design-chat-file-input";
+      fileInput.setAttribute("aria-label", "Chọn ảnh preview");
+      attach.appendChild(fileInput);
+    }
+    const openFilePicker = (event) => {
+      if (event?.target === fileInput) return;
+      event?.preventDefault();
+      event?.stopPropagation();
+      if (typeof fileInput?.showPicker === "function") {
+        fileInput.showPicker();
+      } else {
+        fileInput?.click();
+      }
+    };
+    attach?.addEventListener("click", openFilePicker);
+    attach?.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openFilePicker();
+      }
+    });
+    fileInput?.addEventListener("change", () => {
+      addImages(fileInput.files || []);
+      fileInput.value = "";
+    });
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        send();
+      }
+    });
+    compose.querySelector(".dac-design-order-send")?.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      send();
+    }, true);
+  },
+
+  bindDesignChatImageCopy() {
+    const conversation = this.el?.querySelector(".dac-design-order-conversation-body") || document.querySelector(".dac-design-order-conversation-body");
+    if (conversation && !conversation.dataset.dacCopyImageBound) {
+      conversation.dataset.dacCopyImageBound = "1";
+      conversation.addEventListener("click", async (event) => {
+        const button = event.target.closest(".dac-v6-copy-image");
+        if (!button) return;
+        event.preventDefault();
+        event.stopPropagation();
+        try {
+          const response = await fetch(button.dataset.imageUrl, { credentials: "same-origin" });
+          if (!response.ok) throw new Error("Không thể tải ảnh");
+          let image = await response.blob();
+          // Chrome's clipboard image support is consistently available for PNG.
+          // Convert other preview formats so they can still be pasted to chat.
+          if (image.type !== "image/png" && globalThis.createImageBitmap) {
+            const bitmap = await createImageBitmap(image);
+            const canvas = document.createElement("canvas");
+            canvas.width = bitmap.width;
+            canvas.height = bitmap.height;
+            canvas.getContext("2d").drawImage(bitmap, 0, 0);
+            image = await new Promise((resolve, reject) => canvas.toBlob(
+              (blob) => blob ? resolve(blob) : reject(new Error("Không thể chuyển ảnh")),
+              "image/png"
+            ));
+            bitmap.close();
+          }
+          if (!navigator.clipboard?.write || !globalThis.ClipboardItem) {
+            throw new Error("Trình duyệt không hỗ trợ copy ảnh");
+          }
+          await navigator.clipboard.write([new ClipboardItem({ [image.type]: image })]);
+          this.notification.add("Đã copy ảnh. Có thể dán để gửi cho khách hàng.", {
+            type: "success",
+          });
+        } catch (error) {
+          this.notification.add("Không thể copy ảnh. Vui lòng thử lại.", {
+            type: "danger",
+          });
+        }
+      });
+    }
+  },
+
+  bindDesignFilePreview() {
+    if (document.body.dataset.dacDesignFilePreviewBound) return;
+    document.body.dataset.dacDesignFilePreviewBound = "1";
+    // The HTML field can stop bubbling before it reaches the form controller.
+    // Capture at document level so preview buttons remain usable after rerenders.
+    document.addEventListener("click", (event) => {
+      const trigger = event.target.closest(".dac-design-file-preview");
+      if (!trigger) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const filename = trigger.dataset.fileName || "File thiết kế";
+      const url = trigger.dataset.fileUrl;
+      const modal = document.createElement("div");
+      modal.className = "dac-design-file-modal";
+      const imageFile = /\.(svg|png|jpe?g|gif|webp)$/i.test(filename);
+      modal.innerHTML = `
+        <div class="dac-design-file-modal-dialog" role="dialog" aria-modal="true" aria-label="${filename}">
+          <header><strong>${filename}</strong><button type="button" aria-label="Đóng"><i class="fa fa-times"></i></button></header>
+          <div class="dac-design-file-modal-preview${imageFile ? "" : " is-non-image"}">${imageFile ? `<img src="${url}" alt="${filename}"/>` : `<p>Mở file bằng phần mềm thiết kế sau khi tải về.</p>`}</div>
+          <footer><a href="${url.replace('download=false', 'download=true')}" target="_blank"><i class="fa fa-download"></i> Tải file thiết kế</a></footer>
+        </div>`;
+      const close = () => modal.remove();
+      modal.addEventListener("click", (click) => {
+        if (click.target === modal || click.target.closest("header button")) close();
+      });
+      document.body.appendChild(modal);
+    }, true);
+  },
+
+  bindDesignFinalFilePicker() {
+    const picker = this.el?.querySelector(".dac-design-final-file-picker") || document.querySelector(".dac-design-final-file-picker");
+    if (!picker || picker.dataset.dacFinalFileBound) return;
+    picker.dataset.dacFinalFileBound = "1";
+    const pickerButton = picker.querySelector(".dac-design-final-file-picker-button");
+    if (!pickerButton) return;
+    const input = document.createElement("input");
+    input.type = "file";
+    input.className = "dac-design-final-file-native";
+    input.setAttribute("aria-label", "Chọn file thiết kế");
+    pickerButton.appendChild(input);
+    const filename = picker.querySelector(".dac-design-final-file-name");
+    const selectedName = this.model.root.data.design_final_file_filename;
+    if (selectedName) filename.textContent = selectedName;
+    input.addEventListener("change", () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      filename.textContent = file.name;
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const data = String(reader.result).split(",", 2)[1];
+        await this.model.root.update({
+          design_final_file: data,
+          design_final_file_filename: file.name,
+        });
+      };
+      reader.readAsDataURL(file);
+    });
+  },
+
+  bindDesignBreadcrumbActions() {
+    if (!this.el) return;
+    // An Odoo ``type=object`` button has its own click listener.  Bind on
+    // the button itself in the capture phase so our client action runs first
+    // and the object method cannot append another item to the breadcrumb.
+    (this.el.querySelectorAll(".dac-design-back-orders, .dac-design-back-overview").length
+      ? this.el.querySelectorAll(".dac-design-back-orders, .dac-design-back-overview")
+      : document.querySelectorAll(".dac-design-back-orders, .dac-design-back-overview")).forEach((button) => {
+      if (button.dataset.dacBreadcrumbBound) return;
+      button.dataset.dacBreadcrumbBound = "1";
+      button.addEventListener("click", async (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+        const xmlid = button.classList.contains("dac-design-back-orders")
+          ? "dac_erp.dac_sale_order_action_design_only"
+          : "dac_erp.dac_design_dashboard_action";
+        await this.dacSearchAction.doAction(xmlid, {
+          clearBreadcrumbs: true,
+        });
+      }, true);
+    });
   },
 
   syncSaleOrderPageTitle() {
@@ -610,14 +933,7 @@ patch(FormController.prototype, {
     );
     if (renderedBlocks.length) {
       for (const block of renderedBlocks) {
-        const message = block.querySelector(":scope > div");
-        if (message) {
-          const messageText = message.innerText.replace(/\s+/g, " ").trim();
-          message.classList.add("dac-v6-next-step-info");
-          message.title = messageText;
-          message.setAttribute("aria-label", messageText);
-          message.setAttribute("role", "note");
-        }
+        block.querySelector(":scope > div")?.remove();
       }
       target.replaceChildren(...renderedBlocks);
     }

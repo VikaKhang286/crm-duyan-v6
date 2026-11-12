@@ -48,7 +48,6 @@ export class CartOrdersListController extends ListController {
         super.setup();
         this.orm = useService("orm");
         this.action = useService("action");
-        this.quickSale = useService("dac_quick_sale");
         this.cartStats = null;
         this.cartToolbarFilterGroupIds = { search: null, stage: null, sale: null };
         this.cartSearchTimer = null;
@@ -73,7 +72,17 @@ export class CartOrdersListController extends ListController {
     }
 
     openRecord(record) {
-        return this.quickSale.open(record.resId);
+        return this.openOrder(record.resId);
+    }
+
+    openOrder(orderId) {
+        return this.action.doAction({
+            type: "ir.actions.act_window",
+            res_model: "sale.order",
+            res_id: orderId,
+            views: [[false, "form"]],
+            target: "current",
+        });
     }
 
     isCartWorkspace() {
@@ -102,7 +111,7 @@ export class CartOrdersListController extends ListController {
                 if (event.target.closest("a,button,input,select,textarea,.o-checkbox,.o_field_x2many")) return;
                 event.preventDefault();
                 event.stopPropagation();
-                this.quickSale.open(records[index].resId);
+                this.openOrder(records[index].resId);
             }, true);
         });
     }
@@ -213,25 +222,27 @@ export class CartOrdersListController extends ListController {
                         <i class="fa fa-search"></i>
                         <input type="search" placeholder="Tìm mã đơn, khách hàng, SĐT..." aria-label="Tìm đơn hàng"/>
                     </label>
-                    <select class="dac-cart-stage-select" aria-label="Giai đoạn">
-                        <option value="">Tất cả giai đoạn</option>
-                        <option value="quotation">Báo giá</option>
-                        <option value="deposit">Thiết kế / Cọc</option>
-                        <option value="production">Sản xuất</option>
-                        <option value="delivery">Giao hàng</option>
-                        <option value="completed">Hoàn thành</option>
-                        <option value="cancel">Hủy</option>
-                    </select>
-                    <select class="dac-cart-sale-select" aria-label="Sale"><option value="">Tất cả Sale</option></select>
-                    <button type="button" class="dac-cart-toolbar-filter">Bộ lọc</button>
-                    <button type="button" class="dac-cart-toolbar-filter-clear"
+                    <div class="dac-cart-toolbar-filters-group">
+                        <select class="dac-cart-stage-select" aria-label="Giai đoạn">
+                            <option value="">Tất cả giai đoạn</option>
+                            <option value="quotation">Báo giá</option>
+                            <option value="deposit">Thiết kế / Cọc</option>
+                            <option value="production">Sản xuất</option>
+                            <option value="delivery">Giao hàng</option>
+                            <option value="completed">Hoàn thành</option>
+                            <option value="cancel">Hủy</option>
+                        </select>
+                        <select class="dac-cart-sale-select" aria-label="Sale"><option value="">Tất cả Sale</option></select>
+                        <button type="button" class="dac-cart-toolbar-filter">Bộ lọc</button>
+                        <button type="button" class="dac-cart-toolbar-filter-clear"
                             title="Tắt bộ lọc Chưa nhận cọc" aria-label="Tắt bộ lọc Chưa nhận cọc" hidden>×</button>
-                    <div class="${BULK_ACTIONS_CLASS}" hidden>
-                        <button type="button" class="dac-cart-bulk-actions-toggle" aria-expanded="false" aria-haspopup="true">
-                            <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
-                            <span>Tác vụ</span>
-                            <span class="dac-cart-bulk-actions-count" aria-label="Số đơn đã chọn">0</span>
-                        </button>
+                        <div class="${BULK_ACTIONS_CLASS}" hidden>
+                            <button type="button" class="dac-cart-bulk-actions-toggle" aria-expanded="false" aria-haspopup="true">
+                                <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
+                                <span>Tác vụ</span>
+                                <span class="dac-cart-bulk-actions-count" aria-label="Số đơn đã chọn">0</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div class="dac-cart-view-toggle" aria-label="Kiểu hiển thị">
@@ -423,7 +434,7 @@ export class CartOrdersListController extends ListController {
                     line.textContent = text;
                     card.append(line);
                 }
-                card.addEventListener("click", () => this.quickSale.open(record.id));
+                card.addEventListener("click", () => this.openOrder(record.id));
                 column.append(card);
             }
             board.append(column);

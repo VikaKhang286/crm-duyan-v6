@@ -22,6 +22,21 @@
               groups="hr_attendance.group_hr_attendance_manager"
               sequence="2"/>
 
+    <!-- Standard Attendance entries cloned into the DAC Attendance app. -->
+    <menuitem id="menu_dac_attendance_overview"
+              name="Tổng quan"
+              parent="menu_dac_attendance_root"
+              action="hr_attendance.hr_attendance_action"
+              groups="hr_attendance.group_hr_attendance_officer"
+              sequence="3"/>
+
+    <menuitem id="menu_dac_attendance_kiosk"
+              name="Chế độ Ki-ốt"
+              parent="menu_dac_attendance_root"
+              action="hr_attendance.open_kiosk_url"
+              groups="hr_attendance.group_hr_attendance_manager"
+              sequence="5"/>
+
     <!-- Configuration Menu -->
     <menuitem id="menu_dac_attendance_config"
               name="Cấu hình"

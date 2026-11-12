@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_meta_event_system,Meta conversion admin,model_dac_meta_conversion_event,base.group_system,1,0,0,0
+access_meta_event_manager,Meta conversion manager,model_dac_meta_conversion_event,dac_erp.group_dac_erp_manager,1,0,0,0
+access_meta_api_system,Meta API log admin,model_dac_meta_api_log,base.group_system,1,0,0,0
+access_meta_api_manager,Meta API log manager,model_dac_meta_api_log,dac_erp.group_dac_erp_manager,1,0,0,0

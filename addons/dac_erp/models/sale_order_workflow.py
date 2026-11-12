@@ -2,6 +2,7 @@ from odoo import models, fields, api, _
 from odoo.exceptions import UserError
 from markupsafe import Markup
 import logging
+import base64
 from datetime import date, timedelta
 
 _logger = logging.getLogger(__name__)
@@ -317,12 +318,71 @@ class SaleOrderWorkflow(models.Model):
     def action_post_internal_note(self):
         self.ensure_one()
         note = (self.internal_note_draft or '').strip()
-        self.message_post(
-            body=Markup('<div class="dac-internal-note-message">{}</div>').format(note),
-            subtype_xmlid='mail.mt_note',
-        )
+        attachments = []
+        if self.design_preview_upload:
+            attachments.append((
+                self.design_preview_upload_filename or 'anh-preview.png',
+                base64.b64decode(self.design_preview_upload),
+                {'mimetype': 'image/*'},
+            ))
+        if note or attachments:
+            self.message_post(
+                body=Markup('<div class="dac-internal-note-message">{}</div>').format(
+                    note
+                ),
+                subtype_xmlid='mail.mt_note',
+                attachments=attachments,
+            )
+            if attachments and self.env.user.has_group('dac_erp.group_dac_erp_design'):
+                self.design_preview_sent = True
+            self._mark_design_revision_from_sale_note(note)
+        self.internal_note_draft = False
+        self.design_preview_upload = False
+        self.design_preview_upload_filename = False
+        return {'type': 'ir.actions.client', 'tag': 'dac_soft_reload_sale_order'}
+
+    def action_post_internal_note_with_images(self, images=None):
+        """Post an internal note with clipboard image attachments."""
+        self.ensure_one()
+        images = images or []
+        attachments = []
+        for image in images[:5]:
+            data = (image.get('data') or '').split(',', 1)[-1]
+            if not data or not (image.get('mimetype') or '').startswith('image/'):
+                continue
+            attachments.append((
+                image.get('name') or 'anh-preview.png',
+                base64.b64decode(data),
+                {'mimetype': image['mimetype']},
+            ))
+        note = (self.internal_note_draft or '').strip()
+        if note or attachments:
+            self.message_post(
+                body=Markup('<div class="dac-internal-note-message">{}</div>').format(note),
+                subtype_xmlid='mail.mt_note', attachments=attachments,
+            )
+            if attachments and self.env.user.has_group('dac_erp.group_dac_erp_design'):
+                self.design_preview_sent = True
+            self._mark_design_revision_from_sale_note(note)
         self.internal_note_draft = False
         return {'type': 'ir.actions.client', 'tag': 'dac_soft_reload_sale_order'}
+
+    def _mark_design_revision_from_sale_note(self, note):
+        """A manual note from Sale, Manager, or the order owner requests revision."""
+        is_design_user = self.env.user.has_group('dac_erp.group_dac_erp_design')
+        is_reviewer = (
+            self.env.user.has_group('dac_erp.group_dac_erp_sale')
+            or self.env.user.has_group('dac_erp.group_dac_erp_manager')
+            or self.user_id == self.env.user
+        )
+        # Sale/Manager text is an instruction for Design at every point in the
+        # flow, including before the first preview has been uploaded.
+        if note and is_reviewer and not is_design_user:
+            self.write({
+                'design_review_state': 'revision',
+                'design_final_file_sent': False,
+                'design_preview_sent': False,
+            })
 
     def action_cancel_order(self):
         """Hủy đơn hàng - chỉ cho phép ở trạng thái báo giá và chưa có hóa đơn cọc"""
@@ -685,12 +745,18 @@ class SaleOrderWorkflow(models.Model):
         if self.order_state_custom not in ('deposit', 'production'):
             raise UserError(_("Chỉ xác nhận khi đơn đang ở Đặt cọc hoặc Sản xuất."))
 
-        # Phải có link
-        if not self.design_link:
+        # Designer có thể gửi ảnh preview trong phần Trao đổi thay cho link.
+        # Các vai trò khác vẫn phải điền link như luồng cũ.
+        if not self.design_link and not self.env.user.has_group('dac_erp.group_dac_erp_design'):
             raise UserError(_("Vui lòng nhập link thiết kế trước khi hoàn thành."))
+        if (
+            self.env.user.has_group('dac_erp.group_dac_erp_design')
+            and not self.design_preview_sent
+        ):
+            raise UserError(_("Vui lòng gửi ảnh preview trước khi hoàn thành thiết kế."))
 
-        # Đã hoàn tất trước đó?
-        if self.design_done:
+        # Chỉ cho gửi lại khi Sale đã yêu cầu chỉnh sửa.
+        if self.design_done and self.design_review_state != 'revision':
             return {
                 'type': 'ir.actions.client',
                 'tag': 'display_notification',
@@ -708,6 +774,10 @@ class SaleOrderWorkflow(models.Model):
             'design_done': True,
             'design_done_date': fields.Datetime.now(),
             'design_done_user_id': self.env.user.id,
+            'design_review_state': 'pending',
+            'design_approved_date': False,
+            'design_approved_user_id': False,
+            'design_final_file_sent': False,
         }
         base = self.design_assigned_date or today
         if not self.design_assigned_date:
@@ -715,6 +785,100 @@ class SaleOrderWorkflow(models.Model):
         if not self.design_deadline:
             vals_done['design_deadline'] = base if self.is_priority_today else (base + timedelta(days=3))
         self.write(vals_done)
+        self.message_post(
+            body=Markup(
+                '<div class="dac-internal-note-message">'
+                'Thiết kế xong. Nhờ Sale kiểm tra và duyệt bản preview.'
+                '</div>'
+            ),
+            subtype_xmlid='mail.mt_note',
+        )
+        return {'type': 'ir.actions.client', 'tag': 'reload'}
+
+    def action_approve_design(self):
+        """Sale xác nhận preview trước khi Designer bàn giao file cuối."""
+        self.ensure_one()
+        allowed = (
+            self.env.user.has_group('dac_erp.group_dac_erp_sale')
+            or self.env.user.has_group('dac_erp.group_dac_erp_manager')
+            or self.env.user.has_group('base.group_system')
+        )
+        if not allowed:
+            raise UserError(_("Chỉ Sale hoặc quản lý mới có thể duyệt thiết kế."))
+        if not self.design_done:
+            raise UserError(_("Thiết kế chưa được gửi để Sale duyệt."))
+        if self.design_review_state == 'approved':
+            return {'type': 'ir.actions.client', 'tag': 'reload'}
+
+        self.write({
+            'design_review_state': 'approved',
+            'design_approved_date': fields.Datetime.now(),
+            'design_approved_user_id': self.env.user.id,
+        })
+        self.message_post(
+            body=Markup('<div class="dac-internal-note-message">Đã duyệt bản preview. Thiết kế gửi file chính thức giúp mình.</div>'),
+            subtype_xmlid='mail.mt_note',
+        )
+        return {'type': 'ir.actions.client', 'tag': 'reload'}
+
+    def action_continue_design_revision(self):
+        """Designer reopens an approved design to prepare a revised preview."""
+        self.ensure_one()
+        allowed = (
+            self.env.user.has_group('dac_erp.group_dac_erp_design')
+            or self.env.user.has_group('dac_erp.group_dac_erp_manager')
+            or self.env.user.has_group('base.group_system')
+        )
+        if not allowed:
+            raise UserError(_("Bạn không có quyền chỉnh sửa tiếp thiết kế."))
+        if self.design_review_state != 'approved':
+            raise UserError(_("Chỉ có thể chỉnh sửa tiếp sau khi Sale đã duyệt."))
+
+        self.write({
+            'design_review_state': 'revision',
+            'design_final_file_sent': False,
+            'design_preview_sent': False,
+        })
+        self.message_post(
+            body=Markup(
+                '<div class="dac-internal-note-message">'
+                'Bắt đầu chỉnh sửa tiếp từ bản đã duyệt. '
+                'Sẽ gửi preview mới để Sale duyệt lại.'
+                '</div>'
+            ),
+            subtype_xmlid='mail.mt_note',
+        )
+        return {'type': 'ir.actions.client', 'tag': 'reload'}
+
+    def action_send_design_final_file(self):
+        """Bàn giao file thiết kế chỉ sau khi Sale đã duyệt preview."""
+        self.ensure_one()
+        allowed = (
+            self.env.user.has_group('dac_erp.group_dac_erp_design')
+            or self.env.user.has_group('dac_erp.group_dac_erp_manager')
+            or self.env.user.has_group('base.group_system')
+        )
+        if not allowed:
+            raise UserError(_("Bạn không có quyền gửi file thiết kế."))
+        if self.design_review_state != 'approved':
+            raise UserError(_("Chỉ gửi file sau khi Sale đã duyệt thiết kế."))
+        if not self.design_final_file:
+            raise UserError(_("Vui lòng chọn file thiết kế trước khi gửi."))
+
+        self.message_post(
+            body=Markup('<div class="dac-internal-note-message">Đã gửi file thiết kế để bàn giao cho Sản xuất.</div>'),
+            subtype_xmlid='mail.mt_note',
+            attachments=[(
+                self.design_final_file_filename or 'file-thiet-ke',
+                base64.b64decode(self.design_final_file),
+                {'mimetype': 'application/octet-stream'},
+            )],
+        )
+        self.write({
+            'design_final_file_sent': True,
+            'design_final_file': False,
+            'design_final_file_filename': False,
+        })
         return {'type': 'ir.actions.client', 'tag': 'reload'}
 
     def action_mark_production_done(self):

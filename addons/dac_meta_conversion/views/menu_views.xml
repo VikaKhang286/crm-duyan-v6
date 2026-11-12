@@ -1,0 +1,13 @@
+<odoo>
+    <record id="action_meta_connection_settings" model="ir.actions.act_window">
+        <field name="name">Kết nối Chuyển đổi Meta</field>
+        <field name="res_model">res.config.settings</field>
+        <field name="view_mode">form</field>
+        <field name="target">inline</field>
+        <field name="context">{'module': 'dac_meta_conversion', 'bin_size': False}</field>
+    </record>
+    <menuitem id="menu_meta_conversion_root" name="Chuyển đổi Meta" sequence="40" web_icon="dac_meta_conversion,static/description/icon.png" groups="base.group_system,dac_erp.group_dac_erp_manager"/>
+    <menuitem id="menu_meta_connection" name="Hướng dẫn kết nối" parent="menu_meta_conversion_root" action="action_meta_connection_settings" sequence="10" groups="base.group_system"/>
+    <menuitem id="menu_meta_api_logs" name="Lịch sử API" parent="menu_meta_conversion_root" action="action_meta_api_logs" sequence="20" groups="base.group_system,dac_erp.group_dac_erp_manager"/>
+    <menuitem id="menu_meta_events" name="Sự kiện chuyển đổi" parent="menu_meta_conversion_root" action="action_meta_conversion_events" sequence="30" groups="base.group_system,dac_erp.group_dac_erp_manager"/>
+</odoo>

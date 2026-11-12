@@ -143,10 +143,16 @@ class AttendanceSummaryWizard(models.TransientModel):
         if self.employee_ids:
             domain.append(('employee_id', 'in', self.employee_ids.ids))
         
-        if self.include_late:
+        if self.include_late and self.include_early:
+            # The two options are report categories; include either one.
+            domain.extend([
+                '|',
+                ('is_late', '=', True),
+                ('is_early_leave', '=', True),
+            ])
+        elif self.include_late:
             domain.append(('is_late', '=', True))
-        
-        if self.include_early:
+        elif self.include_early:
             domain.append(('is_early_leave', '=', True))
         
         # Return action to open report
@@ -154,7 +160,7 @@ class AttendanceSummaryWizard(models.TransientModel):
             'name': 'Attendance Summary',
             'type': 'ir.actions.act_window',
             'res_model': 'dac.attendance.report',
-            'view_mode': 'pivot,tree',
+            'view_mode': 'pivot,list',
             'domain': domain,
             'context': {
                 'search_default_group_by_employee': 1 if self.group_by == 'employee' else 0,

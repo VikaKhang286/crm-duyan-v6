@@ -12,7 +12,10 @@ export class AttendanceMiniCalendar extends Component {
         if (!this.props.days.length) return [];
         // weekday: 0=Mon … 6=Sun → Mon is column 0
         const firstWeekday = this.props.days[0].weekday; // 0=Mon
-        return Array.from({ length: firstWeekday });
+        // Return stable, unique values because Owl requires every t-foreach
+        // key to be unique. Array.from({ length }) would produce repeated
+        // `undefined` values and crash the employee dashboard at runtime.
+        return Array.from({ length: firstWeekday }, (_, index) => index);
     }
 
     dayTooltip(day) {

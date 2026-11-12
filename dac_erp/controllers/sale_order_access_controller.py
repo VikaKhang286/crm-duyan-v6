@@ -3,6 +3,7 @@ from odoo import http
 from odoo.http import request
 from odoo.exceptions import AccessError
 import logging
+import re
 
 _logger = logging.getLogger(__name__)
 
@@ -41,6 +42,30 @@ class SaleOrderAccessController(http.Controller):
             parts = base_url.split('#', 1)
             return f'{parts[0]}{debug_query}#{parts[1]}'
         return f'{base_url}{debug_query}'
+
+    @http.route('/dac/design/navigation/<string:destination>', type='http', auth='user', website=False)
+    def design_navigation(self, destination, **kwargs):
+        """Navigate Design users by XMLID, never by a database action ID.
+
+        The actions' numeric IDs differ between development and production.
+        The two links in the Design workspace therefore target this stable
+        route; the route resolves the allowed XMLID in the current database
+        before redirecting to Odoo's normal action URL.
+        """
+        destinations = {
+            'orders': 'dac_erp.dac_sale_order_action_design_only',
+            'overview': 'dac_erp.dac_design_dashboard_action',
+        }
+        xmlid = destinations.get(destination)
+        user = request.env.user
+        if not xmlid or not user.has_group('dac_erp.group_dac_erp_design'):
+            return request.redirect('/web')
+
+        action = request.env.ref(xmlid, raise_if_not_found=False)
+        if not action:
+            _logger.error('[DESIGN NAVIGATION] Missing action XMLID: %s', xmlid)
+            return request.redirect('/web')
+        return request.redirect(self._build_url_with_debug('/odoo/action-%s' % action.id, kwargs))
     
     @http.route([
         '/odoo/action-<int:action_id>',
@@ -61,6 +86,16 @@ class SaleOrderAccessController(http.Controller):
         
         # Kiểm tra quyền user TRƯỚC
         user = request.env.user
+
+        # This must run before the admin bypass: a Design user may also have
+        # system rights, but their nested task URL must still resolve to the
+        # dedicated task action after a browser reload.
+        task_action = request.env.ref('dac_erp.action_design_collaboration', raise_if_not_found=False)
+        nested_task = re.match(r'^action-(\d+)/(\d+)(?:/.*)?$', breadcrumb or '')
+        if sale_order_id and task_action and nested_task and int(nested_task.group(1)) == task_action.id:
+            nested_order_id = int(nested_task.group(2))
+            base_url = f'/web#id={nested_order_id}&model=sale.order&view_type=form&action={task_action.id}'
+            return request.redirect(self._build_url_with_debug(base_url, kwargs))
         
         # ===== ADMIN BYPASS: Admin có full access, không cần kiểm tra gì =====
         if user.has_group('base.group_system'):
@@ -91,14 +126,21 @@ class SaleOrderAccessController(http.Controller):
         
         # Nếu có sale_order_id → kiểm tra quyền truy cập đơn hàng
         if sale_order_id:
-            return self._check_access_and_redirect(sale_order_id, kwargs)
+            # Keep the requested action when the URL itself already points to
+            # the Design task.  Without this, a direct task URL falls back to
+            # the Design order-list action after a browser reload.
+            return self._check_access_and_redirect(
+                sale_order_id,
+                kwargs,
+                requested_action_id=action_id,
+            )
         
         # Nếu không có sale_order_id → cho phép truy cập action bình thường
         _logger.info(f"[INTERCEPT] User {user.name} accessing action {action_id} (no order ID) - allowing")
         redirect_url = self._build_url_with_debug(f'/web#action={action_id}', kwargs)
         return request.redirect(redirect_url)
     
-    def _check_access_and_redirect(self, sale_order_id, url_params):
+    def _check_access_and_redirect(self, sale_order_id, url_params, requested_action_id=None):
         """
         Kiểm tra quyền truy cập đơn hàng và redirect đến action phù hợp
         """
@@ -162,7 +204,7 @@ class SaleOrderAccessController(http.Controller):
                 if can_access:
                     # Có quyền → redirect đến form view
                     _logger.info(f"[INTERCEPT] Access granted - redirecting to form view")
-                    return self._redirect_to_form(sale_order_id, is_design_production=True, url_params=url_params)
+                    return self._redirect_to_form(sale_order_id, is_design_production=True, url_params=url_params, requested_action_id=requested_action_id)
                 else:
                     # KHÔNG có quyền → hiển thị notification và redirect về list view
                     _logger.warning(f"[INTERCEPT] Access DENIED - order {sale_order.name} not assigned to user {user.name}")
@@ -208,7 +250,7 @@ class SaleOrderAccessController(http.Controller):
             _logger.error(f"[INTERCEPT] Error checking access: {e}", exc_info=True)
             return request.redirect('/web')
     
-    def _redirect_to_form(self, sale_order_id, is_design_production=False, url_params=None):
+    def _redirect_to_form(self, sale_order_id, is_design_production=False, url_params=None, requested_action_id=None):
         """
         Redirect đến form view của đơn hàng với action phù hợp
         """
@@ -219,7 +261,10 @@ class SaleOrderAccessController(http.Controller):
             # Xác định action cụ thể dựa vào user group
             user = request.env.user
             
-            if user.has_group('dac_erp.group_dac_erp_design'):
+            task_action = request.env.ref('dac_erp.action_design_collaboration', raise_if_not_found=False)
+            if task_action and requested_action_id == task_action.id and user.has_group('dac_erp.group_dac_erp_design'):
+                action = task_action
+            elif user.has_group('dac_erp.group_dac_erp_design'):
                 # Người thiết kế → action thiết kế
                 action = request.env.ref('dac_erp.dac_sale_order_action_design_only')
                 _logger.info(f"[INTERCEPT] Using Design action for user {user.name}")

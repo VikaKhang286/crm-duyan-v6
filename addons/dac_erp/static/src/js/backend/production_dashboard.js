@@ -20,7 +20,6 @@ class ProductionDashboard extends Component {
     this.orm = useService("orm");
     this.action = useService("action");
     this.menu = useService("menu");
-    this.quickSale = useService("dac_quick_sale");
     this.notification = useService("notification");
     this.state = useState({ loading: true, data: null, error: null, filter: null });
     this.designScrollRef = useRef("designScroll");
@@ -152,6 +151,14 @@ class ProductionDashboard extends Component {
   get productionTasks() {
     return this.state.data?.production_tasks || [];
   }
+  get productionInProgressCount() {
+    // Keep the KPI aligned with the "Đơn đang sản xuất" block: each order
+    // already exposes its unfinished task count as remaining_tasks.
+    return this.productionOrders.reduce(
+      (total, order) => total + Number(order.remaining_tasks || 0),
+      0,
+    );
+  }
   get productionStats() {
     return this.state.data?.production_stats || {};
   }
@@ -182,7 +189,7 @@ class ProductionDashboard extends Component {
 
   async openOrder(order) {
     if (!order?.id) return;
-    await this.quickSale.open(order.id);
+    await this.action.doAction({ type: "ir.actions.act_window", res_model: "sale.order", res_id: order.id, views: [[false, "form"]], target: "current" });
   }
 
   async openProductionOrders() {
@@ -229,7 +236,7 @@ class ProductionDashboard extends Component {
   async openTaskOrOrder(task) {
     if (!task || !task.id) return;
     if (task.order_id) {
-      await this.quickSale.open(task.order_id);
+      await this.action.doAction({ type: "ir.actions.act_window", res_model: "sale.order", res_id: task.order_id, views: [[false, "form"]], target: "current" });
     } else {
       await this.action.doAction({
         type: "ir.actions.act_window",

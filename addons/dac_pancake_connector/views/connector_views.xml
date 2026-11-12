@@ -1,0 +1,107 @@
+<odoo>
+    <record id="pancake_api_log_list" model="ir.ui.view">
+        <field name="name">dac.pancake.api.log.list</field><field name="model">dac.pancake.api.log</field>
+        <field name="arch" type="xml"><list create="0" edit="0" delete="0" decoration-danger="state == 'rejected'" decoration-warning="state == 'uncertain'">
+            <field name="started_at"/><field name="company_id" groups="base.group_multi_company"/><field name="order_reference"/><field name="operation"/><field name="method"/><field name="state" widget="badge"/><field name="http_status"/><field name="summary"/>
+        </list></field>
+    </record>
+    <record id="pancake_api_log_form" model="ir.ui.view">
+        <field name="name">dac.pancake.api.log.form</field><field name="model">dac.pancake.api.log</field>
+        <field name="arch" type="xml"><form create="0" edit="0" delete="0"><sheet><group>
+            <field name="company_id"/><field name="order_id"/><field name="order_reference"/><field name="operation"/><field name="method"/><field name="endpoint"/><field name="state"/><field name="started_at"/><field name="completed_at"/><field name="duration_ms"/><field name="http_status"/><field name="error_code"/><field name="summary"/><field name="request_digest" groups="base.group_system"/>
+        </group></sheet></form></field>
+    </record>
+    <record id="action_pancake_api_logs" model="ir.actions.act_window">
+        <field name="name">Lịch sử API Pancake</field><field name="res_model">dac.pancake.api.log</field><field name="view_mode">list,form</field>
+    </record>
+
+    <record id="pancake_connector_settings" model="ir.ui.view">
+        <field name="name">res.config.settings.pancake.connector</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base_setup.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app name="dac_pancake_connector" string="Kết nối Pancake" groups="base.group_system">
+                    <div class="alert alert-info mx-4 mt-4">
+                        <h2>Kết nối Pancake Chat và POS</h2>
+                        <p>Quản lý kết nối chung tại đây. Hội thoại và lịch sử đồng bộ cũ vẫn tra cứu được trong các dashboard hiện có. Cấu hình POS theo công ty đang chọn; token Chat dùng chung với hệ thống đồng bộ hiện tại.</p>
+                    </div>
+                    <block title="1 · Kết nối hội thoại Pancake" name="pancake_chat_connection">
+                        <setting string="Token Pancake Chat">
+                            <p>Mở Pancake → tài khoản / Public API để lấy access token chính. Token Chat khác API key POS. Nhập token, bấm Lưu rồi kiểm tra; lỗi 103 nghĩa là cần cập nhật token.</p>
+                            <field name="access_token" password="True" groups="base.group_system" class="w-100"/>
+                            <button name="action_pancake_connector_check_chat" type="object" string="Kiểm tra token hội thoại" class="btn btn-primary mt-2"/>
+                            <a href="https://pancake.vn/" target="_blank" rel="noopener noreferrer" class="btn btn-link">Mở Pancake</a>
+                            <p class="text-muted mt-2">Nút kiểm tra chỉ GET danh sách Page, không gửi tin, không tự tạo lại token Page.</p>
+                        </setting>
+                        <setting string="Chọn Page và đồng bộ lại dữ liệu">
+                            <p>Sau khi token hợp lệ, mở Đồng bộ liên tục → tải danh sách Page → chọn đúng Page Facebook. Đồng bộ metadata để đơn có đúng hội thoại khách. Chỉ dán URL Business Suite chưa tự đối chiếu được ID hội thoại Pancake.</p>
+                            <button name="%(CRM_DAC.action_pancake_sync_dashboard)d" type="action" string="Mở Đồng bộ liên tục" class="btn btn-secondary"/>
+                            <button name="%(CRM_DAC.action_pancake_bulk_sync_dashboard)d" type="action" string="Mở Đồng bộ toàn bộ" class="btn btn-link"/>
+                            <a href="https://developer.pancake.biz/" target="_blank" rel="noopener noreferrer" class="btn btn-link">Tài liệu API hội thoại</a>
+                        </setting>
+                    </block>
+                    <block title="2 · Kết nối Pancake POS" name="pancake_pos_connection">
+                        <setting string="API key và shop POS">
+                            <p>Vào Pancake POS → Cấu hình → Nâng cao / Ứng dụng → Kết nối bên thứ 3 → Webhook/API → API Key. Bản cài đặt đã chuyển API key và Shop ID cũ sang công ty chính nếu có; không cần nhập lại khóa đang hoạt động.</p>
+                            <label for="pancake_pos_api_key"/><field name="pancake_pos_api_key" password="True" class="w-100"/>
+                            <label for="pancake_pos_shop_id"/><field name="pancake_pos_shop_id" class="w-100"/>
+                            <a href="https://pos.pancake.vn/" target="_blank" rel="noopener noreferrer" class="btn btn-secondary mt-2">Mở Pancake POS</a>
+                            <a href="https://pos.pages.fm/developers/api/en/authentication" target="_blank" rel="noopener noreferrer" class="btn btn-link">Hướng dẫn lấy API key</a>
+                        </setting>
+                        <setting string="Page, kho và sản phẩm dùng để ghi giá trị đơn">
+                            <label for="pancake_pos_page_id"/><field name="pancake_pos_page_id" class="w-100"/>
+                            <label for="pancake_pos_warehouse_id"/><field name="pancake_pos_warehouse_id" class="w-100"/>
+                            <label for="pancake_pos_summary_sku"/><field name="pancake_pos_summary_sku" class="w-100"/>
+                            <p>Trên POS, chuẩn bị SKU dịch vụ “Doanh thu đơn CRM” phù hợp, không quản lý/trừ kho hàng thật. Mỗi đơn POS chứa 1 dòng dịch vụ, số lượng 1, giá bằng tổng tiền VND đã gồm các khoản của đơn CRM. Chi tiết sản phẩm vẫn quản lý trong CRM.</p>
+                            <p>Lấy Shop ID, Warehouse ID và variation ID hoặc mã SKU theo tài liệu API POS. Không dùng ID kho/sản phẩm của Odoo.</p>
+                            <a href="https://pos.pages.fm/developers/api/en" target="_blank" rel="noopener noreferrer" class="btn btn-link">Tra cứu ID trong API POS</a>
+                        </setting>
+                    </block>
+                    <block title="3 · Chuẩn bị gửi Purchase và tắt thông báo cho khách" name="pancake_capi_setup">
+                        <setting string="Hoàn tất cấu hình ở shop POS trước khi xác nhận">
+                            <ol>
+                                <li>POS → Cấu hình → Sự kiện chuyển đổi Meta CAPI: kết nối đúng Page/Dataset, chọn gửi <strong>Mua hàng / Purchase</strong> khi đơn chuyển sang <strong>Đã xác nhận</strong>.</li>
+                                <li>POS → Cấu hình thông báo → Facebook: tắt <strong>Tự động gửi hóa đơn</strong>. Kiểm tra và tắt các tin nhắn theo trạng thái, Botcake hoặc tự động hóa liên quan tới đơn này.</li>
+                                <li>Kiểm tra SKU dịch vụ và kho phù hợp. CRM sẽ tạo đơn Mới, đọc lại giá trị/hội thoại rồi chỉ gửi một lần chuyển Đã xác nhận.</li>
+                            </ol>
+                            <field name="pancake_pos_capi_ready"/><label for="pancake_pos_capi_ready"/>
+                            <div><field name="pancake_pos_silent_ready"/><label for="pancake_pos_silent_ready"/></div>
+                            <div><field name="pancake_pos_product_ready"/><label for="pancake_pos_product_ready"/></div>
+                            <p class="text-muted mt-2">Đây là xác nhận của người quản trị sau khi thao tác trên POS. CRM chưa có API để tự chứng minh các cấu hình này.</p>
+                        </setting>
+                        <setting string="Hướng dẫn Pancake chính thức">
+                            <a href="https://docs.pancake.biz/pos/st-f10/st-p1?lang=vi" target="_blank" rel="noopener noreferrer" class="btn btn-link">Thiết lập Meta CAPI</a><br/>
+                            <a href="https://docs.pancake.biz/pos/st-f10/st-p1/st-s3?lang=vi" target="_blank" rel="noopener noreferrer" class="btn btn-link">Purchase, doanh thu và ROAS</a><br/>
+                            <a href="https://docs.pancake.biz/pos/st-f11/st-p4?lang=vi" target="_blank" rel="noopener noreferrer" class="btn btn-link">Cấu hình hóa đơn và tin nhắn tự động</a>
+                            <div class="alert alert-warning mt-3">CAPI và hóa đơn Messenger là hai cấu hình riêng. Cần kiểm chứng trên một giao dịch thật rằng không có tin/hóa đơn tới khách và giá trị đã tới Dataset/Ads Manager.</div>
+                        </setting>
+                    </block>
+                    <block title="4 · Lưu và kiểm tra kết nối" name="pancake_check">
+                        <setting string="Kiểm tra đọc đúng shop/Page">
+                            <p>Bấm Lưu trước, sau đó kiểm tra. Có thể kiểm tra khi chưa nhập SKU/kho hoặc chưa bật gửi đơn. Sau khi đổi cấu hình, kiểm tra lại trước khi bật.</p>
+                            <button name="action_pancake_connector_check_pos" type="object" string="Kiểm tra Pancake POS" class="btn btn-primary"/>
+                            <field name="pancake_pos_check_status" widget="badge"/><field name="pancake_pos_checked_at"/>
+                            <field name="pancake_pos_check_message" nolabel="1"/>
+                        </setting>
+                        <setting string="Theo dõi sau khi tạo đơn CRM">
+                            <p>Chọn “Qua Pancake POS” trong Chuyển đổi Meta khi đã chuẩn bị xong. Đơn phải gắn đúng inbox Facebook của khách. POS nhận đơn chưa chứng minh Meta nhận Purchase hay phân bổ doanh thu cho quảng cáo.</p>
+                            <button name="%(action_pancake_api_logs)d" type="action" string="Lịch sử API Pancake" class="btn btn-secondary"/>
+                            <p class="text-muted mt-2">Lịch sử ghi phương thức, đích gọi, mã đơn, HTTP, thời điểm và kết quả. Không lưu khóa, nội dung chat hay dữ liệu khách trong log API.</p>
+                        </setting>
+                    </block>
+                </app>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="action_pancake_connector_settings" model="ir.actions.act_window">
+        <field name="name">Kết nối Pancake</field><field name="res_model">res.config.settings</field><field name="view_mode">form</field><field name="target">inline</field>
+        <field name="context">{'module': 'dac_pancake_connector', 'bin_size': False}</field>
+    </record>
+    <menuitem id="menu_pancake_connector_root" name="Kết nối Pancake" sequence="39" web_icon="dac_pancake_connector,static/description/icon.png" groups="base.group_system,dac_erp.group_dac_erp_manager"/>
+    <menuitem id="menu_pancake_connector_settings" name="Thiết lập kết nối" parent="menu_pancake_connector_root" action="action_pancake_connector_settings" sequence="10" groups="base.group_system"/>
+    <menuitem id="menu_pancake_connector_api_logs" name="Lịch sử API" parent="menu_pancake_connector_root" action="action_pancake_api_logs" sequence="20" groups="base.group_system,dac_erp.group_dac_erp_manager"/>
+    <menuitem id="menu_pancake_connector_chat" name="Đồng bộ hội thoại" parent="menu_pancake_connector_root" action="CRM_DAC.action_pancake_sync_dashboard" sequence="30" groups="base.group_system"/>
+    <menuitem id="menu_pancake_connector_bulk" name="Đồng bộ toàn bộ" parent="menu_pancake_connector_root" action="CRM_DAC.action_pancake_bulk_sync_dashboard" sequence="40" groups="base.group_system"/>
+</odoo>

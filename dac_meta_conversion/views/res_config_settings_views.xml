@@ -1,0 +1,277 @@
+<odoo>
+    <record id="res_config_settings_meta_conversion" model="ir.ui.view">
+        <field name="name">res.config.settings.meta.conversion</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base_setup.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app name="dac_meta_conversion" string="Chuyển đổi Meta" groups="base.group_system"><div class="mx-4 mt-4 p-3 border rounded">
+    <h2>Chọn cách gửi chuyển đổi</h2><field name="meta_conversion_provider" widget="radio" />
+    <div invisible="meta_conversion_provider != 'pancake_pos'" class="alert alert-info mt-3">
+        <h3>CRM → Pancake POS → CAPI của Pancake → Meta</h3>
+        <ol><li>Mở Kết nối Pancake, dùng lại API key/shop hiện có; cập nhật token Chat nếu hết hạn.</li>
+        <li>Chọn Page, SKU dịch vụ tổng giá trị đơn, kho và hoàn tất CAPI Purchase khi Đã xác nhận; tắt hóa đơn/thông báo.</li>
+        <li>Lưu và kiểm tra POS. Bật gửi ở bước 8, tạo đơn VND và gắn đúng inbox Facebook của khách.</li>
+        <li>Đối chiếu log Pancake, đơn POS, Purchase trong Events Manager và giá trị mua hàng theo mẫu quảng cáo trong Ads Manager.</li></ol>
+        <button name="%(dac_pancake_connector.action_pancake_connector_settings)d" type="action" string="Mở Kết nối Pancake" class="btn btn-primary" />
+        <button name="%(dac_pancake_connector.action_pancake_api_logs)d" type="action" string="Xem lịch sử API Pancake" class="btn btn-secondary ms-2" />
+        <p class="mt-3">Không cần nhập Meta App ID/token trực tiếp cho cách gửi này. POS nhận đơn chưa xác nhận Meta nhận Purchase. Mỗi đơn giữ nguyên cách gửi đã chọn khi tạo để tránh gửi qua cả hai nguồn.</p>
+        <p>Chỉ đơn mới sau khi bật được xếp hàng gửi. Đơn nhập từ POS không xuất lại. Kết nối này chưa tự đối chiếu URL Business Suite; hãy gắn hội thoại Pancake đã xác minh.</p>
+    </div>
+</div>
+                    <div class="dac-meta-hero" invisible="meta_conversion_provider != 'meta_direct'">
+                        <h2>Kết nối Messenger với CRM, từng bước một</h2>
+                        <p>Với cách CRM tự gửi chuyển đổi Messenger, bạn cần một Meta App có tích hợp Messenger và quyền phù hợp. Nếu đã có app đáp ứng yêu cầu thì dùng lại; không cần tạo thêm app chỉ vì có chiến dịch quảng cáo mới.</p>
+                        <div class="dac-meta-tags">
+                            <span>Đơn tạo trong CRM</span><span>Gửi Purchase và giá trị đơn</span><span>Không gửi hóa đơn vào chat</span>
+                        </div>
+                        <div class="dac-meta-journey" aria-label="Lộ trình 8 bước kết nối Meta">
+                            <div class="dac-meta-stop"><b>1</b><span>Doanh nghiệp và Page</span></div>
+                            <div class="dac-meta-stop"><b>2</b><span>Tạo hoặc chọn App</span></div>
+                            <div class="dac-meta-stop"><b>3</b><span>Quyền và xét duyệt</span></div>
+                            <div class="dac-meta-stop"><b>4</b><span>Lấy Access Token</span></div>
+                            <div class="dac-meta-stop"><b>5</b><span>Liên kết Dataset</span></div>
+                            <div class="dac-meta-stop"><b>6</b><span>Kiểm tra kết nối</span></div>
+                            <div class="dac-meta-stop"><b>7</b><span>Đối chiếu một đơn</span></div>
+                            <div class="dac-meta-stop"><b>8</b><span>Bật và theo dõi</span></div>
+                        </div>
+                        <div class="dac-meta-links">
+                            <a href="https://developers.facebook.com/documentation/ads-commerce/conversions-api/business-messaging/" target="_blank" rel="noopener noreferrer" class="btn btn-link">Hướng dẫn chính thức của Meta cho Messenger</a>
+                        </div>
+                    </div>
+                    <block title="Bước 1 · Chuẩn bị doanh nghiệp và Facebook Page" name="meta_step_source" invisible="meta_conversion_provider != 'meta_direct'">
+                        <setting string="Chọn đúng tài khoản và quyền quản trị">
+                            <ol class="dac-meta-steps">
+                                <li>Mở Meta Business Suite, đăng nhập tài khoản Facebook quản lý doanh nghiệp và chọn đúng Business Portfolio / trang quản lý tài sản doanh nghiệp.</li>
+                                <li>Trong Cài đặt doanh nghiệp, kiểm tra bạn được phép quản lý Page, nguồn dữ liệu và tài khoản quảng cáo cần đo lường.</li>
+                                <li>Mở Meta for Developers và hoàn thành đăng ký nhà phát triển, xác minh tài khoản hoặc bảo mật nếu Meta yêu cầu.</li>
+                            </ol>
+                            <div class="dac-meta-links">
+                                <a href="https://business.facebook.com/" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">Mở Business Suite</a>
+                                <a href="https://business.facebook.com/settings/" target="_blank" rel="noopener noreferrer" class="btn btn-link">Cài đặt doanh nghiệp</a>
+                                <a href="https://developers.facebook.com/" target="_blank" rel="noopener noreferrer" class="btn btn-link">Đăng ký nhà phát triển</a>
+                            </div>
+                        </setting>
+                        <setting string="Page đang chốt đơn">
+                            <p>Cài đặt doanh nghiệp → Tài khoản → Trang (Pages) → chọn đúng Page → sao chép Page ID dạng số.</p>
+                            <field name="meta_conversion_page_id" class="w-100" placeholder="ID của Facebook Page nhận tin nhắn"/>
+                            <div class="dac-meta-note">Page ID khác Business ID và App ID. Nhân viên phải tạo đơn cho khách đã nhắn tin với đúng Page này.</div>
+                            <details class="dac-meta-details">
+                                <summary>Kênh gửi chuyển đổi đang chọn</summary>
+                                <field name="meta_conversion_channel" class="w-100"/>
+                                <p class="text-muted mt8">Hướng dẫn tạo app bên dưới dành cho Messenger. Chế độ Tin nhắn chỉ so khớp thông tin liên hệ, không thay thế PSID cho luồng Messenger.</p>
+                            </details>
+                        </setting>
+                    </block>
+                    <block title="Bước 2 · Tạo Meta App mới hoặc dùng app có sẵn" name="meta_step_app" invisible="meta_conversion_provider != 'meta_direct'">
+                        <setting string="Bạn đã có ứng dụng tích hợp Messenger chưa?">
+                            <field name="meta_conversion_setup_path" widget="radio" class="w-100"/>
+                            <div invisible="meta_conversion_setup_path != 'new_app'">
+                                <ol class="dac-meta-steps mt16">
+                                    <li>Bấm <strong>Tạo Meta App</strong>. Nhập tên dễ nhận biết, ví dụ <strong>CRM – Chuyển đổi Messenger</strong>, và email liên hệ của doanh nghiệp.</li>
+                                    <li>Ở Use cases / Trường hợp sử dụng, chọn lựa chọn hỗ trợ Messenger / nhắn tin khách hàng theo giao diện Meta đang hiển thị. Nếu không có lựa chọn phù hợp, chọn <strong>Other / Khác</strong> và theo hướng dẫn loại app của Meta; nếu được hỏi loại app, dùng luồng dành cho doanh nghiệp.</li>
+                                    <li>Chọn Business Portfolio quản lý Page ở bước 1. Xem các yêu cầu Meta liệt kê, kiểm tra lại thông tin rồi bấm <strong>Go to dashboard / Đi đến bảng điều khiển</strong>.</li>
+                                    <li>Trong App Dashboard, hoàn thiện trường hợp sử dụng Messenger / Messenger API. Chỉ tạo App ID mà chưa thêm tích hợp và quyền thì chưa gửi được chuyển đổi.</li>
+                                </ol>
+                            </div>
+                            <div invisible="meta_conversion_setup_path != 'existing_app'" class="dac-meta-note">
+                                Mở app hiện có, kiểm tra quyền quản lý app, tích hợp Messenger và Page được cấp quyền. Nếu app chưa có quyền cần thiết, bổ sung ở bước 3; không cần tạo app thứ hai chỉ để nhập lại cùng một Page.
+                            </div>
+                            <div class="dac-meta-links">
+                                <a href="https://developers.facebook.com/apps/creation/" target="_blank" rel="noopener noreferrer" class="btn btn-primary">Tạo Meta App</a>
+                                <a href="https://developers.facebook.com/apps/" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">Danh sách app của tôi</a>
+                                <a href="https://developers.facebook.com/documentation/development/create-an-app" target="_blank" rel="noopener noreferrer" class="btn btn-link">Xem các màn hình tạo app theo Meta</a>
+                            </div>
+                        </setting>
+                        <setting string="Lưu App ID để mở đúng ứng dụng">
+                            <p>Trong App Dashboard, tìm App ID / ID ứng dụng, thường hiển thị ở phần thông tin ứng dụng hoặc Settings → Basic. Sao chép dãy số vào ô này.</p>
+                            <field name="meta_conversion_app_id" class="w-100" placeholder="App ID dạng số — không dán token vào đây"/>
+                            <button name="action_meta_open_app_dashboard" type="object" string="Mở app đã nhập" class="btn btn-secondary mt8"/>
+                            <div class="dac-meta-note">App ID là thông tin tham chiếu, không phải Access Token. CRM hiện không yêu cầu nhập App Secret. Không gửi App Secret hay token qua chat.</div>
+                            <p class="text-muted">Ô App ID không bắt buộc với cấu hình token đã có sẵn và không được gửi trong payload Purchase. Lưu App ID không chứng minh token thuộc app đó.</p>
+                        </setting>
+                    </block>
+                    <block title="Bước 3 · Cấp quyền đúng cho ứng dụng" name="meta_step_permissions" invisible="meta_conversion_provider != 'meta_direct'">
+                        <setting string="Quyền dùng để gửi chuyển đổi Messenger">
+                            <ol class="dac-meta-steps">
+                                <li>Trong App Dashboard, mở phần Permissions and features / Quyền và tính năng của trường hợp sử dụng hoặc phần App Review.</li>
+                                <li>Tìm <strong>page_events</strong>. Hướng dẫn Conversions API for Business Messaging yêu cầu quyền này với mức truy cập phù hợp, bao gồm Advanced Access theo quy trình Meta.</li>
+                                <li>Nếu app đã được duyệt Advanced Access cho <strong>pages_messaging</strong>, Meta cho biết có thể tự phê duyệt <strong>page_events</strong> sau khi bạn đăng ký quyền này. Vẫn phải kiểm tra trạng thái thật trong dashboard.</li>
+                                <li>Hoàn tất các yêu cầu về quyền, xác minh doanh nghiệp, xét duyệt và cấp truy cập API mà Meta hiển thị cho chính app của bạn.</li>
+                            </ol>
+                            <div class="dac-meta-links">
+                                <a href="https://developers.facebook.com/apps/" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">Mở App Dashboard để kiểm tra quyền</a>
+                                <a href="https://developers.facebook.com/documentation/ads-commerce/conversions-api/business-messaging/" target="_blank" rel="noopener noreferrer" class="btn btn-link">Xem điều kiện quyền Messenger CAPI</a>
+                            </div>
+                        </setting>
+                        <setting string="Phân biệt quyền gửi sự kiện và quyền đọc inbox">
+                            <table class="dac-meta-table">
+                                <thead><tr><th>Quyền / chức năng</th><th>Dùng vào việc gì?</th></tr></thead>
+                                <tbody>
+                                    <tr><td><code>page_events</code></td><td>Gửi sự kiện chuyển đổi cho Page qua Messenger CAPI.</td></tr>
+                                    <tr><td><code>pages_messaging</code></td><td>Truy cập chức năng Messenger theo phạm vi được cấp. Cần xem riêng khi triển khai luồng đọc/đối chiếu hội thoại.</td></tr>
+                                    <tr><td>Quyền liệt kê Page / tài sản</td><td>Phụ thuộc cách lấy token và tài sản cần cấp. Chỉ xin quyền mà luồng Meta bạn dùng yêu cầu.</td></tr>
+                                </tbody>
+                            </table>
+                            <details class="dac-meta-details">
+                                <summary>Meta yêu cầu xét duyệt hoặc xác minh thì làm gì?</summary>
+                                <p>Đọc mục Required actions / Yêu cầu trong app. Hoàn thiện những mục Meta yêu cầu, có thể gồm thông tin doanh nghiệp, quyền truy cập, tài liệu mô tả luồng và thông tin chính sách của ứng dụng. Dùng đường dẫn chính sách thật nếu Meta yêu cầu, không nhập một URL CRM chưa tồn tại.</p>
+                                <p>Yêu cầu có thể khác giữa app dùng cho tài sản doanh nghiệp mình quản lý và app phục vụ doanh nghiệp khác. Không có một token nào tự bỏ qua việc Meta cấp quyền.</p>
+                                <p class="text-muted">Không tự đặt ngưỡng số lần gọi API ở đây; kiểm tra điều kiện hiện hành ngay trong App Dashboard và tài liệu Meta.</p>
+                            </details>
+                        </setting>
+                    </block>
+                    <block title="Bước 4 · Nhận Access Token hợp lệ và nhập vào CRM" name="meta_step_token" invisible="meta_conversion_provider != 'meta_direct'">
+                        <setting string="Lấy token từ đúng app và đúng Page">
+                            <ol class="dac-meta-steps">
+                                <li>Trong app đã chọn, hoàn tất kết nối Page theo phần Messenger API / thiết lập trường hợp sử dụng của Meta. Đăng nhập bằng tài khoản có quyền với Page.</li>
+                                <li>Đối với Messenger CAPI, hướng dẫn Meta sử dụng token từ <strong>Facebook Login for Business</strong> với các quyền cần thiết, gồm <strong>page_events</strong>. Nếu app/đối tác tích hợp đã có luồng này, sử dụng token được cấp hợp lệ từ luồng đó.</li>
+                                <li>Mở Access Token Debugger của Meta để kiểm tra app phát hành, quyền được cấp và thời hạn. Token phải được cấp cho đúng tài sản; có App ID chưa có nghĩa là đã có token phù hợp.</li>
+                                <li>Dán token vào ô bên cạnh, không kèm chữ <strong>Bearer</strong>. Lưu cấu hình và kiểm tra tại bước 6.</li>
+                            </ol>
+                            <div class="dac-meta-links">
+                                <a href="https://developers.facebook.com/documentation/facebook-login/facebook-login-for-business" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">Hướng dẫn lấy token qua Login for Business</a>
+                                <a href="https://developers.facebook.com/tools/debug/accesstoken/" target="_blank" rel="noopener noreferrer" class="btn btn-link">Kiểm tra app, quyền và hạn token</a>
+                            </div>
+                            <details class="dac-meta-details">
+                                <summary>Lấy Page Access Token thủ công qua công cụ Meta</summary>
+                                <ol class="dac-meta-steps">
+                                    <li>Theo hướng dẫn Messenger của Meta, có thể lấy token qua App Dashboard → Messenger → Settings, hoặc qua Graph API Explorer. Nếu dashboard có mục tạo token cho Page, kết nối đúng Page rồi dùng chức năng Meta cung cấp.</li>
+                                    <li>Trong Graph API Explorer, chọn đúng app. Luồng liệt kê Page dùng token Người dùng với quyền <code>pages_show_list</code>; luồng Messenger dùng thêm quyền mà app được Meta cho phép, gồm <code>pages_messaging</code> khi cần truy cập hội thoại.</li>
+                                    <li>Chạy <code>GET /me/accounts</code> theo tài liệu Meta, tìm đúng Page ID và token Page tương ứng. Không nhầm token Người dùng ở công cụ với token của Page trong kết quả.</li>
+                                    <li>Trước khi dùng cho CAPI, vẫn phải xác minh quyền <code>page_events</code>, tài sản và app phát hành trong Token Debugger. Token lấy được để đọc Page chưa tự chứng minh đã được gửi chuyển đổi Messenger.</li>
+                                </ol>
+                                <p>Chỉ dùng phần lấy token / ID trong hướng dẫn. Kết nối chuyển đổi này không yêu cầu gửi thử tin nhắn hoặc hóa đơn cho khách.</p>
+                                <a href="https://developers.facebook.com/docs/messenger-platform/get-started/" target="_blank" rel="noopener noreferrer">Xem hướng dẫn token và ID của Messenger API</a>
+                            </details>
+                            <details class="dac-meta-details">
+                                <summary>Dùng Graph API Explorer để kiểm tra ban đầu</summary>
+                                <p>Chọn đúng app trong công cụ Meta rồi dùng loại token và quyền được app hỗ trợ. Công cụ giúp thử lệnh API, không thay thế việc hoàn tất quyền và luồng cấp token của app. Token dùng để thử có thể hết hạn, cần kiểm tra trước khi dùng lâu dài.</p>
+                                <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noopener noreferrer">Mở Graph API Explorer</a>
+                            </details>
+                        </setting>
+                        <setting string="Access Token Meta">
+                            <field name="meta_conversion_access_token" class="w-100" password="True" placeholder="Dán token Meta đã được cấp quyền"/>
+                            <div class="dac-meta-note">CRM hiện nhận token thủ công; chưa có luồng đăng nhập OAuth tự cấp hoặc tự làm mới token. Chỉ nhập App ID sẽ không tự sinh token.</div>
+                            <p class="text-muted">Token Pancake, App ID và App Secret không dùng thay Access Token ở ô này. Token được che trên màn hình và trong nhật ký API.</p>
+                            <div invisible="meta_conversion_channel != 'chat'" class="dac-meta-note">Với chế độ Tin nhắn dùng thông tin liên hệ, có thể lấy token cho Dataset qua Events Manager → Settings → Conversions API → thiết lập tích hợp trực tiếp. Hướng dẫn app Messenger ở trên không phải yêu cầu chung cho mọi luồng CAPI.</div>
+                        </setting>
+                    </block>
+                    <block title="Bước 5 · Liên kết Page với Dataset và lấy Dataset ID" name="meta_step_dataset" invisible="meta_conversion_provider != 'meta_direct'">
+                        <setting string="Lấy đúng Dataset của Page Messenger">
+                            <ol class="dac-meta-steps">
+                                <li>Trong luồng Messenger, sử dụng Page ID ở bước 1 và token có quyền <strong>page_events</strong>.</li>
+                                <li>Theo hướng dẫn Meta, thiết lập Dataset bằng lệnh <strong>POST</strong> đến đường dẫn bên dưới. Có thể thực hiện trong Graph API Explorer sau khi chọn đúng app, token và phiên bản API.</li>
+                                <li>Meta trả về Dataset ID. Nếu Page đã có Dataset liên kết, endpoint trả lại ID đó. Sao chép ID trả về vào ô Dataset ID bên cạnh.</li>
+                                <li>Mở Events Manager và kiểm tra Dataset thuộc đúng doanh nghiệp. Để Dataset hiển thị trong doanh nghiệp, tài khoản/token cần các quyền tài sản liên quan theo hướng dẫn Meta.</li>
+                            </ol>
+                            <div class="dac-meta-note">
+                                <strong>Phương thức: POST</strong><br/>
+                                <field name="meta_conversion_dataset_request" readonly="1" nolabel="1" class="w-100"/>
+                                <span>Đường dẫn được ghép từ Page ID bạn nhập. CRM không tự thực hiện lệnh tạo/liên kết Dataset này.</span>
+                            </div>
+                            <div class="dac-meta-links">
+                                <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">Mở công cụ chạy lệnh của Meta</a>
+                                <a href="https://developers.facebook.com/documentation/ads-commerce/conversions-api/business-messaging/" target="_blank" rel="noopener noreferrer" class="btn btn-link">Xem ví dụ thiết lập Dataset</a>
+                            </div>
+                        </setting>
+                        <setting string="Dataset / Pixel ID">
+                            <field name="meta_conversion_dataset_id" class="w-100" placeholder="Dataset ID trả về cho đúng Page Messenger"/>
+                            <p class="mt8">Trong Events Manager → chọn nguồn dữ liệu → Settings / Cài đặt, bạn cũng có thể xem Dataset ID. Với Messenger, không chọn tùy ý một Pixel website chưa liên kết Page.</p>
+                            <div class="dac-meta-links">
+                                <a href="https://business.facebook.com/events_manager2/" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">Mở Events Manager</a>
+                            </div>
+                            <details class="dac-meta-details">
+                                <summary>Phân biệt các ID để tránh nhập nhầm</summary>
+                                <table class="dac-meta-table">
+                                    <tbody>
+                                        <tr><th>App ID</th><td>Ứng dụng tích hợp, lấy trong App Dashboard.</td></tr>
+                                        <tr><th>Page ID</th><td>Facebook Page nơi khách nhắn tin.</td></tr>
+                                        <tr><th>Business ID</th><td>Doanh nghiệp quản lý tài sản, không thay cho App ID hoặc Page ID.</td></tr>
+                                        <tr><th>Dataset ID</th><td>Nguồn dữ liệu nhận Purchase, phải liên kết đúng Page.</td></tr>
+                                        <tr><th>PSID</th><td>Định danh riêng của khách trong Page; không phải ID của đơn hàng.</td></tr>
+                                    </tbody>
+                                </table>
+                            </details>
+                        </setting>
+                    </block>
+                    <block title="Bước 6 · Kiểm tra kết nối ngay trong CRM" name="meta_step_connection" invisible="meta_conversion_provider != 'meta_direct'">
+                        <setting string="Kiểm tra thông tin và kết nối">
+                            <p>Bấm <strong>Lưu</strong> các thông tin vừa nhập trước khi kiểm tra. Có thể kiểm tra khi chưa bật gửi đơn. CRM kiểm tra định dạng, đọc Dataset bằng token và đối chiếu Page – Dataset ở luồng Messenger.</p>
+                            <button name="action_meta_check_connection" type="object" string="Kiểm tra thông tin và kết nối" class="btn btn-primary mb-2"/>
+                            <field name="meta_conversion_check_status" widget="badge"/>
+                            <field name="meta_conversion_checked_at" readonly="1"/>
+                            <div invisible="meta_conversion_check_status != 'stale'" class="dac-meta-note dac-meta-attention">Thông tin đã đổi sau lần kiểm tra trước. Bấm kiểm tra lại để có kết quả mới.</div>
+                            <field name="meta_conversion_check_message" readonly="1" nolabel="1"/>
+                            <button name="action_meta_open_api_logs" type="object" string="Xem log kiểm tra" class="btn btn-link"/>
+                        </setting>
+                        <setting string="Hiểu đúng kết quả kiểm tra">
+                            <div class="dac-meta-evidence">
+                                <div><strong>Đúng định dạng</strong>ID dạng số, token không bị dán kèm chữ Bearer hoặc khoảng trắng bên trong.</div>
+                                <div><strong>Đọc được Dataset</strong>Token có thể truy cập Dataset đã nhập; Messenger kiểm tra thêm liên kết Page.</div>
+                                <div><strong>Chưa xác minh doanh thu quảng cáo</strong>Cần tiếp tục bước 7. App ID chỉ được kiểm tra định dạng; dùng Meta Debugger để đối chiếu app phát hành token và các quyền.</div>
+                            </div>
+                            <p class="text-muted">Nút kiểm tra không tạo đơn, không gửi Purchase và không đọc nội dung tin nhắn của khách.</p>
+                            <details class="dac-meta-details">
+                                <summary>Phiên bản Graph API</summary>
+                                <field name="meta_conversion_api_version"/>
+                                <p>Giữ mặc định nếu không có yêu cầu dùng phiên bản khác. Trong Graph API Explorer, chọn cùng phiên bản khi đối chiếu.</p>
+                            </details>
+                        </setting>
+                    </block>
+                    <block title="Bước 7 · Đối chiếu một giao dịch từ CRM đến báo cáo Meta" name="meta_step_verify_event" invisible="meta_conversion_provider != 'meta_direct'">
+                        <setting string="Chuẩn bị đúng khách và giá trị đơn">
+                            <ol class="dac-meta-steps">
+                                <li>Lưu cấu hình. Chuẩn bị một giao dịch mua thật cần đối chiếu, có khách, sản phẩm và tổng tiền lớn hơn 0.</li>
+                                <li>Với Messenger, gắn đúng hội thoại Pancake đã đồng bộ PSID, hoặc nhập PSID đã xác minh của khách trong đúng Page.</li>
+                                <li>Bật gửi ở bước 8, tạo đơn theo quy trình CRM rồi mở tab Chuyển đổi Meta để theo dõi.</li>
+                                <li>Đối chiếu log API, Events Manager và cuối cùng là giá trị mua hàng trong Ads Manager nếu đơn đủ điều kiện phân bổ cho quảng cáo.</li>
+                            </ol>
+                            <details class="dac-meta-details">
+                                <summary>Chỉ dán link Business Suite đã lấy được PSID chưa?</summary>
+                                <p>Chưa. Phiên bản hiện tại dùng hội thoại Pancake hoặc PSID nhập trực tiếp; chưa có bước tự đối chiếu URL sang PSID. Không coi selected_item_id trong URL là PSID nếu chưa được xác minh.</p>
+                            </details>
+                        </setting>
+                        <setting string="Test Event Code và ba nơi cần kiểm tra">
+                            <p>Trong Events Manager → đúng Dataset → Test Events / Thử nghiệm sự kiện, lấy mã để dễ tìm sự kiện cần đối chiếu.</p>
+                            <field name="meta_conversion_test_code" class="w-100" placeholder="Để trống khi không cần gắn mã kiểm tra"/>
+                            <div class="dac-meta-note dac-meta-attention">Test Event Code không bảo đảm cách ly sự kiện khỏi nhắm mục tiêu và đo lường quảng cáo. Nếu cần mô phỏng, dùng Dataset thử nghiệm riêng.</div>
+                            <div class="dac-meta-evidence">
+                                <div><strong>1 · Lịch sử API trong CRM</strong>HTTP, số sự kiện Meta nhận, mã lỗi và mã truy vết.</div>
+                                <div><strong>2 · Events Manager</strong>Purchase đã tới Dataset, giá trị và tiền tệ có đúng không.</div>
+                                <div><strong>3 · Ads Manager</strong>Meta có phân bổ đơn cho quảng cáo và ghi nhận giá trị mua hàng / ROAS không. API trả thành công chưa chứng minh bước này.</div>
+                            </div>
+                            <div class="dac-meta-links">
+                                <a href="https://business.facebook.com/events_manager2/" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">Mở Events Manager / Test Events</a>
+                                <a href="https://adsmanager.facebook.com/" target="_blank" rel="noopener noreferrer" class="btn btn-link">Mở Ads Manager</a>
+                            </div>
+                        </setting>
+                    </block>
+                    <block title="Bước 8 · Bật tự gửi đơn và theo dõi lâu dài" name="meta_step_enable">
+                        <setting string="Tự gửi Purchase khi tạo đơn" help="Áp dụng cho công ty đang chọn. Đơn mới được tính là đã mua; đơn cũ không tự gửi lại.">
+                            <field name="meta_conversion_enabled"/>
+                            <p class="mt8">Bấm Lưu sau khi thay đổi. Sự kiện được gửi sau khi lưu đơn thành công. Đơn thiếu dữ liệu vẫn được lưu và hiển thị lý do chưa gửi.</p>
+                            <div invisible="meta_conversion_provider != 'pancake_pos'" class="dac-meta-note">Đơn được chuyển sang POS, nơi thực hiện CAPI và các quy tắc thông báo của shop. Hãy hoàn tất tắt hóa đơn/thông báo trong Kết nối Pancake trước khi bật.</div>
+                            <div class="dac-meta-note" invisible="meta_conversion_provider != 'meta_direct'">Luồng này chỉ báo chuyển đổi về Meta. Nó không gửi hóa đơn, thẻ đơn hàng hay tin nhắn vào khung chat của khách.</div>
+                        </setting>
+                        <setting string="Lịch sử gửi qua Pancake POS" invisible="meta_conversion_provider != 'pancake_pos'">
+                            <p>Mở lịch sử API Pancake để xem CRM tạo, đọc lại và xác nhận đơn POS. Nếu chưa rõ kết quả, dùng Đối soát POS trên đơn để kiểm tra chỉ đọc; không tự gửi lại Purchase.</p>
+                            <button name="%(dac_pancake_connector.action_pancake_api_logs)d" type="action" string="Mở lịch sử API Pancake" class="btn btn-secondary"/>
+                            <button name="%(action_meta_conversion_events)d" type="action" string="Xem sự kiện chuyển đổi" class="btn btn-link"/>
+                            <p>Tiếp tục kiểm tra Dataset và doanh thu theo mẫu quảng cáo trong Ads Manager. Test Event Code của kết nối Meta trực tiếp không được dùng cho luồng POS.</p>
+                        </setting>
+                        <setting string="Lịch sử API và bảo trì kết nối" invisible="meta_conversion_provider != 'meta_direct'">
+                            <p>Mỗi lần kiểm tra hoặc gửi Purchase có log riêng. Lọc theo đơn, ngày, kết quả hay mã truy vết. Nếu chưa rõ kết quả gửi, đối soát Meta trước khi gửi lại để tránh trùng.</p>
+                            <div class="dac-meta-links">
+                                <button name="action_meta_open_api_logs" type="object" string="Mở lịch sử API" class="btn btn-secondary"/>
+                                <button name="%(action_meta_conversion_events)d" type="action" string="Xem sự kiện chuyển đổi" class="btn btn-link"/>
+                                <a href="https://developers.facebook.com/tools/debug/accesstoken/" target="_blank" rel="noopener noreferrer" class="btn btn-link">Kiểm tra lại hạn token</a>
+                            </div>
+                            <p class="text-muted">Khóa và định danh khách được che trong log. Khi token/quyền thay đổi hoặc Meta yêu cầu xét duyệt lại, cập nhật kết nối rồi kiểm tra lại ở bước 6.</p>
+                        </setting>
+                    </block>
+                </app>
+            </xpath>
+        </field>
+    </record>
+</odoo>

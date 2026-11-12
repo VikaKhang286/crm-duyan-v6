@@ -68,6 +68,23 @@ class DacWorkTask(models.Model):
         'res.users', string='Người thực hiện', tracking=True,
     )
     sale_user_id = fields.Many2one('res.users', related='order_id.user_id', string='Sale giao', readonly=True)
+    design_review_state = fields.Selection(
+        related='order_id.design_review_state', string='Trạng thái duyệt thiết kế', readonly=True,
+    )
+
+    def action_open_design_collaboration(self):
+        """Open the order's shared design workspace from a Design task card."""
+        self.ensure_one()
+        if not self.order_id:
+            raise ValidationError('Task này chưa được liên kết với đơn hàng.')
+        return self.order_id.action_open_design_collaboration()
+
+    def action_approve_design(self):
+        """Approve the linked order directly from the pending Design task."""
+        self.ensure_one()
+        if not self.order_id:
+            raise ValidationError('Task này chưa được liên kết với đơn hàng.')
+        return self.order_id.action_approve_design()
     design_revision_display = fields.Char(
         related='order_id.design_revision_display', string='Bản vẽ', readonly=True,
     )
@@ -410,19 +427,10 @@ class DacWorkTask(models.Model):
                         ),
                         subtype_xmlid='mail.mt_note',
                     )
-                elif task.task_type == 'design' and not order.design_done:
-                    order_ctx.write({
-                        'design_done': True,
-                        'design_done_date': now,
-                        'design_done_user_id': self.env.user.id,
-                    })
-                    order.message_post(
-                        body=(
-                            f"Task thiết kế <b>{task.name}</b> đã hoàn thành "
-                            f"→ đơn tự động chuyển sang <b>Hoàn tất thiết kế</b>."
-                        ),
-                        subtype_xmlid='mail.mt_note',
-                    )
+                # Task design có thể được tick xong để quản lý tiến độ riêng,
+                # nhưng không được thay cho preview và nút “Thiết kế xong”.
+                # Chỉ action_submit_design_link mới được phép hoàn tất thiết kế
+                # và chuyển đơn sang chờ Sale duyệt.
 
     def _send_task_assigned_notification(self):
         self.ensure_one()

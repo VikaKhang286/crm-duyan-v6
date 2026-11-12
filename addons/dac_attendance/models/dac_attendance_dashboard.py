@@ -450,17 +450,32 @@ class DacAttendanceDashboard(models.AbstractModel):
         if not employee:
             return {'success': False, 'message': 'Không tìm thấy nhân viên'}
         try:
+            if not isinstance(vals, dict):
+                return {'success': False, 'message': 'Dữ liệu đơn nghỉ phép không hợp lệ.'}
+
+            date_from = fields.Date.to_date(vals.get('date_from'))
+            date_to = fields.Date.to_date(vals.get('date_to'))
+            reason = (vals.get('reason') or '').strip()
+            if not date_from or not date_to:
+                return {'success': False, 'message': 'Vui lòng chọn ngày bắt đầu và kết thúc.'}
+            if date_to < date_from:
+                return {'success': False, 'message': 'Ngày kết thúc phải sau hoặc bằng ngày bắt đầu.'}
+            if not reason:
+                return {'success': False, 'message': 'Vui lòng nhập lý do nghỉ phép.'}
+
             leave = self.env['dac.attendance.leave'].create({
                 'employee_id': employee.id,
                 'leave_type': vals.get('leave_type', 'annual'),
-                'date_from': vals['date_from'],
-                'date_to': vals['date_to'],
-                'reason': vals.get('reason', ''),
+                'date_from': date_from,
+                'date_to': date_to,
+                'reason': reason,
                 'state': 'pending',
             })
             return {'success': True, 'id': leave.id}
-        except Exception as e:
-            return {'success': False, 'message': str(e)}
+        except (AccessError, ValidationError) as exc:
+            return {'success': False, 'message': str(exc)}
+        except (TypeError, ValueError):
+            return {'success': False, 'message': 'Ngày nghỉ phép không hợp lệ.'}
 
     @api.model
     def dac_submit_amendment(self, vals):

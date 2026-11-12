@@ -24,7 +24,7 @@
           <article><span class="icon blue"><i class="fa fa-window-maximize"/></span><small>Page kết nối</small><strong><t t-esc="formatNumber(state.data.pages)"/></strong><p class="success"><t t-esc="state.data.active_pages"/>/<t t-esc="state.data.pages"/> hoạt động</p></article>
           <article><span class="icon yellow"><i class="fa fa-comments-o"/></span><small>Hội thoại</small><strong><t t-esc="formatNumber(state.data.conversations)"/></strong><p>+<t t-esc="formatNumber(state.data.conversations_today)"/> hôm nay</p></article>
           <article><span class="icon green"><i class="fa fa-refresh"/></span><small>Sync hôm nay</small><strong><t t-esc="formatNumber(state.data.processed_today)"/></strong><p class="success"><t t-esc="state.data.success_rate"/>% thành công</p></article>
-          <article><span class="icon red"><i class="fa fa-exclamation"/></span><small>Lỗi cần xử lý</small><strong><t t-esc="state.data.errors"/></strong><p class="danger"><t t-esc="state.data.critical_errors"/> critical</p></article>
+          <article><span class="icon red"><i class="fa fa-exclamation"/></span><small>Lỗi cần xử lý</small><strong><t t-esc="formatNumber(state.data.quality_issue_count)"/></strong><p class="danger"><t t-esc="formatNumber(state.data.quality_critical_count)"/> critical · <t t-esc="formatNumber(state.data.quality_high_count)"/> high</p></article>
         </section>
 
         <section class="pancake-monitoring-middle">

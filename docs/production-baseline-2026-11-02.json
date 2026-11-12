@@ -1,0 +1,118 @@
+{
+  "checked_at": "2026-11-02T09:14:46+07:00",
+  "repository": "VikaKhang286/crm-duyan-v6",
+  "baseline_commit": "ab61f5b529d67bf6d429250abfdb7d462697ab43",
+  "algorithm": "SHA-256",
+  "scope": "All files in the eight root addons, including images and other static assets; excludes __pycache__, .pyc, .pyo, .git and .DS_Store. Tests are reported separately. The duplicate addons/ copies were also checked locally.",
+  "modules": [
+    {
+      "module": "CRM_DAC",
+      "tracked_addon_files": 72,
+      "matching_files": 72,
+      "non_test_files": 67,
+      "matching_non_test_files": 67,
+      "modified": [],
+      "github_only": [],
+      "production_only": [],
+      "non_test_manifest_sha256": "bab3d0655ee7bdf713f687f64378b24fe0c85de511fd3e8d5288067927dbbdc7"
+    },
+    {
+      "module": "Chameleon",
+      "tracked_addon_files": 27,
+      "matching_files": 27,
+      "non_test_files": 27,
+      "matching_non_test_files": 27,
+      "modified": [],
+      "github_only": [],
+      "production_only": [
+        "models/res_users.py"
+      ],
+      "non_test_manifest_sha256": "72d6c943700b8a40ee3723716123cf40e2157e0a9af7c3da5a16585fcb615495"
+    },
+    {
+      "module": "dac_attendance",
+      "tracked_addon_files": 39,
+      "matching_files": 39,
+      "non_test_files": 39,
+      "matching_non_test_files": 39,
+      "modified": [],
+      "github_only": [],
+      "production_only": [],
+      "non_test_manifest_sha256": "0cb1f1f511fa5d73841e5373e59dd0ca9a4c0f073b574b28fa85cab9c2bcdb82"
+    },
+    {
+      "module": "dac_erp",
+      "tracked_addon_files": 231,
+      "matching_files": 221,
+      "non_test_files": 186,
+      "matching_non_test_files": 186,
+      "modified": [
+        "tests/__init__.py",
+        "tests/test_cart_pricing.py",
+        "tests/test_customer_address.py",
+        "tests/test_payment_workflow.py",
+        "tests/test_production_workflow.py",
+        "tests/test_sprint1_task_workflow.py"
+      ],
+      "github_only": [
+        "tests/test_deposit_summary.py",
+        "tests/test_deposit_sync.py",
+        "tests/test_res_users_home_action.py",
+        "tests/test_sale_back_permission.py"
+      ],
+      "production_only": [],
+      "non_test_manifest_sha256": "86b4e9e5c69ed20acc5ccda6a93bd6913c4c85a081a8fa516826a58e036a3fac"
+    },
+    {
+      "module": "dac_openclaw",
+      "tracked_addon_files": 21,
+      "matching_files": 21,
+      "non_test_files": 17,
+      "matching_non_test_files": 17,
+      "modified": [],
+      "github_only": [],
+      "production_only": [],
+      "non_test_manifest_sha256": "2d5f45234d534df6c70a8924aa6d5adaab40e0bcfcc34ae44b0112b131e88b8f"
+    },
+    {
+      "module": "dac_report",
+      "tracked_addon_files": 24,
+      "matching_files": 24,
+      "non_test_files": 24,
+      "matching_non_test_files": 24,
+      "modified": [],
+      "github_only": [],
+      "production_only": [],
+      "non_test_manifest_sha256": "6d8774f1170fac8a0975942f006701ff7cb10249592db843f162bfe790d869ff"
+    },
+    {
+      "module": "home_menu",
+      "tracked_addon_files": 16,
+      "matching_files": 16,
+      "non_test_files": 16,
+      "matching_non_test_files": 16,
+      "modified": [],
+      "github_only": [],
+      "production_only": [],
+      "non_test_manifest_sha256": "a194c0fb6c52150c6908f00a4516feb3c6a9c9dab684b54922d83215b7e03a2c"
+    },
+    {
+      "module": "sale_ai_invoice_reader",
+      "tracked_addon_files": 14,
+      "matching_files": 14,
+      "non_test_files": 12,
+      "matching_non_test_files": 12,
+      "modified": [],
+      "github_only": [],
+      "production_only": [],
+      "non_test_manifest_sha256": "64b3671730b0f5244bc9dae1f8e890c782032d2610646201116f53be7f8f722e"
+    }
+  ],
+  "manifest_hash_format": "SHA-256 of UTF-8 concatenation of sorted relative paths, NUL, file SHA-256 hex, newline; only GitHub non-test files included.",
+  "totals": {
+    "github_addon_files": 444,
+    "matching_files": 434,
+    "github_non_test_files": 388,
+    "matching_non_test_files": 388
+  }
+}

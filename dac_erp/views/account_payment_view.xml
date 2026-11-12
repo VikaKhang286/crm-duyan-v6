@@ -127,6 +127,12 @@
             <field name="inherit_id" ref="account.view_account_payment_form"/>
             <field name="priority">20</field>
             <field name="arch" type="xml">
+                <xpath expr="//sheet" position="inside">
+                    <group string="Chứng từ chuyển khoản" invisible="not dac_payment_proof_image">
+                        <field name="dac_payment_proof_filename" invisible="1"/>
+                        <field name="dac_payment_proof_image" widget="image" filename="dac_payment_proof_filename" readonly="1" class="oe_avatar"/>
+                    </group>
+                </xpath>
                 <!-- Ẩn các nút trong header bằng invisible - ẩn tất cả các nút có thể có -->
                 <xpath expr="//button[@name='action_post']" position="attributes">
                     <attribute name="invisible">1</attribute>
