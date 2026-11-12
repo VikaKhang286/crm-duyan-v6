@@ -31,6 +31,16 @@ class SaleOrder(models.Model):
         """Open the native new quotation page from custom order lists."""
         return self.env.ref('dac_erp.action_new_cart_sale_order').read()[0]
 
+    @api.model
+    def dac_is_design_workspace_user(self):
+        """Client-safe role flag for the persistent Design workspace header."""
+        user = self.env.user
+        return (
+            user.has_group('dac_erp.group_dac_erp_design')
+            and not user.has_group('dac_erp.group_dac_erp_sale')
+            and not user.has_group('dac_erp.group_dac_erp_manager')
+        )
+
     def action_open_design_collaboration(self):
         """Open the dedicated Design discussion and file workspace for this order."""
         self.ensure_one()

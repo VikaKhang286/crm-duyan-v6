@@ -3309,9 +3309,16 @@
   display: none !important;
 }
 
-/* Sale order screens render their own in-form header; remove Odoo's panel. */
-.o_action_manager:has(.dac-sale-form) .o_control_panel {
+/* Hide Odoo's default panel, but keep the active panel that receives the
+   sale-order workflow header from sale_order_control_panel.js. */
+.o_action_manager:has(.dac-sale-form) .o_control_panel:not(.dac-sale-order-control-panel-active) {
   display: none !important;
+}
+
+/* The active panel owns the complete order template: title, badges, five-step
+   workflow, and Edit/Save controls.  Keep it visible for Sale and Manager. */
+.o_action_manager:has(.dac-sale-form) .o_control_panel.dac-sale-order-control-panel-active {
+  display: block !important;
 }
 
 .o_control_panel.dac-sale-order-control-panel-active .o_control_panel_main,

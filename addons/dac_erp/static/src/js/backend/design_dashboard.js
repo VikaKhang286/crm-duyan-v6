@@ -261,34 +261,10 @@ class DesignDashboard extends Component {
   }
 
   get notificationItems() {
-    const conversationItems = this.state.data?.design_notifications || [];
-    const taskItems = this.designTasks.slice(0, 5).map((task, index) => {
-      const isNewAssignment = task.state === "draft";
-      return {
-        key: task.id,
-        task,
-        alert: task.is_overdue,
-        kind: isNewAssignment ? "order" : (index % 2 ? "order" : "message"),
-        title: task.is_overdue
-          ? `${task.order_number || task.name} đã trễ hạn`
-          : (isNewAssignment
-            ? `Bạn có đơn thiết kế mới ${task.order_number || task.name}`
-            : `Có cập nhật ở ${task.order_number || task.name}`),
-        detail: task.is_overdue
-          ? `Deadline ${task.deadline_str || "chưa đặt"}. Cần ưu tiên xử lý.`
-          : (isNewAssignment
-            ? `Đơn ${task.order_number || task.name} vừa được giao cho bạn.`
-            : (task.description || "Task thiết kế đang được cập nhật.")),
-        time: this.formatNotificationTime(task.notification_at),
-      };
-    });
-    return [
-      ...conversationItems.map((item) => ({
-        ...item,
-        time: this.formatNotificationTime(item.notification_at),
-      })),
-      ...taskItems,
-    ].slice(0, 8);
+    return (this.state.data?.design_notifications || []).map((item) => ({
+      ...item,
+      time: this.formatNotificationTime(item.notification_at),
+    }));
   }
 
   formatNotificationTime(value) {

@@ -182,7 +182,9 @@
                             </div>
 
                             <section class="dac-design-order-card dac-design-order-brief dac-design-order-brief-full">
-                                <div class="dac-design-order-card-header"><span><i class="fa fa-file-text-o"/> Mô tả thiết kế</span></div>
+                                <div class="dac-design-order-card-header dac-design-order-brief-header">
+                                    <span><i class="fa fa-file-text-o"/> Mô tả thiết kế</span>
+                                </div>
                                 <div class="dac-design-order-card-body">
                                     <field name="order_summary" nolabel="1" readonly="1"
                                            placeholder="Chưa có mô tả đơn hàng." widget="text"/>

@@ -322,7 +322,7 @@ class SaleOrder(models.Model):
                 ('res_id', 'in', list(order_by_id)),
                 ('author_id', 'in', reviewer_partner_ids),
                 ('body', 'ilike', 'dac-internal-note-message'),
-            ], order='date desc, id desc', limit=20)
+            ], order='date desc, id desc')
             for message in messages:
                 order = order_by_id.get(message.res_id)
                 if not order:
@@ -351,6 +351,41 @@ class SaleOrder(models.Model):
                     'initials': ''.join(part[0] for part in author.split()[:2]).upper() or 'S',
                     'avatar_tone': 'approval' if is_approval else 'message',
                 })
+        # Keep every active assignment and overdue warning in this canonical
+        # server-side feed.  Both the Overview card and the persistent bell
+        # consume this list, so neither UI can silently omit a notification.
+        for task in active:
+            order = task.order_id
+            if not order:
+                continue
+            task_label = task.name or order.order_number or order.name
+            timestamp = fields.Datetime.to_string(task.write_date) if task.write_date else False
+            if task.deadline and task.deadline < now and order.design_review_state not in ('pending', 'approved', 'done'):
+                deadline = fields.Datetime.context_timestamp(self, task.deadline).strftime('%d/%m/%Y %H:%M')
+                design_notifications.append({
+                    'key': f'overdue-task-{task.id}',
+                    'order_id': order.id,
+                    'notification_at': timestamp,
+                    'title': _('%s đã trễ hạn') % task_label,
+                    'detail': _('Deadline %s. Cần ưu tiên xử lý.') % deadline,
+                    'kind': 'overdue',
+                    'alert': True,
+                    'open_task': False,
+                })
+            if task.state == 'draft':
+                design_notifications.append({
+                    'key': f'assignment-task-{task.id}',
+                    'order_id': order.id,
+                    'notification_at': timestamp,
+                    'title': _('Bạn có đơn thiết kế mới %s') % task_label,
+                    'detail': _('Đơn %s vừa được giao cho bạn.') % (order.order_number or order.name),
+                    'kind': 'order',
+                    'alert': False,
+                    'open_task': False,
+                })
+        design_notifications.sort(
+            key=lambda item: item.get('notification_at') or '', reverse=True
+        )
         return {
             'task_stats': {
                 'total': len(active),
