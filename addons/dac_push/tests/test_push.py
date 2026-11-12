@@ -276,6 +276,16 @@ class TestPushEvents(TransactionCase):
         self._reply(original, 'Da goi roi a')  # cùng tin trả lời được gửi lại (bridge thử lại): không cảm ơn hai lần
         self.assertEqual(len(self.channel.message_ids - before), 1)
 
+    def test_reply_to_an_old_lead_message_without_links_still_finds_the_lead_by_its_event(self):
+        lead = self._lead_with_sent_message('rp0')
+        original = lead.zalo_message_ids.filtered(lambda m: m.channel_id == self.channel)
+        lead.write({'zalo_message_ids': [(5, 0, 0)]})  # như lead tạo trước khi có liên kết tin ↔ lead
+        self.assertFalse(lead.zalo_message_ids)
+        before = self.channel.message_ids
+        self._reply(original, 'đã gọi')
+        self.assertEqual(lead.contact_state, 'contacted')
+        self.assertEqual((self.channel.message_ids - before).text, 'Em xin cảm ơn ạ')
+
     def test_reply_to_a_summary_marks_every_number_in_it(self):
         first = self._lead_with_sent_message('rp2')
         first.received_at = self._vn('2026-11-12 08:30')  # nằm trước mốc 11:30 của tin tổng giả định

@@ -310,8 +310,13 @@ class ZaloChannelMessageLead(models.Model):
         if not means_contacted(reply.get('text')):
             return
         # sudo(): luồng nhận tin từ bridge (máy) không có user; chỉ đổi trạng thái liên hệ của lead gắn với tin được trả lời
-        leads = self.env['dac.web.lead'].sudo().search(['|', '|', ('zalo_message_ids', 'in', self.id),
-                                                        ('reminder_message_ids', 'in', self.id), ('summary_message_ids', 'in', self.id)])
+        Lead = self.env['dac.web.lead'].sudo()
+        leads = Lead.search(['|', '|', ('zalo_message_ids', 'in', self.id),
+                             ('reminder_message_ids', 'in', self.id), ('summary_message_ids', 'in', self.id)])
+        # Tin báo lead gửi từ trước khi có liên kết tin ↔ lead: mã tin có dạng push:<id sự kiện>:<id hội thoại>, tra lead theo sự kiện đó
+        origin = re.match(r'^push:(\d+):', self.event_key or '')
+        if origin:
+            leads |= Lead.search([('event_id', '=', int(origin.group(1)))])
         if not leads:
             return  # trả lời một tin không liên quan tới lead
         for lead in leads.filtered(lambda l: l.contact_state == 'new'):
