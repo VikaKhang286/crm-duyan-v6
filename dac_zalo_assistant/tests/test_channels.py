@@ -103,10 +103,16 @@ class TestZaloChannels(TransactionCase):
 
     def test_failed_messages_raise_one_system_alert_for_the_channels_that_ask_for_it(self):
         alert_type = self.env.ref('dac_zalo_assistant.event_type_system_alert')
-        admin_chat = self.channels.create({'name': 'Quản trị', 'thread_id': 'U-admin', 'thread_type': 'user',
-                                           'event_type_ids': [(6, 0, alert_type.ids)]})
         Message = self.env['dac.zalo.channel.message']
         Message.search([('state', 'in', ('failed', 'uncertain'))]).write({'alerted': True})  # lỗi cũ có sẵn trong DB thử
+        alert_type.channel_ids = [(5, 0, 0)]  # DB thử có thể đã có hội thoại đăng ký
+        lonely = self.channels._notify('unit.lead', 'x', 'lead:alert0')
+        lonely.write({'state': 'failed'})
+        Message._cron_process()
+        self.assertFalse(lonely.alerted, 'nobody asked for alerts yet: the failure stays pending instead of being lost')
+        lonely.write({'state': 'cancelled', 'alerted': True})
+        admin_chat = self.channels.create({'name': 'Quản trị', 'thread_id': 'U-admin', 'thread_type': 'user',
+                                           'event_type_ids': [(6, 0, alert_type.ids)]})
         Message._cron_process()
         self.assertFalse(admin_chat.message_ids, 'nothing new failed: no alert')
         bad = self.channels._notify('unit.lead', 'x', 'lead:alert1')

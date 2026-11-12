@@ -540,14 +540,18 @@ class TestPushEvents(TransactionCase):
         # không bao giờ thành công: hết lượt thì dừng tự thử lại và cảnh báo đúng một lần
         type(self.events)._handle_unit_never = lambda rec: (_ for _ in ()).throw(ValueError('always'))
         self.addCleanup(lambda: delattr(type(self.events), '_handle_unit_never'))
-        alert_channel = self.env['dac.zalo.channel'].create({
-            'name': 'Quản trị', 'thread_id': 'U-push-admin', 'thread_type': 'user',
-            'event_type_ids': [(6, 0, self.env.ref('dac_zalo_assistant.event_type_system_alert').ids)]})
+        self.events.search([('state', '=', 'failed')]).write({'alerted': True})  # lỗi cũ có sẵn trong DB thử
+        alert_type = self.env.ref('dac_zalo_assistant.event_type_system_alert')
+        alert_type.channel_ids = [(5, 0, 0)]
         stuck, _ = self.events._receive(envelope('rt-2', 'unit.never'))
         for _ in EVENT_RETRY_MINUTES:
             stuck.next_attempt_at = fields.Datetime.now() - timedelta(minutes=1)
             self.events._cron_reprocess_failed()
         self.assertEqual((stuck.state, stuck.attempts, bool(stuck.next_attempt_at)), ('failed', len(EVENT_RETRY_MINUTES) + 1, False))
+        self.assertFalse(stuck.alerted, 'nobody asked for alerts yet: stays pending')
+        alert_channel = self.env['dac.zalo.channel'].create({
+            'name': 'Quản trị', 'thread_id': 'U-push-admin', 'thread_type': 'user', 'event_type_ids': [(6, 0, alert_type.ids)]})
+        self.events._cron_reprocess_failed()
         self.assertEqual(len(alert_channel.message_ids), 1)
         self.assertIn('1 dữ liệu từ website chưa xử lý được', alert_channel.message_ids.text)
         self.events._cron_reprocess_failed()

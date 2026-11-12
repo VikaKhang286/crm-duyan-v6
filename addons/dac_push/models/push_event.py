@@ -112,8 +112,8 @@ class PushEvent(models.Model):
             return
         text = ('⚠️ Hệ thống: %d dữ liệu từ website chưa xử lý được (đã tự thử lại nhiều lần), có thể chưa có lead tương ứng.\n'
                 'Vào Odoo → Lead website → Sự kiện nhận từ website, chọn mục lỗi rồi bấm "Xử lý lại".' % len(stuck))
-        self.env['dac.zalo.channel']._notify('system.alert', text, 'alert-push:%s' % max(stuck.ids))
-        stuck.write({'alerted': True})
+        if self.env['dac.zalo.channel']._notify('system.alert', text, 'alert-push:%s' % max(stuck.ids)):
+            stuck.write({'alerted': True})  # chưa hội thoại nào đăng ký thì giữ nguyên: sẽ báo khi có người đăng ký
 
 
 class PushEventSystem(models.Model):

@@ -349,8 +349,8 @@ class ZaloChannelMessage(models.Model):
         if uncertain:
             parts.append('%d tin cần kiểm tra xem đã gửi chưa' % uncertain)
         text = '⚠️ Hệ thống: %s.\nVào Odoo → Trợ lý Zalo → Tin cần kiểm tra để xem và gửi lại.' % '; '.join(parts)
-        self.env['dac.zalo.channel']._notify('system.alert', text, 'alert-msg:%s' % max(bad.ids))
-        bad.write({'alerted': True})
+        if self.env['dac.zalo.channel']._notify('system.alert', text, 'alert-msg:%s' % max(bad.ids)):
+            bad.write({'alerted': True})  # chưa hội thoại nào đăng ký thì giữ nguyên: sẽ báo khi có người đăng ký
 
     def _on_reply(self, reply):
         """Móc cho addon khác: có người trả lời (reply) tin này. `reply`: dict {thread_id, sender_uid, message_id, text, ...}."""
