@@ -111,7 +111,7 @@ viên. Nâng cấp addon rồi chọn các nhóm cần nhận; hướng dẫn ch
 **Đích nhận thông báo (nhóm / chat riêng)**
 
 Từ bản 18.0.2.7.0, ngoài thông báo cho từng nhân viên, trợ lý có thể gửi thông báo vào bất kỳ hội thoại nào của tài khoản
-“tro ly DAC” (nhóm hoặc chat riêng). Quản lý và admin vào **Trợ lý Zalo → Tìm hội thoại Zalo**: gõ tên, bấm Tìm
+“tro ly DAC” (nhóm hoặc chat riêng). Quản lý và admin vào **Trợ lý Zalo → Thông báo → Tìm nhóm / người Zalo**: gõ tên, bấm Tìm
 (bridge liệt kê bạn bè + nhóm, cache 5 phút), bật chọn rồi Thêm. Mỗi hội thoại có tab **Thông báo nhận** (tick loại thông
 báo), tab **Tin đã gửi** (trạng thái, Gửi lại) và nút **Gửi tin thử**. Addon khác đăng ký loại thông báo bằng
 `dac.zalo.event.type` và gửi bằng `env['dac.zalo.channel']._notify(code, text, key)` (idempotent theo `key`).

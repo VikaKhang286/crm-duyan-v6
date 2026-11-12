@@ -20,9 +20,9 @@ Không dùng OpenClaw. Tin đi qua bridge `zca-js` của Trợ lý Zalo, bằng 
    phải là thành viên của nhóm muốn nhận tin.
 3. **WordPress**: chép `wp-content/plugins/push-dac-odoo/` lên duyan.vn, kích hoạt, vào **Cài đặt → Push DAC Odoo**,
    dán địa chỉ + khóa, bấm **Gửi thử kết nối**. Có thể đặt `DAC_PUSH_ODOO_URL` / `DAC_PUSH_ODOO_SECRET` trong `wp-config.php`.
-4. **Chọn nơi nhận**: Odoo → **Trợ lý Zalo → Tìm hội thoại Zalo** → gõ tên nhóm/người → **Tìm** → bật chọn → **Thêm**.
+4. **Chọn nơi nhận**: Odoo → **Trợ lý Zalo → Thông báo → Tìm nhóm / người Zalo** → gõ tên nhóm/người → **Tìm** → bật chọn → **Thêm**.
    Mở hội thoại vừa thêm, tab **Thông báo nhận**, tick loại thông báo (vd “Khách mới từ form website”). **Gửi tin thử** để kiểm tra.
-   Quản lý toàn bộ ở **Trợ lý Zalo → Đích nhận thông báo**.
+   Quản lý toàn bộ ở **Trợ lý Zalo → Thông báo → Đích nhận thông báo**.
 
 Nếu hosting không phân giải được tên miền Odoo (lỗi “Resolving timed out”; đã gặp với Hostinger vì resolver nội bộ không với tới
 name server `zonedns.vn`), điền **IP máy chủ Odoo** (hoặc hằng số `DAC_PUSH_ODOO_IP`) để plugin bỏ qua bước tra DNS; tên miền và TLS giữ nguyên.
@@ -93,3 +93,14 @@ có thể **Xử lý lại** sau khi triển khai handler.
 - **Chưa kiểm tra**: gửi tin Zalo thật vào nhóm và tìm hội thoại bằng tài khoản Zalo thật (cần quét QR); cài lên production.
 - Một test có sẵn của `dac_zalo_assistant` (`test_uncertain_delivery_is_not_silently_retried`) lỗi trên image `odoo:18.0` mới
   (harness test không chấp nhận `timeout` dạng tuple). Lỗi nằm ở code không đổi (`assistant.py`), có từ trước.
+
+## Menu và giao diện (từ addon 18.0.1.1.0)
+
+Sidebar chia 3 cấp: **Ứng dụng → Nhóm → Mục**, mỗi mục có icon (khai báo bằng `web_icon="fa-..."` trên `ir.ui.menu`,
+sidebar Chameleon đọc trường này nên addon nào cũng tự đặt icon được).
+
+- **Lead Website** → *Lead* (Lead từ website: kanban/danh sách/form) · *Kết nối* (Cấu hình kết nối, Dữ liệu nhận được).
+- **Trợ lý Zalo** → *Kết nối* (Tài khoản & kết nối, Liên kết nhân viên) · *Thông báo* (Đích nhận thông báo, Tìm nhóm / người Zalo,
+  Loại thông báo) · *Theo dõi* (Hội thoại, Theo dõi tin nhắn, Nhật ký thông báo) · *Của tôi* (Xác thực, Liên kết, Thông báo của tôi).
+
+Màn **Tài khoản & kết nối** là trung tâm kết nối: thẻ trạng thái Zalo / AI / cầu nối / Website; Push tự thêm thẻ "Website duyan.vn".

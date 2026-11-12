@@ -1,60 +1,143 @@
 <odoo>
+    <!-- ═══ Trung tâm kết nối Zalo (cấu hình singleton) ═══════════════════════ -->
     <record id="config_form" model="ir.ui.view">
         <field name="name">dac.zalo.config.form</field>
         <field name="model">dac.zalo.config</field>
         <field name="arch" type="xml">
             <form string="Trợ lý Zalo" class="dac_zalo_config_form" create="0" delete="0">
                 <header>
-                    <button name="action_refresh" type="object" string="Cập nhật trạng thái" groups="base.group_system"/>
-                    <button name="action_disconnect" type="object" string="Ngắt kết nối" groups="base.group_system" confirm="Ngừng trợ lý và xóa phiên đăng nhập lưu ở dịch vụ Zalo?"/>
-                    <field name="connection_state"/>
+                    <button name="action_refresh" type="object" string="Kiểm tra kết nối" icon="fa-refresh"
+                            class="btn-primary" groups="base.group_system"/>
+                    <button name="action_disconnect" type="object" string="Ngắt kết nối" icon="fa-power-off"
+                            groups="base.group_system" invisible="connection_state == 'disconnected'"
+                            confirm="Ngừng trợ lý và xóa phiên đăng nhập lưu ở dịch vụ Zalo?"/>
+                    <field name="connection_state" widget="statusbar"
+                           statusbar_visible="disconnected,waiting_qr,scanned,connected"/>
                 </header>
                 <sheet>
-                    <div class="oe_title">
-                        <label for="name" string="Tên trợ lý"/>
-                        <h1><field name="name" placeholder="Trợ lý DAC"/></h1>
+                    <div class="oe_button_box" name="button_box">
+                        <button class="oe_stat_button" type="object" name="action_open_channels" icon="fa-users">
+                            <field name="channel_count" widget="statinfo" string="Nơi nhận thông báo"/>
+                        </button>
+                        <button class="oe_stat_button" type="object" name="action_open_bindings" icon="fa-link">
+                            <field name="linked_binding_count" widget="statinfo" string="Nhân viên đã liên kết"/>
+                        </button>
+                        <button class="oe_stat_button text-danger" type="object" name="action_open_failed_messages"
+                                icon="fa-exclamation-triangle" invisible="failed_message_count == 0">
+                            <field name="failed_message_count" widget="statinfo" string="Tin cần kiểm tra"/>
+                        </button>
                     </div>
-                    <notebook>
-                        <page name="connection" string="Kết nối">
-                            <div class="alert alert-info" role="status">
-                                <strong>Đăng nhập bot Zalo</strong>
-                                <div>Quét mã bằng tài khoản “tro ly DAC” trên điện thoại, rồi xác nhận đăng nhập.</div>
+
+                    <div class="dac_ui_hero">
+                        <div class="dac_ui_hero_icon">
+                            <field name="assistant_avatar" widget="image" nolabel="1" invisible="not assistant_avatar"
+                                   options="{'size': [72, 72], 'preview_image': 'assistant_avatar'}"
+                                   groups="base.group_system"/>
+                            <i class="fa fa-comments" invisible="assistant_avatar" role="img" aria-label="Zalo"/>
+                        </div>
+                        <div class="dac_ui_hero_body">
+                            <div class="dac_ui_hero_title">
+                                <label for="name" string="Tên trợ lý" class="d-none"/>
+                                <h1><field name="name" placeholder="Trợ lý DAC"/></h1>
                             </div>
-                            <div class="alert alert-warning" role="alert" invisible="connection_state not in ('disconnected', 'error')">
-                                <strong>Tài khoản Zalo chưa kết nối.</strong>
-                                <div>Admin hãy bấm “Cập nhật trạng thái”. Nếu mất phiên đăng nhập, tạo mã QR mới bên dưới và quét lại.</div>
+                            <div class="dac_ui_hero_meta">
+                                <span class="dac_ui_pill is-ok" invisible="connection_state != 'connected'">
+                                    <i class="fa fa-check-circle"/> Đã kết nối
+                                </span>
+                                <span class="dac_ui_pill is-warn" invisible="connection_state not in ('waiting_qr', 'scanned')">
+                                    <i class="fa fa-qrcode"/> Đang chờ đăng nhập
+                                </span>
+                                <span class="dac_ui_pill is-danger" invisible="connection_state not in ('disconnected', 'error')">
+                                    <i class="fa fa-plug"/> Chưa kết nối
+                                </span>
+                                <span invisible="not assistant_name">
+                                    Tài khoản Zalo: <strong><field name="assistant_name" readonly="1" nolabel="1" groups="base.group_system"/></strong>
+                                </span>
+                                <span invisible="not last_checked_at">
+                                    <i class="fa fa-clock-o"/> Kiểm tra lần cuối <field name="last_checked_at" readonly="1" nolabel="1"/>
+                                </span>
                             </div>
-                            <div class="alert alert-success" role="status" invisible="connection_state != 'connected'">
-                                <strong>Đã kết nối tài khoản Zalo</strong>
-                                <span invisible="not assistant_name">: <field name="assistant_name" nolabel="1"/></span>
-                            </div>
-                            <group string="Tài khoản Zalo" col="2" groups="base.group_system" invisible="not assistant_uid">
-                                <field name="assistant_avatar" widget="image" nolabel="1"
-                                       options="{'size': [88, 88]}" class="oe_avatar"/>
-                                <field name="assistant_name" readonly="1"/>
-                                <field name="assistant_uid" readonly="1"/>
-                            </group>
-                            <group string="Trạng thái" col="2">
-                                <field name="active" widget="boolean_toggle"/>
-                                <field name="last_checked_at" readonly="1"/>
-                            </group>
-                            <group string="Quét mã QR" col="1" groups="base.group_system">
-                                <field name="qr_image" widget="image" nolabel="1"
-                                       options="{'size': [260, 260]}" invisible="not qr_image"/>
-                                <div class="text-muted" invisible="qr_image or connection_state == 'connected'">
-                                    Chưa có mã QR. Bấm nút bên dưới để tạo mã đăng nhập.
+                        </div>
+                        <div class="dac_ui_hero_side">
+                            <label for="active" string="Trợ lý đang bật"/>
+                            <field name="active" widget="boolean_toggle" nolabel="1"/>
+                        </div>
+                    </div>
+
+                    <div class="dac_ui_section_title"><i class="fa fa-plug"/> Các kết nối <small>trạng thái từng dịch vụ</small></div>
+                    <div class="dac_ui_cards" name="connection_cards">
+                        <div class="dac_ui_card" name="card_zalo">
+                            <div class="dac_ui_card_head">
+                                <span class="dac_ui_card_icon"><i class="fa fa-comments" title="Zalo"/></span>
+                                <div>
+                                    <div class="dac_ui_card_title">Tài khoản Zalo</div>
+                                    <div class="dac_ui_card_sub">Bot nhắn tin cho nhân viên và nhóm</div>
                                 </div>
-                                <div class="text-muted" invisible="not qr_image">
-                                    Dùng ứng dụng Zalo trên điện thoại của tài khoản “tro ly DAC” để quét mã.
+                            </div>
+                            <div class="dac_ui_card_body">
+                                <span invisible="connection_state != 'connected'">Đang đăng nhập bằng tài khoản <field name="assistant_name" readonly="1" nolabel="1" groups="base.group_system"/>.</span>
+                                <span invisible="connection_state == 'connected'">Chưa có phiên đăng nhập. Mở tab “Đăng nhập Zalo” để quét mã QR.</span>
+                            </div>
+                            <div class="dac_ui_card_foot">
+                                <span class="dac_ui_pill is-ok" invisible="connection_state != 'connected'"><i class="fa fa-check"/> Hoạt động</span>
+                                <span class="dac_ui_pill is-warn" invisible="connection_state not in ('waiting_qr', 'scanned')"><i class="fa fa-hourglass-half"/> Chờ xác nhận</span>
+                                <span class="dac_ui_pill is-danger" invisible="connection_state not in ('disconnected', 'error')"><i class="fa fa-times"/> Ngắt kết nối</span>
+                            </div>
+                        </div>
+                        <div class="dac_ui_card" name="card_ai">
+                            <div class="dac_ui_card_head">
+                                <span class="dac_ui_card_icon is-ai"><i class="fa fa-magic" title="AI"/></span>
+                                <div>
+                                    <div class="dac_ui_card_title">Trợ lý AI</div>
+                                    <div class="dac_ui_card_sub">Tùy chọn — trả lời câu hỏi qua /ai</div>
                                 </div>
-                                <button name="action_login" type="object" string="Tạo lại mã QR"
-                                        class="btn-primary" groups="base.group_system"
-                                        confirm="Thao tác này sẽ làm mới phiên đăng nhập Zalo hiện tại. Tiếp tục?"/>
-                            </group>
-                            <group string="Kết nối dịch vụ" groups="base.group_system" col="2">
-                                <field name="bridge_url"/>
-                                <field name="bridge_token" password="True"/>
-                            </group>
+                            </div>
+                            <div class="dac_ui_card_body">
+                                <span invisible="not ai_enabled">Model: <strong><field name="ai_model" readonly="1" nolabel="1" groups="base.group_system"/></strong></span>
+                                <span invisible="ai_enabled">AI đang tắt. Thông báo và lệnh /congviec vẫn hoạt động bình thường.</span>
+                            </div>
+                            <div class="dac_ui_card_foot">
+                                <span class="dac_ui_pill is-ok" invisible="not ai_enabled"><i class="fa fa-check"/> Đang bật</span>
+                                <span class="dac_ui_pill" invisible="ai_enabled"><i class="fa fa-pause"/> Đang tắt</span>
+                            </div>
+                        </div>
+                        <div class="dac_ui_card" name="card_bridge">
+                            <div class="dac_ui_card_head">
+                                <span class="dac_ui_card_icon is-bridge"><i class="fa fa-exchange" title="Dịch vụ cầu nối"/></span>
+                                <div>
+                                    <div class="dac_ui_card_title">Dịch vụ cầu nối</div>
+                                    <div class="dac_ui_card_sub">Máy chủ giữ phiên đăng nhập Zalo</div>
+                                </div>
+                            </div>
+                            <div class="dac_ui_card_body">
+                                <field name="bridge_url" readonly="1" nolabel="1" groups="base.group_system"/>
+                            </div>
+                            <div class="dac_ui_card_foot">
+                                <span class="dac_ui_pill is-ok" invisible="connection_state == 'error'"><i class="fa fa-check"/> Đã cấu hình</span>
+                                <span class="dac_ui_pill is-danger" invisible="connection_state != 'error'"><i class="fa fa-exclamation-triangle"/> Không liên lạc được</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <notebook class="dac_ui_tabs">
+                        <page name="login" string="Đăng nhập Zalo">
+                            <div class="dac_ui_steps">
+                                <div class="dac_ui_step"><strong>Tạo mã QR</strong><span class="dac_ui_step_hint">Bấm “Tạo mã QR” bên dưới để lấy mã đăng nhập mới.</span></div>
+                                <div class="dac_ui_step"><strong>Quét bằng điện thoại</strong><span class="dac_ui_step_hint">Mở Zalo của tài khoản “tro ly DAC” và quét mã.</span></div>
+                                <div class="dac_ui_step"><strong>Xác nhận đăng nhập</strong><span class="dac_ui_step_hint">Chọn “Đồng ý” trên điện thoại, trạng thái sẽ chuyển sang Đã kết nối.</span></div>
+                            </div>
+                            <div class="dac_ui_qr" groups="base.group_system">
+                                <div class="dac_ui_qr_empty" invisible="qr_image"><i class="fa fa-qrcode" title="Mã QR"/></div>
+                                <field name="qr_image" widget="image" nolabel="1" options="{'size': [220, 220]}" invisible="not qr_image"/>
+                                <div>
+                                    <div class="dac_ui_section_title"><i class="fa fa-qrcode"/> Mã QR đăng nhập</div>
+                                    <p class="text-muted mb-3" invisible="connection_state == 'connected'">Mã có thời hạn ngắn. Nếu hết hạn, tạo lại mã mới.</p>
+                                    <p class="text-success mb-3" invisible="connection_state != 'connected'"><i class="fa fa-check-circle"/> Trợ lý đang đăng nhập. Chỉ tạo lại mã khi cần đổi tài khoản hoặc mất phiên.</p>
+                                    <button name="action_login" type="object" string="Tạo mã QR" icon="fa-qrcode"
+                                            class="btn-primary" groups="base.group_system"
+                                            confirm="Thao tác này sẽ làm mới phiên đăng nhập Zalo hiện tại. Tiếp tục?"/>
+                                </div>
+                            </div>
                         </page>
                         <page name="ai" string="Trợ lý AI" groups="base.group_system">
                             <div class="alert alert-secondary" role="note">
@@ -66,14 +149,23 @@
                                     <field name="ai_base_url" placeholder="https://nha-cung-cap.example/v1"/>
                                     <field name="ai_model"/>
                                     <field name="ai_api_key" password="True"/>
-                                    <button name="action_test_ai" type="object" string="Kiểm tra kết nối AI"
+                                    <button name="action_test_ai" type="object" string="Kiểm tra kết nối AI" icon="fa-flask"
                                             class="btn-secondary" invisible="not ai_enabled"/>
                                 </group>
                                 <group string="Cách trả lời">
-                                    <field name="ai_auto_reply"/>
-                                    <field name="ai_include_tasks"/>
+                                    <field name="ai_auto_reply" widget="boolean_toggle"/>
+                                    <field name="ai_include_tasks" widget="boolean_toggle"/>
                                     <field name="ai_instructions"/>
                                 </group>
+                            </group>
+                        </page>
+                        <page name="bridge" string="Dịch vụ cầu nối" groups="base.group_system">
+                            <div class="alert alert-secondary" role="note">
+                                Dịch vụ cầu nối là chương trình giữ phiên đăng nhập Zalo. Chỉ đổi khi chuyển máy chủ.
+                            </div>
+                            <group>
+                                <field name="bridge_url"/>
+                                <field name="bridge_token" password="True"/>
                             </group>
                         </page>
                     </notebook>
@@ -82,71 +174,190 @@
         </field>
     </record>
     <record id="config_action" model="ir.actions.act_window">
-        <field name="name">Cấu hình trợ lý Zalo</field>
+        <field name="name">Tài khoản &amp; kết nối Zalo</field>
         <field name="res_model">dac.zalo.config</field>
         <field name="view_mode">form</field>
         <field name="res_id" ref="config_default"/>
     </record>
+
+    <!-- ═══ Liên kết nhân viên ══════════════════════════════════════════════ -->
     <record id="binding_list" model="ir.ui.view">
         <field name="name">dac.zalo.binding.list</field><field name="model">dac.zalo.binding</field>
         <field name="arch" type="xml">
-            <list create="0" delete="0"><field name="user_id"/><field name="zalo_uid"/><field name="state"/><field name="linked_at"/>
-                <button name="action_revoke" type="object" string="Hủy liên kết" invisible="state != 'linked'" confirm="Hủy liên kết Zalo? Trợ lý sẽ ngừng nhận và gửi tin nhắn cho liên kết này."/>
+            <list create="0" delete="0" decoration-muted="state != 'linked'">
+                <field name="user_id" widget="many2one_avatar_user"/>
+                <field name="state" widget="badge" decoration-success="state == 'linked'" decoration-muted="state != 'linked'"/>
+                <field name="zalo_uid" optional="show"/>
+                <field name="linked_at"/>
+                <button name="action_revoke" type="object" string="Hủy liên kết" icon="fa-chain-broken"
+                        invisible="state != 'linked'"
+                        confirm="Hủy liên kết Zalo? Trợ lý sẽ ngừng nhận và gửi tin nhắn cho liên kết này."/>
             </list>
         </field>
+    </record>
+    <record id="binding_search" model="ir.ui.view">
+        <field name="name">dac.zalo.binding.search</field><field name="model">dac.zalo.binding</field>
+        <field name="arch" type="xml"><search><field name="user_id"/><field name="zalo_uid"/>
+            <filter name="linked" string="Đã liên kết" domain="[('state', '=', 'linked')]"/>
+            <filter name="unlinked" string="Chưa liên kết" domain="[('state', '!=', 'linked')]"/>
+        </search></field>
     </record>
     <record id="binding_action" model="ir.actions.act_window">
         <field name="name">Liên kết của tôi</field><field name="res_model">dac.zalo.binding</field><field name="view_mode">list</field>
         <field name="domain">[('user_id', '=', uid)]</field>
+        <field name="help" type="html"><p class="o_view_nocontent_smiling_face">Bạn chưa liên kết Zalo</p>
+            <p>Vào “Xác thực với trợ lý”, tạo mã dùng một lần rồi nhắn cho tài khoản trợ lý trên Zalo.</p></field>
     </record>
     <record id="bindings_admin_action" model="ir.actions.act_window">
         <field name="name">Liên kết nhân viên</field><field name="res_model">dac.zalo.binding</field><field name="view_mode">list</field>
+        <field name="help" type="html"><p class="o_view_nocontent_smiling_face">Chưa có nhân viên nào liên kết Zalo</p>
+            <p>Nhân viên tự liên kết trong “Xác thực với trợ lý”.</p></field>
     </record>
+
+    <!-- ═══ Xác thực với trợ lý (wizard của nhân viên) ════════════════════════ -->
     <record id="link_form" model="ir.ui.view">
         <field name="name">dac.zalo.link.wizard.form</field><field name="model">dac.zalo.link.wizard</field>
         <field name="arch" type="xml">
-            <form string="Liên kết Zalo của tôi"><group><field name="instructions" nolabel="1"/><field name="code" widget="CopyClipboardChar"/><field name="expires_at"/></group>
-                <footer><button name="action_generate" type="object" string="Tạo mã dùng một lần" class="btn-primary"/><button special="cancel" string="Đóng"/></footer>
+            <form string="Liên kết Zalo của tôi">
+                <div class="dac_ui_steps">
+                    <div class="dac_ui_step"><strong>Tạo mã</strong><span class="dac_ui_step_hint">Bấm “Tạo mã dùng một lần”.</span></div>
+                    <div class="dac_ui_step"><strong>Nhắn cho trợ lý</strong><span class="dac_ui_step_hint">Gửi /xac-thuc kèm mã tới tài khoản “tro ly DAC” trên Zalo.</span></div>
+                    <div class="dac_ui_step"><strong>Hoàn tất</strong><span class="dac_ui_step_hint">Trợ lý trả lời xác nhận; mã hết hạn sau 10 phút.</span></div>
+                </div>
+                <group>
+                    <field name="code" widget="CopyClipboardChar" placeholder="Chưa tạo mã"/>
+                    <field name="expires_at"/>
+                </group>
+                <footer>
+                    <button name="action_generate" type="object" string="Tạo mã dùng một lần" icon="fa-key" class="btn-primary"/>
+                    <button special="cancel" string="Đóng"/>
+                </footer>
             </form>
         </field>
     </record>
     <record id="link_action" model="ir.actions.act_window">
         <field name="name">Xác thực với trợ lý</field><field name="res_model">dac.zalo.link.wizard</field><field name="view_mode">form</field><field name="target">new</field>
     </record>
+
+    <!-- ═══ Hội thoại với trợ lý ═══════════════════════════════════════════ -->
     <record id="conversation_list" model="ir.ui.view">
         <field name="name">dac.zalo.conversation.list</field><field name="model">dac.zalo.conversation</field>
-        <field name="arch" type="xml"><list create="0" delete="0"><field name="user_id"/><field name="zalo_uid"/><field name="last_message_at"/></list></field>
+        <field name="arch" type="xml"><list create="0" delete="0">
+            <field name="user_id" widget="many2one_avatar_user"/><field name="zalo_uid" optional="show"/><field name="last_message_at"/>
+        </list></field>
     </record>
     <record id="conversation_form" model="ir.ui.view">
         <field name="name">dac.zalo.conversation.form</field><field name="model">dac.zalo.conversation</field>
         <field name="arch" type="xml">
-            <form create="0" edit="0" delete="0"><header><button name="action_compose" type="object" string="Nhắn qua trợ lý" class="btn-primary"/></header>
-                <sheet><group><field name="user_id"/><field name="binding_id"/><field name="zalo_uid"/><field name="last_message_at"/></group>
-                    <field name="message_ids"><list create="0" edit="0" delete="0" default_order="create_date desc"><field name="create_date"/><field name="direction"/><field name="text"/><field name="state"/><field name="error_message" optional="hide"/></list></field>
+            <form create="0" edit="0" delete="0">
+                <header><button name="action_compose" type="object" string="Nhắn qua trợ lý" icon="fa-paper-plane" class="btn-primary"/></header>
+                <sheet>
+                    <div class="dac_ui_hero">
+                        <div class="dac_ui_hero_icon is-user"><i class="fa fa-user" title="Cá nhân"/></div>
+                        <div class="dac_ui_hero_body">
+                            <div class="dac_ui_hero_title"><h1><field name="user_id" readonly="1"/></h1></div>
+                            <div class="dac_ui_hero_meta">
+                                <span class="dac_ui_pill is-info"><i class="fa fa-comments"/> Hội thoại với trợ lý</span>
+                                <span invisible="not last_message_at"><i class="fa fa-clock-o"/> Tin gần nhất <field name="last_message_at" readonly="1" nolabel="1"/></span>
+                            </div>
+                        </div>
+                    </div>
+                    <group invisible="1"><field name="binding_id"/><field name="zalo_uid"/></group>
+                    <div class="dac_ui_section_title"><i class="fa fa-commenting-o"/> Tin nhắn</div>
+                    <field name="message_ids" nolabel="1">
+                        <list create="0" edit="0" delete="0" default_order="create_date desc"
+                              decoration-danger="state in ('failed', 'uncertain')">
+                            <field name="create_date"/>
+                            <field name="direction" widget="badge" decoration-info="direction == 'in'" decoration-success="direction == 'out'"/>
+                            <field name="text"/>
+                            <field name="state" widget="badge" decoration-success="state == 'sent'" decoration-danger="state in ('failed', 'uncertain')" decoration-warning="state in ('queued', 'ai_pending')"/>
+                            <field name="error_message" optional="hide"/>
+                        </list>
+                    </field>
                 </sheet>
             </form>
         </field>
     </record>
     <record id="conversation_action" model="ir.actions.act_window">
         <field name="name">Hội thoại với trợ lý</field><field name="res_model">dac.zalo.conversation</field><field name="view_mode">list,form</field>
+        <field name="help" type="html"><p class="o_view_nocontent_smiling_face">Chưa có hội thoại nào</p>
+            <p>Hội thoại xuất hiện khi nhân viên nhắn cho trợ lý sau khi liên kết Zalo.</p></field>
     </record>
+
+    <!-- ═══ Theo dõi tin nhắn ═══════════════════════════════════════════════ -->
     <record id="message_list" model="ir.ui.view">
         <field name="name">dac.zalo.message.list</field><field name="model">dac.zalo.message</field>
-        <field name="arch" type="xml"><list create="0" edit="0" delete="0"><field name="create_date"/><field name="user_id"/><field name="direction"/><field name="text"/><field name="state"/><field name="attempts"/><field name="error_message"/></list></field>
+        <field name="arch" type="xml">
+            <list create="0" edit="0" delete="0" decoration-danger="state in ('failed', 'uncertain')">
+                <field name="create_date"/>
+                <field name="user_id" widget="many2one_avatar_user"/>
+                <field name="direction" widget="badge" decoration-info="direction == 'in'" decoration-success="direction == 'out'"/>
+                <field name="kind" widget="badge" optional="show"/>
+                <field name="text"/>
+                <field name="state" widget="badge" decoration-success="state == 'sent'" decoration-danger="state in ('failed', 'uncertain')" decoration-warning="state in ('queued', 'ai_pending')"/>
+                <field name="attempts" optional="hide"/>
+                <field name="error_message" optional="show"/>
+            </list>
+        </field>
+    </record>
+    <record id="message_search" model="ir.ui.view">
+        <field name="name">dac.zalo.message.search</field><field name="model">dac.zalo.message</field>
+        <field name="arch" type="xml"><search><field name="user_id"/><field name="text"/>
+            <filter name="errors" string="Cần kiểm tra" domain="[('state', 'in', ['failed', 'uncertain'])]"/>
+            <filter name="pending" string="Chờ gửi" domain="[('state', 'in', ['queued', 'ai_pending'])]"/>
+            <filter name="inbound" string="Nhân viên → trợ lý" domain="[('direction', '=', 'in')]"/>
+            <filter name="outbound" string="Trợ lý → nhân viên" domain="[('direction', '=', 'out')]"/>
+            <group expand="0" string="Nhóm theo">
+                <filter name="by_user" string="Nhân viên" context="{'group_by': 'user_id'}"/>
+                <filter name="by_state" string="Trạng thái" context="{'group_by': 'state'}"/>
+            </group>
+        </search></field>
     </record>
     <record id="message_action" model="ir.actions.act_window">
         <field name="name">Theo dõi tin nhắn</field><field name="res_model">dac.zalo.message</field><field name="view_mode">list</field>
     </record>
+
     <record id="compose_form" model="ir.ui.view">
         <field name="name">dac.zalo.compose.wizard.form</field><field name="model">dac.zalo.compose.wizard</field>
-        <field name="arch" type="xml"><form><group><field name="conversation_id" readonly="1"/><field name="text"/></group><footer><button name="action_send" type="object" string="Đưa vào hàng đợi gửi" class="btn-primary"/><button special="cancel" string="Hủy"/></footer></form></field>
+        <field name="arch" type="xml"><form><group><field name="conversation_id" readonly="1"/><field name="text"/></group>
+            <footer><button name="action_send" type="object" string="Đưa vào hàng đợi gửi" icon="fa-paper-plane" class="btn-primary"/><button special="cancel" string="Hủy"/></footer></form></field>
     </record>
+
+    <!-- ═══ Menu: Ứng dụng → Nhóm → Mục (3 cấp, mỗi cấp có icon) ═════════════ -->
     <menuitem id="menu_root" name="Trợ lý Zalo" sequence="12" groups="base.group_user"
               web_icon="dac_zalo_assistant,static/description/icon.png"/>
-    <menuitem id="menu_link" name="Xác thực với trợ lý" parent="menu_root" action="link_action" sequence="1"/>
-    <menuitem id="menu_binding" name="Liên kết của tôi" parent="menu_root" action="binding_action" sequence="2"/>
-    <menuitem id="menu_conversations" name="Hội thoại" parent="menu_root" action="conversation_action" sequence="3"/>
-    <menuitem id="menu_messages" name="Theo dõi tin nhắn" parent="menu_root" action="message_action" groups="dac_erp.group_dac_erp_manager,base.group_system" sequence="4"/>
-    <menuitem id="menu_bindings_admin" name="Liên kết nhân viên" parent="menu_root" action="bindings_admin_action" groups="base.group_system" sequence="5"/>
-    <menuitem id="menu_config" name="Cấu hình" parent="menu_root" action="config_action" groups="base.group_system" sequence="0"/>
+
+    <menuitem id="menu_section_connect" name="Kết nối" parent="menu_root" sequence="10"
+              groups="base.group_system"/>
+    <menuitem id="menu_config" name="Tài khoản &amp; kết nối" parent="menu_section_connect" action="config_action"
+              groups="base.group_system" sequence="10"/>
+    <menuitem id="menu_bindings_admin" name="Liên kết nhân viên" parent="menu_section_connect" action="bindings_admin_action"
+              groups="base.group_system" sequence="20"/>
+
+    <menuitem id="menu_section_notify" name="Thông báo" parent="menu_root" sequence="20"
+              groups="dac_erp.group_dac_erp_manager,base.group_system"/>
+
+    <menuitem id="menu_section_monitor" name="Theo dõi" parent="menu_root" sequence="30"/>
+    <menuitem id="menu_conversations" name="Hội thoại với trợ lý" parent="menu_section_monitor" action="conversation_action"
+              sequence="10"/>
+    <menuitem id="menu_messages" name="Theo dõi tin nhắn" parent="menu_section_monitor" action="message_action"
+              groups="dac_erp.group_dac_erp_manager,base.group_system" sequence="20"/>
+
+    <menuitem id="menu_section_mine" name="Của tôi" parent="menu_root" sequence="40"/>
+    <menuitem id="menu_link" name="Xác thực với trợ lý" parent="menu_section_mine" action="link_action"
+              sequence="10"/>
+    <menuitem id="menu_binding" name="Liên kết của tôi" parent="menu_section_mine" action="binding_action"
+              sequence="20"/>
+
+    <!-- Icon sidebar (đọc bởi Chameleon: navbar_v6.js dacMenuFaIcon) -->
+    <record id="menu_section_connect" model="ir.ui.menu"><field name="web_icon">fa-plug</field></record>
+    <record id="menu_config" model="ir.ui.menu"><field name="web_icon">fa-id-card-o</field></record>
+    <record id="menu_bindings_admin" model="ir.ui.menu"><field name="web_icon">fa-address-book-o</field></record>
+    <record id="menu_section_notify" model="ir.ui.menu"><field name="web_icon">fa-bullhorn</field></record>
+    <record id="menu_section_monitor" model="ir.ui.menu"><field name="web_icon">fa-eye</field></record>
+    <record id="menu_conversations" model="ir.ui.menu"><field name="web_icon">fa-comments-o</field></record>
+    <record id="menu_messages" model="ir.ui.menu"><field name="web_icon">fa-envelope-o</field></record>
+    <record id="menu_section_mine" model="ir.ui.menu"><field name="web_icon">fa-user-o</field></record>
+    <record id="menu_link" model="ir.ui.menu"><field name="web_icon">fa-key</field></record>
+    <record id="menu_binding" model="ir.ui.menu"><field name="web_icon">fa-link</field></record>
 </odoo>

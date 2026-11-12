@@ -11,6 +11,17 @@ MAX_TEXT = 12000
 THREAD_TYPES = [('group', 'Nhóm'), ('user', 'Chat riêng')]
 
 
+# Icon FontAwesome theo nhóm thông báo; addon khác thêm nhóm mới bằng cách bổ sung khóa vào dict này.
+GROUP_ICONS = {
+    'Website': 'fa-globe',
+    'Hệ thống': 'fa-cog',
+    'Đơn hàng': 'fa-shopping-cart',
+    'Công việc': 'fa-tasks',
+    'Nhân sự': 'fa-id-badge',
+    'Tài chính': 'fa-credit-card',
+}
+
+
 class ZaloEventType(models.Model):
     """Danh mục loại thông báo mà addon khác đăng ký (qua file data) để kênh Zalo chọn nhận."""
     _name = 'dac.zalo.event.type'
@@ -26,6 +37,18 @@ class ZaloEventType(models.Model):
     active = fields.Boolean(default=True)
     channel_ids = fields.Many2many('dac.zalo.channel', 'dac_zalo_channel_event_rel', 'event_type_id', 'channel_id',
         string='Hội thoại nhận tin')
+    icon = fields.Char(string='Icon', compute='_compute_icon')
+    channel_count = fields.Integer(string='Số hội thoại nhận', compute='_compute_channel_count')
+
+    @api.depends('group_name')
+    def _compute_icon(self):
+        for event_type in self:
+            event_type.icon = GROUP_ICONS.get(event_type.group_name, 'fa-bell-o')
+
+    @api.depends('channel_ids.active')
+    def _compute_channel_count(self):
+        for event_type in self:
+            event_type.channel_count = len(event_type.channel_ids.filtered('active'))
     _sql_constraints = [('code_unique', 'unique(code)', 'Mã loại thông báo đã tồn tại.')]
 
 
@@ -243,3 +266,31 @@ class ZaloThreadSearchLine(models.TransientModel):
     members = fields.Integer(string='Thành viên', readonly=True)
     added = fields.Boolean(string='Đã thêm', readonly=True)
     selected = fields.Boolean(string='Chọn')
+
+
+class ZaloConfigOverview(models.Model):
+    """Số liệu tổng quan hiển thị ở nút thống kê trên màn hình Kết nối Zalo."""
+    _inherit = 'dac.zalo.config'
+
+    channel_count = fields.Integer(string='Đích nhận thông báo', compute='_compute_overview')
+    linked_binding_count = fields.Integer(string='Nhân viên đã liên kết', compute='_compute_overview')
+    failed_message_count = fields.Integer(string='Tin cần kiểm tra', compute='_compute_overview')
+
+    def _compute_overview(self):
+        channels = self.env['dac.zalo.channel'].search_count([('active', '=', True)])
+        linked = self.env['dac.zalo.binding'].search_count([('state', '=', 'linked')])
+        failed = self.env['dac.zalo.channel.message'].search_count([('state', 'in', ('failed', 'uncertain'))])
+        for config in self:
+            config.channel_count = channels
+            config.linked_binding_count = linked
+            config.failed_message_count = failed
+
+    def action_open_channels(self):
+        return self.env['ir.actions.actions']._for_xml_id('dac_zalo_assistant.channel_action')
+
+    def action_open_bindings(self):
+        return self.env['ir.actions.actions']._for_xml_id('dac_zalo_assistant.bindings_admin_action')
+
+    def action_open_failed_messages(self):
+        return {'type': 'ir.actions.act_window', 'name': _('Tin cần kiểm tra'), 'res_model': 'dac.zalo.channel.message',
+            'view_mode': 'list', 'domain': [('state', 'in', ('failed', 'uncertain'))]}

@@ -1,6 +1,6 @@
 {
-    'name': 'Push DAC Odoo (nhận dữ liệu từ website)',
-    'version': '18.0.1.0.0',
+    'name': 'Lead Website — Push DAC Odoo',
+    'version': '18.0.1.1.0',
     'category': '1. Duy An ERP',
     'summary': 'Nhận dữ liệu đẩy từ duyan.vn (plugin Push DAC Odoo) và báo vào Zalo',
     'description': """

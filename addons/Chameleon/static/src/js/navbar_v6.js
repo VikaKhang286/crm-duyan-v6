@@ -602,7 +602,18 @@ patch(NavBar.prototype, {
         return this.onNavBarDropdownItemSelection(menu);
     },
 
+    /**
+     * Icon khai báo ngay trên menu: <menuitem web_icon="fa-bell-o"/>.
+     * Addon nào cũng tự đặt icon cho menu của mình mà không phải sửa bảng bên dưới.
+     */
+    dacMenuFaIcon(menu) {
+        const icon = String(menu?.webIcon || "").trim();
+        return /^fa-[a-z0-9-]+$/.test(icon) ? icon : "";
+    },
+
     dacSidebarMenuIcon(menu) {
+        const declared = this.dacMenuFaIcon(menu);
+        if (declared) return declared;
         const icons = {
            "home_menu.home_dashboard_menu": "fa-home",
            "dac_erp.menu_dac_my_tasks": "fa-clock-o",
@@ -639,6 +650,8 @@ patch(NavBar.prototype, {
 
     dacAppIcon(app) {
         const icons = {
+            "dac_zalo_assistant.menu_root": "fa-comments-o",
+            "dac_push.menu_push_root": "fa-globe",
             "home_menu.home_root": "fa-home",
             "dac_erp.dac_sale_crm_root": "fa-bar-chart",
             "dac_erp.dac_operations_root": "fa-cube",

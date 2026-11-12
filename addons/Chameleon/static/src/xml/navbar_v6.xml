@@ -186,7 +186,10 @@
                 <span t-esc="dacMenuName(menu)"/>
                 <span class="caret">›</span>
             </button>
-            <div t-else="" class="dac_v6_section_group_title" t-esc="dacMenuName(menu)"/>
+            <div t-else="" class="dac_v6_section_group_title">
+                <span t-if="dacMenuFaIcon(menu)" t-attf-class="dac_v6_section_title_icon fa {{ dacMenuFaIcon(menu) }}" aria-hidden="true"/>
+                <span t-esc="dacMenuName(menu)"/>
+            </div>
             <t t-if="!isDacMenuGroupCollapsed(menu)">
                 <t t-foreach="dacVisibleMenuChildren(menu)" t-as="child" t-key="child.id">
                     <t t-call="Chameleon.SidebarMenuItem">

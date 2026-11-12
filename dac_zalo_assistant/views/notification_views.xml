@@ -3,7 +3,7 @@
         <field name="name">dac.zalo.notification.config.form</field><field name="model">dac.zalo.config</field>
         <field name="inherit_id" ref="config_form"/>
         <field name="arch" type="xml"><xpath expr="//notebook" position="inside">
-            <page name="notifications" string="Thông báo" groups="base.group_system">
+            <page name="notifications" string="Thông báo nhân viên" groups="base.group_system">
                 <div class="alert alert-info" role="note">
                     Nhân viên tùy chỉnh loại tin và giờ nhận trong “Thông báo của tôi”.
                     Chỉ sự kiện mới sau ngày bật tính năng mới được gửi.
@@ -14,29 +14,29 @@
                         <field name="notification_started_at" readonly="1"/>
                     </group>
                     <group string="Đơn hàng và công việc">
-                        <field name="notify_order_created"/>
-                        <field name="notify_order_updates"/>
-                        <field name="notify_task_assigned"/>
-                        <field name="notify_task_updates"/>
-                        <field name="notify_deadline_changed"/>
-                        <field name="notify_deadline_warning"/>
-                        <field name="notify_task_overdue"/>
-                        <field name="notify_personal_reminder"/>
+                        <field name="notify_order_created" widget="boolean_toggle"/>
+                        <field name="notify_order_updates" widget="boolean_toggle"/>
+                        <field name="notify_task_assigned" widget="boolean_toggle"/>
+                        <field name="notify_task_updates" widget="boolean_toggle"/>
+                        <field name="notify_deadline_changed" widget="boolean_toggle"/>
+                        <field name="notify_deadline_warning" widget="boolean_toggle"/>
+                        <field name="notify_task_overdue" widget="boolean_toggle"/>
+                        <field name="notify_personal_reminder" widget="boolean_toggle"/>
                     </group>
                 </group>
                 <group>
                     <group string="Theo dõi đơn và nhân sự">
-                        <field name="notify_handover"/>
-                        <field name="notify_delivery"/>
-                        <field name="notify_financial"/>
-                        <field name="notify_mentions"/>
-                        <field name="notify_hr_requests"/>
-                        <field name="notify_hr_results"/>
+                        <field name="notify_handover" widget="boolean_toggle"/>
+                        <field name="notify_delivery" widget="boolean_toggle"/>
+                        <field name="notify_financial" widget="boolean_toggle"/>
+                        <field name="notify_mentions" widget="boolean_toggle"/>
+                        <field name="notify_hr_requests" widget="boolean_toggle"/>
+                        <field name="notify_hr_results" widget="boolean_toggle"/>
                     </group>
                     <group string="Bản tin và cảnh báo">
-                        <field name="notify_digest_morning"/>
-                        <field name="notify_digest_evening"/>
-                        <field name="notify_system_alerts"/>
+                        <field name="notify_digest_morning" widget="boolean_toggle"/>
+                        <field name="notify_digest_evening" widget="boolean_toggle"/>
+                        <field name="notify_system_alerts" widget="boolean_toggle"/>
                     </group>
                 </group>
             </page>
@@ -45,11 +45,35 @@
     <record id="preference_form" model="ir.ui.view">
         <field name="name">dac.zalo.preference.form</field><field name="model">dac.zalo.preference</field>
         <field name="arch" type="xml"><form string="Thông báo của tôi" create="0" delete="0"><sheet>
-            <group><group string="Cách nhận"><field name="user_id" readonly="1"/><field name="notifications_enabled" widget="boolean_toggle"/><field name="paused_until"/><field name="timezone"/></group>
-                <group string="Giờ nhận"><field name="quiet_enabled"/><field name="quiet_start" widget="float_time"/><field name="quiet_end" widget="float_time"/><field name="urgent_outside_hours"/><field name="morning_hour" widget="float_time"/><field name="evening_hour" widget="float_time"/></group></group>
-            <group><group string="Đơn hàng và công việc"><field name="order_created"/><field name="order_updates"/><field name="task_assigned"/><field name="task_updates"/><field name="deadline_changed"/><field name="deadline_warning"/><field name="task_overdue"/><field name="personal_reminder"/></group>
-                <group string="Bàn giao và theo dõi"><field name="handover"/><field name="delivery"/><field name="financial"/><field name="mentions"/><field name="hr_requests"/><field name="hr_results"/><field name="digest_morning"/><field name="digest_evening"/><field name="system_alerts" groups="base.group_system"/></group></group>
-            <div class="text-muted">Tắt thông báo không tắt hội thoại với trợ lý. Lệnh /congviec và /ai vẫn dùng được. Chỉ các thông tin bạn có quyền xem mới được gửi.</div>
+            <div class="dac_ui_hero">
+                <div class="dac_ui_hero_icon"><i class="fa fa-bell" title="Thông báo"/></div>
+                <div class="dac_ui_hero_body">
+                    <div class="dac_ui_hero_title"><h1>Thông báo của tôi</h1></div>
+                    <div class="dac_ui_hero_meta">
+                        <span class="dac_ui_pill is-ok" invisible="not notifications_enabled"><i class="fa fa-check"/> Đang nhận qua Zalo</span>
+                        <span class="dac_ui_pill" invisible="notifications_enabled"><i class="fa fa-bell-slash"/> Đã tắt thông báo</span>
+                        <span><field name="user_id" readonly="1" nolabel="1" widget="many2one_avatar_user"/></span>
+                    </div>
+                </div>
+                <div class="dac_ui_hero_side">
+                    <label for="notifications_enabled" string="Nhận thông báo"/>
+                    <field name="notifications_enabled" widget="boolean_toggle" nolabel="1"/>
+                </div>
+            </div>
+            <div class="dac_ui_section_title"><i class="fa fa-clock-o"/> Thời gian nhận</div>
+            <group>
+                <group string="Cách nhận"><field name="paused_until"/><field name="timezone"/></group>
+                <group string="Giờ yên lặng và bản tin">
+                    <field name="quiet_enabled" widget="boolean_toggle"/><field name="quiet_start" widget="float_time"/><field name="quiet_end" widget="float_time"/>
+                    <field name="urgent_outside_hours" widget="boolean_toggle"/><field name="morning_hour" widget="float_time"/><field name="evening_hour" widget="float_time"/>
+                </group>
+            </group>
+            <div class="dac_ui_section_title"><i class="fa fa-list-ul"/> Loại thông báo muốn nhận</div>
+            <group>
+                <group string="Đơn hàng và công việc"><field name="order_created" widget="boolean_toggle"/><field name="order_updates" widget="boolean_toggle"/><field name="task_assigned" widget="boolean_toggle"/><field name="task_updates" widget="boolean_toggle"/><field name="deadline_changed" widget="boolean_toggle"/><field name="deadline_warning" widget="boolean_toggle"/><field name="task_overdue" widget="boolean_toggle"/><field name="personal_reminder" widget="boolean_toggle"/></group>
+                <group string="Bàn giao và theo dõi"><field name="handover" widget="boolean_toggle"/><field name="delivery" widget="boolean_toggle"/><field name="financial" widget="boolean_toggle"/><field name="mentions" widget="boolean_toggle"/><field name="hr_requests" widget="boolean_toggle"/><field name="hr_results" widget="boolean_toggle"/><field name="digest_morning" widget="boolean_toggle"/><field name="digest_evening" widget="boolean_toggle"/><field name="system_alerts" widget="boolean_toggle" groups="base.group_system"/></group>
+            </group>
+            <div class="text-muted"><i class="fa fa-info-circle"/> Tắt thông báo không tắt hội thoại với trợ lý. Lệnh /congviec và /ai vẫn dùng được. Chỉ các thông tin bạn có quyền xem mới được gửi.</div>
         </sheet></form></field>
     </record>
     <record id="preference_action" model="ir.actions.server">
@@ -58,18 +82,33 @@
     </record>
     <record id="notification_list" model="ir.ui.view">
         <field name="name">dac.zalo.notification.list</field><field name="model">dac.zalo.notification</field>
-        <field name="arch" type="xml"><list create="0" edit="0" delete="0"><field name="create_date"/><field name="user_id"/><field name="category"/><field name="state"/><field name="message_id"/><field name="expires_at" optional="hide"/><field name="error_message" optional="show"/></list></field>
+        <field name="arch" type="xml"><list create="0" edit="0" delete="0" decoration-danger="state in ('failed', 'uncertain')" decoration-muted="state == 'cancelled'">
+            <field name="create_date"/><field name="user_id" widget="many2one_avatar_user"/><field name="category" widget="badge"/>
+            <field name="state" widget="badge" decoration-success="state == 'sent'" decoration-danger="state in ('failed', 'uncertain')" decoration-warning="state in ('pending', 'queued')"/>
+            <field name="message_id" optional="hide"/><field name="expires_at" optional="hide"/><field name="error_message" optional="show"/>
+        </list></field>
     </record>
     <record id="notification_search" model="ir.ui.view">
         <field name="name">dac.zalo.notification.search</field><field name="model">dac.zalo.notification</field>
         <field name="arch" type="xml"><search><field name="user_id"/><field name="category"/><field name="state"/>
             <filter name="pending" string="Chờ xử lý / gửi" domain="[('state','in',['pending','queued'])]"/>
             <filter name="errors" string="Cần kiểm tra" domain="[('state','in',['failed','uncertain'])]"/>
+            <group expand="0" string="Nhóm theo">
+                <filter name="by_user" string="Nhân viên" context="{'group_by': 'user_id'}"/>
+                <filter name="by_category" string="Nhóm thông báo" context="{'group_by': 'category'}"/>
+                <filter name="by_state" string="Trạng thái" context="{'group_by': 'state'}"/>
+            </group>
         </search></field>
     </record>
     <record id="notification_action" model="ir.actions.act_window">
         <field name="name">Nhật ký thông báo</field><field name="res_model">dac.zalo.notification</field><field name="view_mode">list</field>
     </record>
-    <menuitem id="menu_preferences" name="Thông báo của tôi" parent="menu_root" action="preference_action" sequence="3"/>
-    <menuitem id="menu_notification_log" name="Nhật ký thông báo" parent="menu_root" action="notification_action" sequence="6"/>
+    <menuitem id="menu_preferences" name="Thông báo của tôi" parent="menu_section_mine" action="preference_action"
+              sequence="30"/>
+    <menuitem id="menu_notification_log" name="Nhật ký thông báo" parent="menu_section_monitor" action="notification_action"
+              groups="dac_erp.group_dac_erp_manager,base.group_system" sequence="30"/>
+
+    <!-- Icon sidebar (đọc bởi Chameleon: navbar_v6.js dacMenuFaIcon) -->
+    <record id="menu_preferences" model="ir.ui.menu"><field name="web_icon">fa-bell-o</field></record>
+    <record id="menu_notification_log" model="ir.ui.menu"><field name="web_icon">fa-history</field></record>
 </odoo>
