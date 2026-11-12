@@ -44,6 +44,7 @@
             <field name="name"/>
             <field name="thread_type" widget="badge" decoration-info="thread_type == 'user'" decoration-primary="thread_type == 'group'"/>
             <field name="members" optional="show"/>
+            <field name="is_test" optional="show"/>
             <field name="event_type_ids" widget="many2many_tags"/>
             <field name="last_sent_at"/>
             <field name="failed_count" decoration-danger="failed_count &gt; 0"/>
@@ -111,7 +112,7 @@
                     </page>
                     <page name="zalo_info" string="Thông tin Zalo">
                         <group>
-                            <group string="Hội thoại"><field name="thread_type"/><field name="thread_id"/><field name="members"/></group>
+                            <group string="Hội thoại"><field name="thread_type"/><field name="thread_id"/><field name="members"/><field name="is_test"/></group>
                             <group string="Ghi chú"><field name="note" placeholder="Vd: Nhóm nhận lead để gọi lại trong 15 phút"/></group>
                         </group>
                     </page>
@@ -125,6 +126,8 @@
             <filter name="receiving" string="Đang nhận tin" domain="[('active','=',True)]"/>
             <filter name="inactive" string="Tạm dừng" domain="[('active','=',False)]"/>
             <separator/>
+            <filter name="test_channels" string="Thử nghiệm" domain="[('is_test','=',True)]"/>
+            <filter name="real_channels" string="Thật" domain="[('is_test','=',False)]"/>
             <filter name="groups" string="Nhóm" domain="[('thread_type','=','group')]"/>
             <filter name="users" string="Chat riêng" domain="[('thread_type','=','user')]"/>
             <filter name="has_failed" string="Có tin lỗi" domain="[('message_ids.state','in',['failed','uncertain'])]"/>

@@ -75,6 +75,9 @@ class ZaloChannel(models.Model):
     last_sent_at = fields.Datetime(string='Gửi gần nhất', compute='_compute_stats')
     failed_count = fields.Integer(string='Tin lỗi', compute='_compute_stats')
     note = fields.Char(string='Ghi chú')
+    is_test = fields.Boolean(string='Nhóm thử nghiệm', default=False, index=True,
+        help='Bật: chỉ nhận thông báo của dữ liệu thử nghiệm (vd lead tên "test" hoặc số 0999999999). '
+             'Tắt: chỉ nhận dữ liệu thật. Dữ liệu thử nghiệm không bao giờ vào hội thoại thật và ngược lại.')
     member_ids = fields.One2many('dac.zalo.channel.member', 'channel_id', string='Thành viên nhóm')
     member_count = fields.Integer(string='Thành viên đã tải', compute='_compute_member_count')
     members_synced_at = fields.Datetime(string='Tải danh sách lúc', readonly=True)
@@ -155,8 +158,10 @@ class ZaloChannel(models.Model):
         return base + extra, mentions
 
     @api.model
-    def _notify(self, event_code, text, key, styles=None):
+    def _notify(self, event_code, text, key, styles=None, test=None):
         """API cho addon khác: gửi `text` tới mọi hội thoại đang đăng ký `event_code`.
+
+        `test`: True = chỉ các hội thoại thử nghiệm (`is_test`), False = chỉ hội thoại thật, None (mặc định) = tất cả.
 
         `styles` (tùy chọn): định dạng chữ, vd [{'start': 0, 'len': 20, 'style': 'bold'}] để in đậm tiêu đề.
 
@@ -168,7 +173,10 @@ class ZaloChannel(models.Model):
             _logger.warning('Zalo notify: loại thông báo %s chưa được đăng ký', event_code)
             return self.env['dac.zalo.channel.message']
         # sudo(): luồng nền (webhook/cron) không có user; chỉ ghi vào outbox riêng của kênh
-        channels = self.sudo().search([('active', '=', True), ('event_type_ids', 'in', event_type.id)])
+        domain = [('active', '=', True), ('event_type_ids', 'in', event_type.id)]
+        if test is not None:
+            domain.append(('is_test', '=', bool(test)))
+        channels = self.sudo().search(domain)
         messages = self.env['dac.zalo.channel.message']
         for channel in channels:
             channel_text, mentions = channel._with_mentions(text, channel._mention_members(event_type))

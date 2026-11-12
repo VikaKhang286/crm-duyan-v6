@@ -20,6 +20,15 @@ class TestZaloChannels(TransactionCase):
         cls.group = cls.channels.create({'name': 'Nhóm Sale', 'thread_id': 'G1', 'thread_type': 'group', 'event_type_ids': [(6, 0, cls.event.ids)]})
         cls.direct = cls.channels.create({'name': 'Kiệt', 'thread_id': 'U1', 'thread_type': 'user', 'event_type_ids': [(6, 0, cls.other_event.ids)]})
 
+    def test_notify_can_be_limited_to_test_or_real_channels(self):
+        test_group = self.channels.create({'name': 'Nhóm thử', 'thread_id': 'G-test', 'thread_type': 'group', 'is_test': True,
+                                           'event_type_ids': [(6, 0, self.event.ids)]})
+        self.assertFalse(self.group.is_test, 'channels are real by default')
+        everyone = self.channels._notify('unit.lead', 'a', 'route:all')
+        self.assertEqual(everyone.channel_id, self.group | test_group, 'no filter: every subscribed channel (unchanged behaviour)')
+        self.assertEqual(self.channels._notify('unit.lead', 'b', 'route:test', test=True).channel_id, test_group)
+        self.assertEqual(self.channels._notify('unit.lead', 'c', 'route:real', test=False).channel_id, self.group)
+
     def test_notify_targets_only_subscribed_active_channels(self):
         messages = self.channels._notify('unit.lead', 'Có khách mới', 'lead:1')
         self.assertEqual(messages.channel_id, self.group)

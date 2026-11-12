@@ -107,6 +107,14 @@ Odoo lưu reaction ở `dac.zalo.channel.reaction` (một dòng cho mỗi ngư�
 `dac.zalo.channel.message._on_reaction` / `_on_reply`; `dac_push` dùng hai móc này. Để cảm ơn bằng cách trả lời đúng tin của nhân viên,
 bridge giữ dữ liệu tin trả lời đó (bảng `quotes`) và `/send` nhận `quote_message_id` = mã tin của nhân viên.
 
+## Lead thử nghiệm và nhóm thử nghiệm
+
+Lead có **tên là "test"** (không phân biệt hoa/thường và dấu; "test 2" cũng tính, "Tester" thì không) hoặc **số điện thoại 0999999999**
+(`+84999999999`, `0999 999 999` cũng tính) là **lead test** (`dac.web.lead.is_test`, tự tính). Mỗi hội thoại Zalo có cờ **Nhóm thử nghiệm**
+(`dac.zalo.channel.is_test`, trong form hội thoại → tab Cấu hình): lead test **chỉ** báo vào hội thoại thử nghiệm, lead thật **chỉ** báo vào
+hội thoại không đặt cờ này; nhắc riêng, nhắc tổng và tin cảm ơn đi theo đúng hội thoại đã nhận lead nên cũng không lẫn. Loại thông báo khác
+không có khái niệm test (`_notify(..., test=None)` gửi mọi hội thoại như cũ). Danh sách lead có bộ lọc "Lead test" / "Lead thật".
+
 ## Chọn nơi nhận lead và nhắc tên
 
 **Lead website → Cấu hình kết nối → Nơi nhận lead trên Zalo → Thêm cuộc hội thoại nhận lead**: Odoo tự liệt kê mọi hội thoại của tài

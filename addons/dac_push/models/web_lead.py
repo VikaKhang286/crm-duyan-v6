@@ -6,11 +6,12 @@ from urllib.parse import urlsplit
 
 from odoo import api, fields, models
 
-from .contact_intent import THANKS_TEXT, means_contacted
+from .contact_intent import THANKS_TEXT, fold, means_contacted
 from .push_event import clean
 from .working_time import add_working_minutes, latest_summary_slot, next_summary_slot
 
 _logger = logging.getLogger(__name__)
+TEST_PHONES = ('0999999999',)  # số dùng để thử; tên "test" cũng là lead thử (xem _compute_is_test)
 REMIND_AFTER_MINUTES = 30  # phút làm việc chờ trước khi nhắc người nhận lead
 REMINDER_TEXT = 'Bạn đã liên hệ khách chưa ạ'
 SUMMARY_PARAM = 'dac_push.last_summary_slot'
@@ -54,6 +55,8 @@ class WebLead(models.Model):
         help='Mọi trường khác trong form (ghi chú, yêu cầu bổ sung, kích thước...), mỗi dòng "Nhãn: giá trị".')
     visited_urls = fields.Text(string='Trang khách đã xem (24 giờ)', help='Lấy từ Bee CRM, cũ → mới.')
     source_info = fields.Char(string='Nguồn truy cập')
+    is_test = fields.Boolean(string='Lead test', compute='_compute_is_test', store=True, index=True,
+        help='Tên là "test" hoặc số điện thoại 0999999999: chỉ báo vào nhóm thử nghiệm, không bao giờ vào nhóm thật.')
     phone_only = fields.Boolean(string='Chỉ để lại số điện thoại', compute='_compute_phone_only', store=True)
     submitted_at = fields.Char(string='Thời điểm gửi (trên web)')
     received_at = fields.Datetime(string='Nhận lúc', default=fields.Datetime.now, readonly=True)
@@ -79,6 +82,14 @@ class WebLead(models.Model):
     def _compute_display_name(self):
         for lead in self:
             lead.display_name = ' - '.join(p for p in (lead.customer_name, lead.phone) if p) or 'Lead web'
+
+    @api.depends('customer_name', 'phone')
+    def _compute_is_test(self):
+        for lead in self:
+            name = fold(lead.customer_name)
+            digits = re.sub(r'\D', '', lead.phone or '')
+            local = '0' + digits[2:] if digits.startswith('84') and len(digits) >= 11 else digits  # +84999999999 = 0999999999
+            lead.is_test = name == 'test' or name.startswith('test ') or local in TEST_PHONES
 
     @api.depends('customer_name', 'email', 'company_name', 'items', 'message', 'extra_info', 'phone')
     def _compute_phone_only(self):
@@ -284,7 +295,7 @@ class PushEventWebLead(models.Model):
             'source_info': ' / '.join(source_parts),
         })
         text, styles = lead._zalo_message()
-        messages = self.env['dac.zalo.channel']._notify('web_lead.created', text, 'push:%s' % self.id, styles=styles)
+        messages = self.env['dac.zalo.channel']._notify('web_lead.created', text, 'push:%s' % self.id, styles=styles, test=lead.is_test)
         lead.write({'zalo_message_ids': [(4, message.id) for message in messages]})  # để sau này trả lời đúng các tin này
 
 

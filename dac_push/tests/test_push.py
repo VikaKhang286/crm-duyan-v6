@@ -135,6 +135,52 @@ class TestPushEvents(TransactionCase):
             event, _ = self.events._receive(envelope(event_id))
         return self.env['dac.web.lead'].search([('event_id', '=', event.id)])
 
+    def test_test_leads_are_recognised_by_name_or_phone(self):
+        Lead = self.env['dac.web.lead']
+        for name, phone in (('test', '0912345678'), ('Test', '0912345678'), ('  TEST  ', ''), ('test 2', '0912345678'), ('Anh A', '0999999999'),
+                            ('Anh A', '+84999999999'), ('Anh A', '0999 999 999'), ('', '0999999999')):
+            self.assertTrue(Lead.new({'customer_name': name, 'phone': phone}).is_test, (name, phone))
+        for name, phone in (('Anh A', '0901234567'), ('Tester', '0912345678'), ('Nguyễn Test', '0912345678'), ('', ''), ('Anh A', '0999999998'),
+                            ('Anh A', '09999999999')):
+            self.assertFalse(Lead.new({'customer_name': name, 'phone': phone}).is_test, (name, phone))
+
+    def test_test_leads_only_reach_test_channels_and_real_leads_never_do(self):
+        event_type = self.env.ref('dac_push.event_type_web_lead_created')
+        test_channel = self.env['dac.zalo.channel'].create({'name': 'Nhóm thử', 'thread_id': 'G-push-test', 'thread_type': 'group',
+                                                            'is_test': True, 'event_type_ids': [(6, 0, event_type.ids)]})
+        for event_id, data in (('rt1', {'name': 'test'}), ('rt2', {'phone': '0999999999', 'name': 'Anh B'}), ('rt3', {'name': 'Khách thật', 'phone': '0911222333'})):
+            event, _ = self.events._receive(envelope(event_id, **data))
+            lead = self.env['dac.web.lead'].search([('event_id', '=', event.id)])
+            channels = lead.zalo_message_ids.channel_id
+            if lead.is_test:
+                self.assertTrue(channels and all(c.is_test for c in channels), 'a test lead reaches test channels only (%s)' % event_id)
+                self.assertIn(test_channel, channels)
+                self.assertNotIn(self.channel, channels)
+            else:
+                self.assertTrue(channels and not any(c.is_test for c in channels), 'a real lead never reaches a test channel')
+                self.assertIn(self.channel, channels)
+                self.assertNotIn(test_channel, channels)
+
+    def test_summary_of_test_leads_goes_to_the_test_group_only(self):
+        event_type = self.env.ref('dac_push.event_type_web_lead_created')
+        test_channel = self.env['dac.zalo.channel'].create({'name': 'Nhóm thử', 'thread_id': 'G-push-test2', 'thread_type': 'group',
+                                                            'is_test': True, 'event_type_ids': [(6, 0, event_type.ids)]})
+        real = self._lead_at('sm-real', '2026-11-12 09:00')
+        event, _ = self.events._receive(envelope('sm-test', name='test'))
+        test = self.env['dac.web.lead'].search([('event_id', '=', event.id)])
+        for lead in (real, test):
+            lead.zalo_message_ids.write({'state': 'sent'})
+            lead.received_at = self._vn('2026-11-12 09:00')
+        test.write({'phone': '0999999999'})
+        real.write({'phone': '0933000111'})
+        self.env['dac.web.lead']._send_summary(self._vn('2026-11-12 11:30'))
+        in_test = test_channel.message_ids.filtered(lambda m: m.event_key.startswith('lead-summary:'))
+        in_real = self.channel.message_ids.filtered(lambda m: m.event_key.startswith('lead-summary:'))
+        self.assertIn('0999999999', in_test.text)
+        self.assertNotIn('0933000111', in_test.text)
+        self.assertIn('0933000111', in_real.text)
+        self.assertNotIn('0999999999', in_real.text)
+
     def test_summary_slots_run_on_working_days_only(self):
         from datetime import timezone
         from ..models.working_time import TZ, latest_summary_slot, next_summary_slot

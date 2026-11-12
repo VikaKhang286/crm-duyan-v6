@@ -199,6 +199,7 @@
         <field name="arch" type="xml"><list create="0">
             <field name="received_at"/>
             <field name="contact_state" widget="badge" decoration-success="contact_state == 'contacted'" decoration-danger="contact_state == 'unreachable'" decoration-warning="contact_state == 'new'"/>
+            <field name="is_test" optional="show"/>
             <field name="customer_name"/>
             <field name="phone" widget="phone"/>
             <field name="items"/>
@@ -216,6 +217,8 @@
             <filter name="last_24h" string="24 giờ qua" domain="[('received_at','&gt;=', (datetime.datetime.now() - datetime.timedelta(hours=24)).strftime('%Y-%m-%d %H:%M:%S'))]"/>
             <filter name="phone_only" string="Chỉ để lại SĐT" domain="[('phone_only','=',True)]"/>
             <filter name="not_contacted" string="Chưa liên hệ" domain="[('contact_state','=','new')]"/>
+            <filter name="test_leads" string="Lead test" domain="[('is_test','=',True)]"/>
+            <filter name="real_leads" string="Lead thật" domain="[('is_test','=',False)]"/>
             <filter name="unreachable" string="Liên hệ không được" domain="[('contact_state','=','unreachable')]"/>
             <separator/>
             <filter name="quote" string="Báo giá" domain="[('form_type','=','quote')]"/>
@@ -266,7 +269,7 @@
                 <page name="source" string="Nguồn gửi">
                     <group>
                         <group string="Website"><field name="site"/><field name="page_url" widget="url"/><field name="page_title"/></group>
-                        <group string="Thời gian"><field name="submitted_at"/><field name="received_at"/><field name="contact_state_at"/><field name="remind_due_at"/><field name="reminded_at"/><field name="acked_at"/><field name="source_info"/><field name="phone_only"/></group>
+                        <group string="Thời gian"><field name="is_test"/><field name="submitted_at"/><field name="received_at"/><field name="contact_state_at"/><field name="remind_due_at"/><field name="reminded_at"/><field name="acked_at"/><field name="source_info"/><field name="phone_only"/></group>
                     </group>
                 </page>
             </notebook>
