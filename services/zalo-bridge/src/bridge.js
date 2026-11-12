@@ -23,15 +23,39 @@ export function normalizeMessage(message, historical = false) {
 // Kiểu chữ Zalo cho phép (giá trị TextStyle của zca-js). Chỉ nhận danh sách trắng, phạm vi phải nằm trong văn bản.
 const STYLE_CODES = { bold: 'b' };
 
-export function buildContent(payload) {
-  if (payload.styles === undefined || payload.styles === null) return payload.text;
-  if (!Array.isArray(payload.styles) || payload.styles.length > 20) throw new Error('invalid_payload');
-  const styles = payload.styles.map((item) => {
-    const code = item && STYLE_CODES[item.style];
-    if (!code || !Number.isInteger(item.start) || !Number.isInteger(item.len) || item.start < 0 || item.len < 1 || item.start + item.len > payload.text.length) throw new Error('invalid_payload');
-    return { start: item.start, len: item.len, st: code };
+const MAX_MENTIONS = 30;
+const USER_ID = /^\d{1,30}$/;
+
+// Nhắc tên (@tag) chỉ dùng được trong nhóm. `pos`/`len` tính theo ký tự JavaScript (UTF-16), đúng như zca-js;
+// mỗi đoạn phải bắt đầu bằng "@" trong văn bản và các đoạn không được chồng lên nhau.
+export function buildMentions(payload) {
+  if (payload.mentions === undefined || payload.mentions === null) return [];
+  if (!Array.isArray(payload.mentions) || payload.mentions.length > MAX_MENTIONS || payload.thread_type !== 'group') throw new Error('invalid_payload');
+  const mentions = payload.mentions.map((item) => {
+    if (!item || typeof item.uid !== 'string' || !USER_ID.test(item.uid) || !Number.isInteger(item.pos) || !Number.isInteger(item.len)
+      || item.pos < 0 || item.len < 2 || item.pos + item.len > payload.text.length || payload.text[item.pos] !== '@') throw new Error('invalid_payload');
+    return { pos: item.pos, len: item.len, uid: item.uid };
   });
-  return styles.length ? { msg: payload.text, styles } : payload.text;
+  const ordered = [...mentions].sort((a, b) => a.pos - b.pos);
+  for (let index = 1; index < ordered.length; index += 1) {
+    if (ordered[index].pos < ordered[index - 1].pos + ordered[index - 1].len) throw new Error('invalid_payload');
+  }
+  return mentions;
+}
+
+export function buildContent(payload) {
+  const mentions = buildMentions(payload);
+  let styles = [];
+  if (payload.styles !== undefined && payload.styles !== null) {
+    if (!Array.isArray(payload.styles) || payload.styles.length > 20) throw new Error('invalid_payload');
+    styles = payload.styles.map((item) => {
+      const code = item && STYLE_CODES[item.style];
+      if (!code || !Number.isInteger(item.start) || !Number.isInteger(item.len) || item.start < 0 || item.len < 1 || item.start + item.len > payload.text.length) throw new Error('invalid_payload');
+      return { start: item.start, len: item.len, st: code };
+    });
+  }
+  if (!styles.length && !mentions.length) return payload.text;
+  return { msg: payload.text, ...(styles.length ? { styles } : {}), ...(mentions.length ? { mentions } : {}) };
 }
 
 const THREAD_CACHE_MS = 5 * 60 * 1000;
@@ -218,6 +242,37 @@ export class Bridge {
       }
     }
     if (this.api === api) this.threadCache = { api, at: Date.now(), items };
+    return items;
+  }
+  // Thành viên một nhóm (trừ chính tài khoản trợ lý), cache 5 phút như danh sách hội thoại.
+  async listGroupMembers(threadId) {
+    if (!USER_ID.test(String(threadId))) throw new Error('invalid_payload');
+    if (!this.api || this.state !== 'connected') throw new Error('not_connected');
+    const api = this.api;
+    this.memberCache ||= new Map();
+    const cached = this.memberCache.get(threadId);
+    if (cached && cached.api === api && Date.now() - cached.at < THREAD_CACHE_MS) return cached.items;
+    const group = (await api.getGroupInfo(threadId))?.gridInfoMap?.[threadId];
+    if (!group) throw new Error('not_found');
+    const names = new Map();
+    for (const member of Array.isArray(group.currentMems) ? group.currentMems : []) {
+      const id = String(member?.id || '');
+      if (id) names.set(id, String(member.dName || member.zaloName || '').trim());
+    }
+    const ids = new Set([...names.keys()]);
+    for (const id of Array.isArray(group.memberIds) ? group.memberIds : []) ids.add(String(id));
+    for (const version of Array.isArray(group.memVerList) ? group.memVerList : []) ids.add(String(version).split('_')[0]);
+    ids.delete(String(this.accountId));
+    for (const id of [...ids]) if (!USER_ID.test(id)) ids.delete(id);
+    const missing = [...ids].filter((id) => !names.get(id));
+    for (let index = 0; index < missing.length; index += 50) {
+      const profiles = (await api.getGroupMembersInfo(missing.slice(index, index + 50)))?.profiles || {};
+      for (const [id, profile] of Object.entries(profiles)) names.set(String(id), String(profile?.displayName || profile?.zaloName || '').trim());
+    }
+    const items = [...ids]
+      .map((id) => ({ uid: id, name: (names.get(id) || id).slice(0, 160) }))
+      .sort((a, b) => fold(a.name).localeCompare(fold(b.name)));
+    if (this.api === api) this.memberCache.set(threadId, { api, at: Date.now(), items });
     return items;
   }
   async searchThreads(query = '') {

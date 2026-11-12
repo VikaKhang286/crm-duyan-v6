@@ -44,6 +44,30 @@ class TestPushEvents(TransactionCase):
             'Khách yêu cầu tư vấn', '👤 Anh A', '📞 0901234567', '➕ Yêu cầu: In bạt, Standee', '💬 Cần báo giá gấp',
             'Xem chi tiết: %s' % lead._short_link()])
 
+    def test_lead_message_tags_the_people_configured_for_new_leads(self):
+        event_type = self.env.ref('dac_push.event_type_web_lead_created')
+        member = self.env['dac.zalo.channel.member'].create([
+            {'channel_id': self.channel.id, 'uid': '111', 'name': 'An'}, {'channel_id': self.channel.id, 'uid': '222', 'name': 'Bình'}])
+        self.env['dac.zalo.channel.mention'].create({'channel_id': self.channel.id, 'event_type_id': event_type.id, 'member_ids': [(6, 0, member.ids)]})
+        self.events._receive(envelope('tag1'))
+        message = self.channel.message_ids
+        self.assertTrue(message.text.endswith('\n@An @Bình'))
+        self.assertEqual([m['uid'] for m in message.mentions], ['111', '222'])
+        self.assertEqual(message.styles, [{'start': 0, 'len': len('Khách yêu cầu tư vấn'), 'style': 'bold'}], 'the bold title is unchanged')
+
+    def test_push_config_lists_lead_recipients_and_opens_the_picker_with_the_lead_event(self):
+        config = self.env['dac.push.config']._config()
+        self.assertIn(self.channel, config.lead_channel_ids)
+        self.assertEqual(config.lead_channel_count, len(config.lead_channel_ids))
+        self.channel.active = False
+        self.assertIn(self.channel, config.lead_channel_ids, 'paused recipients are still listed')
+        from unittest.mock import patch
+        with patch.object(type(self.env['dac.zalo.config']), '_bridge_request', return_value={'threads': []}):
+            action = config.action_add_lead_channel()
+        wizard = self.env[action['res_model']].browse(action['res_id'])
+        self.assertEqual(wizard.event_codes, 'web_lead.created')
+        self.assertEqual(config.action_open_lead_channels()['domain'], [('event_type_ids.code', '=', 'web_lead.created')])
+
     def test_duplicate_event_is_idempotent(self):
         first, _ = self.events._receive(envelope('dup'))
         second, created = self.events._receive(envelope('dup'))

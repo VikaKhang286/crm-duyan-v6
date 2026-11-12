@@ -118,4 +118,16 @@ báo), tab **Tin đã gửi** (trạng thái, Gửi lại) và nút **Gửi tin 
 Hàng đợi riêng `dac.zalo.channel.message`; bridge `/send` nhận thêm `thread_type` (`user` | `group`). Tin gửi nhóm không
 qua giờ yên lặng và không tính vào AI. Tài khoản trợ lý phải là thành viên nhóm. Ví dụ dùng: [PUSH_DAC_ODOO.md](PUSH_DAC_ODOO.md).
 
+**Nhắc tên (@tag) thành viên trong nhóm** (từ bản 18.0.2.9.0)
+
+Tin gửi vào nhóm có thể nhắc tên một hoặc nhiều thành viên để Zalo gạch tên và báo ngay cho họ. Trong form của một nhóm, tab
+**Thông báo nhận** có mục **Nhắc tên**: bấm **Tải danh sách thành viên** (bridge `GET /threads/<id>/members`, cache 5 phút, bỏ
+chính tài khoản trợ lý; nhóm thêm qua wizard được tải tự động), rồi **Thêm dòng**: chọn loại thông báo và bấm vào ô **＋ Thêm người
+cần nhắc tên** để thả xuống đủ thành viên (widget `dac_zalo_member_tags`, không giới hạn 7 mục như mặc định). Mỗi nhóm + loại
+thông báo một dòng, tối đa 30 người mỗi tin, chỉ chọn người thuộc đúng nhóm. Khi gửi, Odoo thêm dòng cuối `@An @Bình` và gửi
+kèm `mentions: [{pos, len, uid}]`; `pos`/`len` tính theo ký tự UTF-16 như zca-js (emoji ngoài BMP chiếm 2 đơn vị). Bridge kiểm tra
+mỗi đoạn bắt đầu bằng `@`, nằm trong văn bản, không chồng nhau, `uid` là số, và chỉ nhận cho `thread_type = group`. Nhắc tên đi
+cùng chữ đậm (`styles`) trong một tin. **Gửi tin thử** cũng nhắc những người đã cài. Bridge phải được cập nhật trước Odoo; bridge cũ
+bỏ qua `mentions` nên tin vẫn gửi nhưng chỉ là chữ `@Tên` thường.
+
 Kết quả và cách chạy kiểm thử: [ZALO_VALIDATION.md](ZALO_VALIDATION.md).

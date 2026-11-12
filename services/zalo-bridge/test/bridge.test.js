@@ -201,3 +201,49 @@ test('invalid styles are rejected before anything is reserved or sent', async ()
   assert.equal(buildContent({ text: 'abc' }), 'abc');
   store.close();
 });
+
+test('mentions are sent with the group message and validated before anything is reserved', async () => {
+  const sent = [];
+  const { bridge, store } = fixture();
+  bridge.api = { sendMessage: async (content, thread, type) => { sent.push([content, type]); return { message: { msgId: `m${sent.length}` } }; }, getUserInfo: async () => ({}) };
+  const text = 'Khách yêu cầu\n📞 0909\n@An @Bình Phạm';
+  const at = text.indexOf('@An');
+  const mentions = [{ pos: at, len: 3, uid: '111' }, { pos: at + 4, len: 10, uid: '222' }];
+  const styles = [{ start: 0, len: 13, style: 'bold' }];
+  assert.equal((await bridge.send({ ...payload, request_id: 'm1', thread_id: 'G1', thread_type: 'group', text, styles, mentions })).delivery, 'sent');
+  assert.deepEqual(sent[0], [{ msg: text, styles: [{ start: 0, len: 13, st: 'b' }], mentions }, 1]);
+  const bad = [
+    [{ pos: at, len: 3, uid: '1x1' }], [{ pos: at, len: 3, uid: 111 }], [{ pos: 0, len: 3, uid: '1' }], [{ pos: at, len: 1, uid: '1' }],
+    [{ pos: at, len: 99, uid: '1' }], [{ pos: -1, len: 3, uid: '1' }], [{ pos: 1.5, len: 3, uid: '1' }], 'x', [null],
+    [{ pos: at, len: 3, uid: '1' }, { pos: at + 1, len: 3, uid: '2' }], Array(31).fill({ pos: at, len: 3, uid: '1' }),
+  ];
+  for (const [index, list] of bad.entries()) {
+    await assert.rejects(bridge.send({ ...payload, request_id: `bm${index}`, thread_id: 'G1', thread_type: 'group', text, mentions: list }), /invalid_payload/);
+  }
+  await assert.rejects(bridge.send({ ...payload, request_id: 'bmu', text, mentions }), /invalid_payload/, 'mentions only work in groups');
+  assert.equal(sent.length, 1);
+  assert.equal(buildContent({ text: 'abc', thread_type: 'group', mentions: [] }), 'abc');
+  store.close();
+});
+
+test('group members: names from the group info, missing names looked up, self excluded, cached, sorted without accents', async () => {
+  let infoCalls = 0; const looked = [];
+  const api = {
+    getGroupInfo: async (id) => { infoCalls += 1; return { gridInfoMap: { [id]: {
+      currentMems: [{ id: '111', dName: 'Đặng Văn B' }, { id: '222', dName: '', zaloName: 'An' }],
+      memberIds: ['111', '222', '333', '999', 'khong-hop-le'], memVerList: ['444_9', '111_1'] } } }; },
+    getGroupMembersInfo: async (ids) => { looked.push(ids); return { profiles: { 333: { displayName: 'Lan Phạm' }, 444: { zaloName: 'Công' } } }; },
+  };
+  const { bridge, store } = fixture(); bridge.api = api; bridge.accountId = '999';
+  const items = await bridge.listGroupMembers('5001');
+  assert.deepEqual(items.map((m) => m.name), ['An', 'Công', 'Đặng Văn B', 'Lan Phạm']);
+  assert.deepEqual(looked, [['333', '444']]);
+  assert.deepEqual(await bridge.listGroupMembers('5001'), items);
+  assert.equal(infoCalls, 1, 'second call must use the cache');
+  await assert.rejects(bridge.listGroupMembers('../x'), /invalid_payload/);
+  bridge.api = { getGroupInfo: async () => ({ gridInfoMap: {} }) };
+  await assert.rejects(bridge.listGroupMembers('6001'), /not_found/);
+  bridge.state = 'disconnected';
+  await assert.rejects(bridge.listGroupMembers('5001'), /not_connected/);
+  store.close();
+});

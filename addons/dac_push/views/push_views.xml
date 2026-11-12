@@ -52,7 +52,25 @@
                         confirm="Tạo khóa mới sẽ làm plugin hiện tại bị từ chối cho đến khi bạn cập nhật khóa trên WordPress. Tiếp tục?"/>
                 </div>
             </div>
-            <div class="text-muted"><i class="fa fa-info-circle"/> Có lead mới, Odoo lưu lại và báo vào nhóm Zalo đã chọn trong <strong>Trợ lý Zalo → Thông báo → Đích nhận thông báo</strong>.</div>
+            <div class="dac_ui_section_title"><i class="fa fa-users"/> Nơi nhận lead trên Zalo <small>nhóm hoặc người nhận tin khi có lead mới</small></div>
+            <div class="d-flex flex-wrap gap-2 mb-2">
+                <button name="action_add_lead_channel" type="object" string="Thêm cuộc hội thoại nhận lead" icon="fa-plus" class="btn-primary"/>
+                <button name="action_open_lead_channels" type="object" string="Chọn người nhắc tên / quản lý nơi nhận" icon="fa-at" class="btn-secondary"
+                        invisible="not lead_channel_count"/>
+            </div>
+            <field name="lead_channel_count" invisible="1"/>
+            <div class="alert alert-warning" role="status" invisible="lead_channel_count">
+                <i class="fa fa-exclamation-triangle"/> Chưa có nơi nào nhận lead. Bấm “Thêm cuộc hội thoại nhận lead”, chọn nhóm hoặc người từ danh sách hội thoại của tài khoản Zalo.
+            </div>
+            <field name="lead_channel_ids" nolabel="1" readonly="1" invisible="not lead_channel_count">
+                <list decoration-muted="not active">
+                    <field name="name"/>
+                    <field name="thread_type" widget="badge" decoration-info="thread_type == 'user'" decoration-primary="thread_type == 'group'"/>
+                    <field name="mention_summary" string="Nhắc tên"/>
+                    <field name="active" widget="boolean" string="Đang nhận"/>
+                </list>
+            </field>
+            <div class="text-muted"><i class="fa fa-info-circle"/> Có lead mới, Odoo lưu lại và báo vào các hội thoại trên. Với nhóm, bạn có thể nhắc tên một hoặc nhiều thành viên để họ được Zalo báo ngay.</div>
         </sheet></form></field>
     </record>
     <record id="config_action" model="ir.actions.act_window">

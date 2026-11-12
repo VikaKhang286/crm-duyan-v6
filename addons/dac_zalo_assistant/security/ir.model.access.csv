@@ -30,3 +30,7 @@ access_thread_search_manager,Zalo thread search manager,model_dac_zalo_thread_se
 access_thread_search_system,Zalo thread search admin,model_dac_zalo_thread_search,base.group_system,1,1,1,1
 access_thread_search_line_manager,Zalo thread search line manager,model_dac_zalo_thread_search_line,dac_erp.group_dac_erp_manager,1,1,1,1
 access_thread_search_line_system,Zalo thread search line admin,model_dac_zalo_thread_search_line,base.group_system,1,1,1,1
+access_channel_member_manager,Zalo channel members manager,model_dac_zalo_channel_member,dac_erp.group_dac_erp_manager,1,1,1,1
+access_channel_member_system,Zalo channel members admin,model_dac_zalo_channel_member,base.group_system,1,1,1,1
+access_channel_mention_manager,Zalo channel mentions manager,model_dac_zalo_channel_mention,dac_erp.group_dac_erp_manager,1,1,1,1
+access_channel_mention_system,Zalo channel mentions admin,model_dac_zalo_channel_mention,base.group_system,1,1,1,1

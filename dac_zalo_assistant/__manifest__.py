@@ -1,8 +1,8 @@
 {
     'name': 'Trợ lý DAC qua Zalo',
-    'version': '18.0.2.8.0',
+    'version': '18.0.2.9.0',
     'category': '1. Duy An ERP',
-    'summary': 'Hội thoại, thông báo nghiệp vụ Zalo, đích nhận thông báo (nhóm/chat) và AI tương thích OpenAI',
+    'summary': 'Hội thoại, thông báo nghiệp vụ Zalo, đích nhận thông báo (nhóm/chat, nhắc tên @tag) và AI tương thích OpenAI',
     'license': 'LGPL-3',
     'depends': ['dac_erp'],
     'data': [
@@ -19,6 +19,8 @@
         'web.assets_backend': [
             'dac_zalo_assistant/static/src/scss/zalo_config.scss',
             'dac_zalo_assistant/static/src/scss/zalo_ui.scss',
+            'dac_zalo_assistant/static/src/js/member_tags.js',
+            'dac_zalo_assistant/static/src/xml/member_tags.xml',
         ],
     },
     'application': True,

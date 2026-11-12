@@ -21,6 +21,9 @@ class PushConfig(models.Model):
     events_24h = fields.Integer(string='Dữ liệu nhận 24 giờ qua', compute='_compute_health')
     failed_event_count = fields.Integer(string='Dữ liệu lỗi', compute='_compute_health')
     lead_count = fields.Integer(string='Lead từ website', compute='_compute_health')
+    lead_channel_ids = fields.Many2many('dac.zalo.channel', string='Nơi nhận lead trên Zalo', compute='_compute_lead_channels',
+        context={'active_test': False})
+    lead_channel_count = fields.Integer(compute='_compute_lead_channels')
 
     def _compute_health(self):
         events = self.env['dac.push.event']
@@ -34,6 +37,24 @@ class PushConfig(models.Model):
             config.events_24h = recent
             config.failed_event_count = failed
             config.lead_count = leads
+
+    def _compute_lead_channels(self):
+        event = self.env.ref('dac_push.event_type_web_lead_created', raise_if_not_found=False)
+        channels = self.env['dac.zalo.channel'].with_context(active_test=False).search(
+            [('event_type_ids', 'in', event.ids)]) if event else self.env['dac.zalo.channel']
+        for config in self:
+            config.lead_channel_ids = channels
+            config.lead_channel_count = len(channels)
+
+    def action_add_lead_channel(self):
+        """Mở danh sách hội thoại của tài khoản Zalo; hội thoại được chọn nhận sẵn thông báo lead mới."""
+        return self.env['dac.zalo.thread.search'].action_open_for_events(['web_lead.created'])
+
+    def action_open_lead_channels(self):
+        action = self.env['ir.actions.actions']._for_xml_id('dac_zalo_assistant.channel_action')
+        action.update(name=_('Nơi nhận lead'), domain=[('event_type_ids.code', '=', 'web_lead.created')],
+                      context={'active_test': False})
+        return action
 
     def action_open_leads(self):
         return self.env['ir.actions.actions']._for_xml_id('dac_push.web_lead_action')

@@ -63,6 +63,13 @@ Lưu ý bảo mật: ai nhận được link đều xem được SĐT khách và
 cũ (tạo trước khi có mã) được cấp mã khi lần đầu cần tới. Link kiểu cũ `/lead/<số>` (tin Zalo đã gửi trước đây) vẫn dùng được nhưng
 bắt đăng nhập. Chữ đậm dùng `styles` của zca-js: bridge chỉ nhận danh sách trắng (hiện chỉ `bold`) và kiểm tra phạm vi.
 
+## Chọn nơi nhận lead và nhắc tên
+
+**Lead website → Cấu hình kết nối → Nơi nhận lead trên Zalo → Thêm cuộc hội thoại nhận lead**: Odoo tự liệt kê mọi hội thoại của tài
+khoản Zalo trợ lý; tick nhóm hoặc người cần nhận rồi Thêm. Hội thoại mới được bật sẵn thông báo “Khách mới từ form website”. Với nhóm,
+mở form hội thoại (nút **Chọn người nhắc tên / quản lý nơi nhận**), tab **Thông báo nhận → Nhắc tên**, thêm dòng cho loại thông báo
+lead và chọn một hoặc nhiều thành viên; họ sẽ được `@tag` ở dòng cuối tin lead. Chi tiết kỹ thuật: [ZALO_ASSISTANT.md](ZALO_ASSISTANT.md).
+
 ## Thêm loại dữ liệu mới
 
 **WordPress** (plugin/theme khác):

@@ -108,7 +108,8 @@ class TestZaloChannels(TransactionCase):
         with self.assertRaises(UserError):
             wizard.action_add()
         wizard.line_ids.filtered(lambda l: l.thread_id in ('G1', 'G2')).write({'selected': True})
-        action = wizard.action_add()
+        with patch.object(type(self.config), '_bridge_request', return_value={'members': [{'uid': '10', 'name': 'An'}]}):
+            action = wizard.action_add()
         created = self.channels.search([('thread_id', '=', 'G2')])
         self.assertEqual((created.name, created.thread_type, created.members), ('Nhóm Thiết kế', 'group', 8))
         self.assertEqual(action['res_id'], created.id, 'G1 already existed and must not be duplicated')
@@ -126,3 +127,109 @@ class TestZaloChannels(TransactionCase):
             self.channels.with_user(self.staff).search([])
         with self.assertRaises(AccessError):
             self.env['dac.zalo.channel.message'].with_user(self.staff).search([])
+
+
+    # ── Nhắc tên (@tag) trong nhóm ─────────────────────────────────────────────
+    def _members(self, channel, *pairs):
+        return self.env['dac.zalo.channel.member'].create([{'channel_id': channel.id, 'uid': uid, 'name': name} for uid, name in pairs])
+
+    def _rule(self, channel, event, members):
+        return self.env['dac.zalo.channel.mention'].create({'channel_id': channel.id, 'event_type_id': event.id, 'member_ids': [(6, 0, members.ids)]})
+
+    def test_mentions_are_appended_with_correct_utf16_positions(self):
+        an, binh = self._members(self.group, ('111', 'An'), ('222', 'Bình  Phạm'))
+        self._rule(self.group, self.event, an | binh)
+        text = '👤 Khách\n📞 0909 xem'
+        message = self.channels._notify('unit.lead', text, 'lead:mention')
+        self.assertEqual(message.text, text + '\n@An @Bình Phạm', 'names are space-normalised, mention line is last')
+        utf16 = lambda value: len(value.encode('utf-16-le')) // 2
+        pos_an = utf16(text + '\n')
+        self.assertEqual(message.mentions, [{'pos': pos_an, 'len': 3, 'uid': '111'},
+                                            {'pos': pos_an + 4, 'len': utf16('@Bình Phạm'), 'uid': '222'}])
+        self.assertGreater(utf16(text), len(text), 'the text has emoji outside the BMP, so UTF-16 differs from len()')
+
+    def test_no_mentions_without_rule_for_event_or_for_private_chats(self):
+        an = self._members(self.group, ('111', 'An'))
+        self._rule(self.group, self.other_event, an)
+        plain = self.channels._notify('unit.lead', 'Tin', 'lead:nomention')
+        self.assertEqual((plain.text, plain.mentions), ('Tin', False))
+        user_member = self.env['dac.zalo.channel.member'].create({'channel_id': self.group.id, 'uid': '5', 'name': 'X'})
+        self.assertFalse(self.direct._mention_members(self.other_event), 'private chats never mention')
+        self.assertFalse(self.group._mention_members(self.env['dac.zalo.event.type']))
+        self.assertTrue(user_member)
+
+    def test_mentions_are_forwarded_to_the_bridge(self):
+        an = self._members(self.group, ('111', 'An'))
+        self._rule(self.group, self.event, an)
+        message = self.channels._notify('unit.lead', 'Có khách', 'lead:mention-send')
+        with patch.object(type(self.config), '_bridge_request', return_value={'delivery': 'sent', 'message_id': 'zm9'}) as bridge:
+            self.env['dac.zalo.channel.message']._cron_process()
+        self.assertEqual(bridge.call_args.args[1]['mentions'], message.mentions)
+        self.assertEqual(bridge.call_args.args[1]['text'], 'Có khách\n@An')
+
+    def test_a_rule_only_accepts_members_of_its_own_group_and_at_most_thirty(self):
+        other_group = self.channels.create({'name': 'Nhóm khác', 'thread_id': 'G9', 'thread_type': 'group'})
+        stranger = self._members(other_group, ('900', 'Người lạ'))
+        with self.assertRaises(UserError), self.cr.savepoint():
+            self._rule(self.group, self.event, stranger)
+        many = self._members(self.group, *[(str(1000 + i), 'Tv %s' % i) for i in range(31)])
+        with self.assertRaises(UserError), self.cr.savepoint():
+            self._rule(self.group, self.event, many)
+        self._rule(self.group, self.event, many[:30])
+        with self.assertRaises(Exception), self.cr.savepoint():
+            self._rule(self.group, self.event, many[:1])
+
+    def test_sync_members_adds_renames_and_removes_people_who_left(self):
+        an, binh = self._members(self.group, ('111', 'An cũ'), ('222', 'Bình'))
+        rule = self._rule(self.group, self.event, an | binh)
+        reply = {'members': [{'uid': '111', 'name': 'An mới'}, {'uid': '333', 'name': ' Chi\n Lê '}, {'uid': 'abc', 'name': 'bad'}, 'junk']}
+        with patch.object(type(self.config), '_bridge_request', return_value=reply) as bridge:
+            self.group.with_user(self.manager).action_sync_members()
+        self.assertEqual(bridge.call_args.args[0], '/threads/G1/members')
+        self.assertEqual({m.uid: m.name for m in self.group.member_ids}, {'111': 'An mới', '333': 'Chi Lê'})
+        self.assertEqual(rule.member_ids.mapped('uid'), ['111'], 'a member who left the group is removed from the rule')
+        self.assertTrue(self.group.members_synced_at)
+        with self.assertRaises(UserError):
+            self.direct._sync_members()
+
+    def test_wizard_with_event_codes_subscribes_new_groups_and_prepares_the_mention_row(self):
+        listing = {'threads': [{'thread_id': 'G7', 'thread_type': 'group', 'name': 'Nhóm Lead', 'members': 4}]}
+        with patch.object(type(self.config), '_bridge_request', return_value=listing) as bridge:
+            action = self.env['dac.zalo.thread.search'].action_open_for_events(['unit.lead'])
+        self.assertEqual(bridge.call_args.args[0], '/threads?q=', 'opening the picker lists every conversation without pressing Search')
+        wizard = self.env['dac.zalo.thread.search'].with_user(self.manager).browse(action['res_id'])
+        self.assertEqual([l.name for l in wizard.line_ids], ['Nhóm Lead'])
+        self.assertEqual(wizard.event_names, 'Lead mới')
+        wizard.line_ids.unlink()
+        wizard.line_ids = [(0, 0, {'thread_id': 'G7', 'thread_type': 'group', 'name': 'Nhóm Lead', 'members': 4, 'selected': True}),
+                           (0, 0, {'thread_id': 'U7', 'thread_type': 'user', 'name': 'Lan', 'members': 0, 'selected': True})]
+        with patch.object(type(self.config), '_bridge_request', return_value={'members': [{'uid': '7', 'name': 'Hoa'}]}):
+            wizard.action_add()
+        group = self.channels.search([('thread_id', '=', 'G7')])
+        private = self.channels.search([('thread_id', '=', 'U7')])
+        self.assertEqual(group.event_type_ids, self.event)
+        self.assertEqual(group.member_ids.mapped('name'), ['Hoa'])
+        self.assertEqual(group.mention_ids.event_type_id, self.event)
+        self.assertEqual(private.event_type_ids, self.event)
+        self.assertFalse(private.mention_ids, 'private chats get no mention row')
+
+    def test_picker_still_opens_when_the_bridge_is_down(self):
+        with patch.object(type(self.config), '_bridge_request', side_effect=UserError('bridge down')):
+            action = self.channels.action_open_search()
+        wizard = self.env['dac.zalo.thread.search'].browse(action['res_id'])
+        self.assertEqual((wizard.searched, len(wizard.line_ids)), (False, 0))
+
+    def test_failed_member_sync_does_not_block_adding_the_group(self):
+        wizard = self.env['dac.zalo.thread.search'].create({})
+        wizard.line_ids = [(0, 0, {'thread_id': 'G8', 'thread_type': 'group', 'name': 'Nhóm tạm', 'selected': True})]
+        with patch.object(type(self.config), '_bridge_request', side_effect=UserError('bridge down')):
+            wizard.action_add()
+        self.assertTrue(self.channels.search([('thread_id', '=', 'G8')]))
+
+    def test_test_message_mentions_people_configured_for_subscribed_events(self):
+        an = self._members(self.group, ('111', 'An'))
+        self._rule(self.group, self.event, an)
+        self.group.with_user(self.manager).action_send_test()
+        message = self.group.message_ids
+        self.assertTrue(message.text.endswith('\n@An'))
+        self.assertEqual(message.mentions[0]['uid'], '111')

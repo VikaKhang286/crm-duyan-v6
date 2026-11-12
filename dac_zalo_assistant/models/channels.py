@@ -8,6 +8,7 @@ from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
 MAX_TEXT = 12000
+MAX_MENTIONS = 30  # bridge từ chối quá 30 lượt nhắc tên trong một tin
 THREAD_TYPES = [('group', 'Nhóm'), ('user', 'Chat riêng')]
 
 
@@ -20,6 +21,11 @@ GROUP_ICONS = {
     'Nhân sự': 'fa-id-badge',
     'Tài chính': 'fa-credit-card',
 }
+
+
+def utf16_len(text):
+    """Zalo/zca-js đánh vị trí theo ký tự JavaScript (UTF-16): emoji ngoài BMP chiếm 2 đơn vị."""
+    return len(text.encode('utf-16-le')) // 2
 
 
 class ZaloEventType(models.Model):
@@ -69,7 +75,24 @@ class ZaloChannel(models.Model):
     last_sent_at = fields.Datetime(string='Gửi gần nhất', compute='_compute_stats')
     failed_count = fields.Integer(string='Tin lỗi', compute='_compute_stats')
     note = fields.Char(string='Ghi chú')
+    member_ids = fields.One2many('dac.zalo.channel.member', 'channel_id', string='Thành viên nhóm')
+    member_count = fields.Integer(string='Thành viên đã tải', compute='_compute_member_count')
+    members_synced_at = fields.Datetime(string='Tải danh sách lúc', readonly=True)
+    mention_ids = fields.One2many('dac.zalo.channel.mention', 'channel_id', string='Nhắc tên theo loại thông báo')
     _sql_constraints = [('thread_unique', 'unique(thread_id, thread_type)', 'Hội thoại này đã được thêm.')]
+
+    mention_summary = fields.Char(string='Đang nhắc tên', compute='_compute_mention_summary')
+
+    @api.depends('mention_ids.member_ids.name')
+    def _compute_mention_summary(self):
+        for channel in self:
+            names = sorted({m.name for m in channel.mention_ids.member_ids if m.name})
+            channel.mention_summary = ', '.join('@' + n for n in names)
+
+    @api.depends('member_ids')
+    def _compute_member_count(self):
+        for channel in self:
+            channel.member_count = len(channel.member_ids)
 
     @api.depends('message_ids.state', 'message_ids.sent_at')
     def _compute_stats(self):
@@ -78,10 +101,11 @@ class ZaloChannel(models.Model):
             channel.last_sent_at = max(sent.mapped('sent_at')) if sent else False
             channel.failed_count = len(channel.message_ids.filtered(lambda m: m.state in ('failed', 'uncertain')))
 
-    def _queue(self, text, key, event_type=False, styles=None):
+    def _queue(self, text, key, event_type=False, styles=None, mentions=None):
         """Đưa tin vào hàng đợi gửi của riêng kênh này. Idempotent theo key.
 
         `styles`: danh sách {'start', 'len', 'style': 'bold'} (vị trí tính theo ký tự của `text`).
+        `mentions`: danh sách {'pos', 'len', 'uid'} nhắc tên thành viên nhóm (xem `_with_mentions`).
         """
         self.ensure_one()
         messages = self.env['dac.zalo.channel.message']
@@ -91,8 +115,33 @@ class ZaloChannel(models.Model):
         return messages.create({
             'channel_id': self.id, 'event_key': key, 'text': text[:MAX_TEXT],
             'event_type_id': event_type.id if event_type else False, 'state': 'queued',
-            'styles': styles or False,
+            'styles': styles or False, 'mentions': mentions or False,
         })
+
+    def _mention_members(self, event_type):
+        """Thành viên cần nhắc tên cho loại thông báo này (chỉ nhóm; tối đa MAX_MENTIONS người)."""
+        self.ensure_one()
+        if self.thread_type != 'group' or not event_type:
+            return self.env['dac.zalo.channel.member']
+        rule = self.mention_ids.filtered(lambda r: r.event_type_id == event_type)[:1]
+        return rule.member_ids.sorted(lambda m: (m.name or '').lower())[:MAX_MENTIONS]
+
+    def _with_mentions(self, text, members):
+        """Thêm dòng cuối "@An @Bình" và trả (text, mentions) để Zalo gạch tên và báo cho đúng người được nhắc.
+
+        Dòng nhắc tên nằm cuối nên không làm lệch vị trí chữ đậm đã tính ở đầu tin.
+        """
+        if not members:
+            return text, None
+        tokens = ['@' + ' '.join((m.name or m.uid).split()) for m in members]
+        extra = ' '.join(tokens)
+        base = text[:max(0, MAX_TEXT - len(extra) - 1)] + '\n'
+        pos = utf16_len(base)
+        mentions = []
+        for member, token in zip(members, tokens):
+            mentions.append({'pos': pos, 'len': utf16_len(token), 'uid': member.uid})
+            pos += utf16_len(token) + 1
+        return base + extra, mentions
 
     @api.model
     def _notify(self, event_code, text, key, styles=None):
@@ -111,7 +160,8 @@ class ZaloChannel(models.Model):
         channels = self.sudo().search([('active', '=', True), ('event_type_ids', 'in', event_type.id)])
         messages = self.env['dac.zalo.channel.message']
         for channel in channels:
-            messages |= channel._queue(text, '%s:%s' % (key, channel.id), event_type, styles)
+            channel_text, mentions = channel._with_mentions(text, channel._mention_members(event_type))
+            messages |= channel._queue(channel_text, '%s:%s' % (key, channel.id), event_type, styles, mentions)
         if messages:
             self._trigger_send()
         return messages
@@ -129,18 +179,85 @@ class ZaloChannel(models.Model):
         test_type = self.env.ref('dac_zalo_assistant.event_type_channel_test')
         title = 'Tin thử từ Odoo'
         receives = ', '.join(self.event_type_ids.mapped('name')) or 'chưa chọn loại thông báo nào'
+        text = '%s\nHội thoại "%s" sẽ nhận: %s' % (title, self.name, receives)
+        # Tin thử nhắc tên mọi người đã cài trong bất kỳ loại thông báo nào, để thấy tên được gạch đúng trên Zalo.
+        tagged = self.mention_ids.filtered(lambda r: r.event_type_id in self.event_type_ids).mapped('member_ids')
+        text, mentions = self._with_mentions(text, tagged.sorted(lambda m: (m.name or '').lower())[:MAX_MENTIONS]) if self.thread_type == 'group' else (text, None)
         # Tiêu đề in đậm giống tin thật: nhìn là biết định dạng chữ đậm có hiển thị trên Zalo hay không.
-        self._queue('%s\nHội thoại "%s" sẽ nhận: %s' % (title, self.name, receives), 'test:%s' % uuid.uuid4().hex, test_type,
-                    styles=[{'start': 0, 'len': len(title), 'style': 'bold'}])
+        self._queue(text, 'test:%s' % uuid.uuid4().hex, test_type,
+                    styles=[{'start': 0, 'len': len(title), 'style': 'bold'}], mentions=mentions)
         self._trigger_send()
         return {'type': 'ir.actions.client', 'tag': 'display_notification', 'params': {
             'title': _('Đã xếp hàng gửi'), 'message': _('Tin thử sẽ được gửi trong ít phút. Xem tab "Tin đã gửi".'),
             'type': 'success'}}
 
+    def _sync_members(self):
+        """Tải danh sách thành viên nhóm từ bridge (thêm người mới, đổi tên, bỏ người đã rời nhóm)."""
+        self.ensure_one()
+        if self.thread_type != 'group':
+            raise UserError(_('Chỉ nhóm Zalo mới có danh sách thành viên.'))
+        # sudo(): người quản lý không đọc được bridge_url/token (chỉ system); chỉ gọi lệnh đọc danh sách thành viên
+        config = self.env['dac.zalo.config'].sudo()._config()
+        result = config._bridge_request('/threads/%s/members' % quote(self.thread_id, safe=''))
+        seen = {}
+        for item in result.get('members', []) if isinstance(result.get('members'), list) else []:
+            uid = str(item.get('uid') or '') if isinstance(item, dict) else ''
+            if uid.isdigit():
+                seen[uid] = ' '.join(str(item.get('name') or uid).split())[:160] or uid
+        existing = {m.uid: m for m in self.member_ids}
+        for uid, member in existing.items():
+            if uid in seen and member.name != seen[uid]:
+                member.name = seen[uid]
+        self.env['dac.zalo.channel.member'].create([{'channel_id': self.id, 'uid': uid, 'name': name}
+                                                    for uid, name in seen.items() if uid not in existing])
+        # Người đã rời nhóm: xóa luôn khỏi các dòng nhắc tên (quan hệ nhiều-nhiều tự gỡ)
+        self.member_ids.filtered(lambda m: m.uid not in seen).unlink()
+        self.members_synced_at = fields.Datetime.now()
+        return len(seen)
+
+    def action_sync_members(self):
+        self.ensure_one()
+        count = self._sync_members()
+        return {'type': 'ir.actions.client', 'tag': 'display_notification', 'params': {
+            'title': _('Đã tải danh sách thành viên'), 'message': _('Nhóm có %s thành viên để nhắc tên.') % count,
+            'type': 'success', 'next': {'type': 'ir.actions.client', 'tag': 'soft_reload'}}}
+
     @api.model
     def action_open_search(self):
-        wizard = self.env['dac.zalo.thread.search'].create({})
-        return wizard._reopen()
+        return self.env['dac.zalo.thread.search'].create({})._open_with_listing()
+
+
+class ZaloChannelMember(models.Model):
+    """Thành viên của một nhóm Zalo, tải từ bridge để chọn người cần nhắc tên (@tag)."""
+    _name = 'dac.zalo.channel.member'
+    _description = 'Thành viên nhóm Zalo'
+    _order = 'name, id'
+
+    channel_id = fields.Many2one('dac.zalo.channel', string='Nhóm', required=True, ondelete='cascade', index=True)
+    uid = fields.Char(string='Mã Zalo', required=True, index=True, readonly=True)
+    name = fields.Char(string='Tên Zalo', required=True)
+    _sql_constraints = [('channel_uid_unique', 'unique(channel_id, uid)', 'Thành viên này đã có trong nhóm.')]
+
+
+class ZaloChannelMention(models.Model):
+    """Người cần nhắc tên (@tag) khi một loại thông báo được gửi vào nhóm. Mỗi nhóm + loại thông báo một dòng."""
+    _name = 'dac.zalo.channel.mention'
+    _description = 'Nhắc tên theo loại thông báo'
+    _order = 'channel_id, event_type_id'
+
+    channel_id = fields.Many2one('dac.zalo.channel', string='Nhóm', required=True, ondelete='cascade', index=True)
+    event_type_id = fields.Many2one('dac.zalo.event.type', string='Loại thông báo', required=True, ondelete='cascade')
+    member_ids = fields.Many2many('dac.zalo.channel.member', 'dac_zalo_mention_member_rel', 'mention_id', 'member_id',
+        string='Nhắc tên')
+    _sql_constraints = [('channel_event_unique', 'unique(channel_id, event_type_id)', 'Loại thông báo này đã có dòng nhắc tên.')]
+
+    @api.constrains('member_ids', 'channel_id')
+    def _check_members(self):
+        for rule in self:
+            if len(rule.member_ids) > MAX_MENTIONS:
+                raise UserError(_('Mỗi tin chỉ nhắc tối đa %s người.') % MAX_MENTIONS)
+            if rule.member_ids.channel_id - rule.channel_id:
+                raise UserError(_('Chỉ chọn người thuộc đúng nhóm này.'))
 
 
 class ZaloChannelMessage(models.Model):
@@ -154,6 +271,7 @@ class ZaloChannelMessage(models.Model):
     event_key = fields.Char(required=True, readonly=True, index=True, copy=False)
     text = fields.Text(string='Nội dung', required=True, readonly=True)
     styles = fields.Json(string='Định dạng chữ', readonly=True, help='Các đoạn in đậm: [{"start", "len", "style": "bold"}].')
+    mentions = fields.Json(string='Nhắc tên', readonly=True, help='Các lượt nhắc tên thành viên nhóm: [{"pos", "len", "uid"}].')
     state = fields.Selection([('queued', 'Chờ gửi'), ('sent', 'Đã gửi'), ('failed', 'Lỗi'),
         ('uncertain', 'Cần kiểm tra gửi'), ('cancelled', 'Đã hủy')], string='Trạng thái', default='queued', required=True, index=True)
     attempts = fields.Integer(string='Số lần thử', readonly=True)
@@ -187,6 +305,8 @@ class ZaloChannelMessage(models.Model):
             'thread_id': self.channel_id.thread_id, 'thread_type': self.channel_id.thread_type, 'text': self.text}
         if self.styles:
             payload['styles'] = self.styles
+        if self.mentions:
+            payload['mentions'] = self.mentions
         try:
             result = config._bridge_request('/send', payload)
         except UserError as error:
@@ -216,6 +336,29 @@ class ZaloThreadSearch(models.TransientModel):
     query = fields.Char(string='Tên nhóm / người')
     line_ids = fields.One2many('dac.zalo.thread.search.line', 'search_id', string='Kết quả')
     searched = fields.Boolean(readonly=True)
+    event_codes = fields.Char(string='Loại thông báo đăng ký sẵn', readonly=True,
+        help='Mã loại thông báo (cách nhau bằng dấu phẩy) sẽ được bật sẵn cho hội thoại vừa thêm.')
+    event_names = fields.Char(compute='_compute_event_names')
+
+    @api.depends('event_codes')
+    def _compute_event_names(self):
+        for wizard in self:
+            codes = [c for c in (wizard.event_codes or '').split(',') if c]
+            wizard.event_names = ', '.join(self.env['dac.zalo.event.type'].search([('code', 'in', codes)]).mapped('name'))
+
+    @api.model
+    def action_open_for_events(self, codes):
+        """Mở wizard chọn hội thoại; hội thoại được thêm sẽ nhận sẵn các loại thông báo `codes` (kèm dòng nhắc tên)."""
+        return self.create({'event_codes': ','.join(codes)})._open_with_listing()
+
+    def _open_with_listing(self):
+        """Mở wizard và tự liệt kê mọi hội thoại của tài khoản (không cần bấm Tìm); bridge lỗi thì mở danh sách trống."""
+        self.ensure_one()
+        try:
+            self.action_search()
+        except UserError:
+            _logger.info('Chưa tải được danh sách hội thoại khi mở wizard; người dùng có thể bấm Tìm.')
+        return self._reopen()
 
     def _reopen(self):
         self.ensure_one()
@@ -242,9 +385,19 @@ class ZaloThreadSearch(models.TransientModel):
         chosen = self.line_ids.filtered(lambda l: l.selected and not l.added)
         if not chosen:
             raise UserError(_('Hãy bật chọn ít nhất một hội thoại chưa được thêm.'))
+        event_types = self.env['dac.zalo.event.type'].search([('code', 'in', [c for c in (self.event_codes or '').split(',') if c])])
         channels = self.env['dac.zalo.channel'].create([{
             'name': line.name, 'thread_id': line.thread_id, 'thread_type': line.thread_type, 'members': line.members,
+            'event_type_ids': [(6, 0, event_types.ids)],
         } for line in chosen])
+        for channel in channels.filtered(lambda c: c.thread_type == 'group'):
+            # Nhóm mới: tải thành viên ngay để mở form là chọn được người nhắc tên; lỗi mạng không chặn việc thêm nhóm
+            try:
+                channel._sync_members()
+            except UserError:
+                _logger.info('Chưa tải được thành viên nhóm %s; bấm "Tải danh sách thành viên" sau.', channel.id)
+            if event_types:
+                self.env['dac.zalo.channel.mention'].create([{'channel_id': channel.id, 'event_type_id': et.id} for et in event_types])
         action = {'type': 'ir.actions.act_window', 'name': _('Hội thoại nhận thông báo'),
             'res_model': 'dac.zalo.channel', 'target': 'current'}
         if len(channels) == 1:

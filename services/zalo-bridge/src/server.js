@@ -23,6 +23,8 @@ const server = createServer(async (req, res) => {
   try {
     if (req.method === 'GET' && req.url === '/status') return respond(200, bridge.status());
     if (req.method === 'GET' && req.url.split('?')[0] === '/threads') return respond(200, await bridge.searchThreads(new URL(req.url, 'http://bridge').searchParams.get('q') || ''));
+    const members = req.method === 'GET' && /^\/threads\/(\d{1,30})\/members$/.exec(req.url.split('?')[0]);
+    if (members) return respond(200, { members: await bridge.listGroupMembers(members[1]) });
     if (req.method !== 'POST') return respond(404, { error: 'not_found' });
     let text = ''; let bytes = 0;
     for await (const chunk of req) { bytes += chunk.length; if (bytes > 1024 * 1024) return respond(413, { error: 'payload_too_large' }); text += chunk; }
@@ -32,8 +34,8 @@ const server = createServer(async (req, res) => {
     if (req.url === '/send') return respond(200, await bridge.send(body));
     return respond(404, { error: 'not_found' });
   } catch (error) {
-    const known = ['invalid_payload', 'wrong_account', 'not_connected', 'request_id_conflict', 'login_in_progress'];
-    respond(error instanceof SyntaxError ? 400 : 409, { error: known.includes(error.message) ? error.message : 'request_failed' });
+    const known = ['invalid_payload', 'wrong_account', 'not_connected', 'request_id_conflict', 'login_in_progress', 'not_found'];
+    respond(error instanceof SyntaxError ? 400 : error.message === 'not_found' ? 404 : 409, { error: known.includes(error.message) ? error.message : 'request_failed' });
   }
 });
 server.requestTimeout = 35000;

@@ -54,7 +54,7 @@
         <field name="name">dac.zalo.channel.form</field><field name="model">dac.zalo.channel</field>
         <field name="arch" type="xml"><form string="Đích nhận thông báo">
             <header><button name="action_send_test" type="object" string="Gửi tin thử" icon="fa-paper-plane" class="btn-primary"
-                invisible="not id" confirm="Gửi một tin thử vào hội thoại này?"/></header>
+                invisible="not id" confirm="Gửi một tin thử vào hội thoại này? Những người đã cài nhắc tên cũng sẽ được nhắc."/></header>
             <sheet>
                 <widget name="web_ribbon" title="Tạm dừng" bg_color="text-bg-warning" invisible="active"/>
                 <div class="dac_ui_hero">
@@ -79,6 +79,27 @@
                     <page name="events" string="Thông báo nhận">
                         <div class="dac_ui_section_title"><i class="fa fa-bell-o"/> Loại thông báo gửi vào đây <small>tick để bật</small></div>
                         <div class="dac_ui_checkgrid"><field name="event_type_ids" widget="many2many_checkboxes" nolabel="1"/></div>
+                        <div invisible="thread_type != 'group' or not id">
+                            <div class="dac_ui_section_title"><i class="fa fa-at"/> Nhắc tên (@tag) <small>báo đúng người khi có thông báo trong nhóm</small></div>
+                            <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                                <button name="action_sync_members" type="object" string="Tải danh sách thành viên" icon="fa-refresh" class="btn-secondary"/>
+                                <span class="text-muted"><field name="member_count" readonly="1" nolabel="1"/> thành viên<span invisible="not members_synced_at"> · cập nhật <field name="members_synced_at" readonly="1" nolabel="1"/></span></span>
+                            </div>
+                            <div class="alert alert-info" role="status" invisible="member_count">
+                                Chưa có danh sách thành viên. Bấm “Tải danh sách thành viên” (trợ lý phải đang ở trong nhóm), rồi thêm dòng bên dưới.
+                            </div>
+                            <field name="mention_ids" nolabel="1" context="{'default_channel_id': id}">
+                                <list editable="bottom">
+                                    <field name="channel_id" column_invisible="1"/>
+                                    <field name="event_type_id" string="Khi có thông báo" options="{'no_create': True, 'no_open': True}"
+                                           domain="[('id', 'in', parent.event_type_ids)]" placeholder="Chọn loại thông báo (tick ở trên trước)"/>
+                                    <field name="member_ids" string="Nhắc tên" widget="dac_zalo_member_tags"
+                                           options="{'no_create': True, 'no_open': True}" domain="[('channel_id', '=', channel_id)]"
+                                           placeholder="＋ Thêm người cần nhắc tên"/>
+                                </list>
+                            </field>
+                            <div class="text-muted small"><i class="fa fa-info-circle"/> Tin gửi vào nhóm sẽ có thêm dòng cuối “@Tên …”; Zalo gạch tên và báo cho những người này. Tối đa 30 người mỗi tin.</div>
+                        </div>
                     </page>
                     <page name="messages" string="Tin đã gửi">
                         <field name="message_ids" readonly="1" nolabel="1"><list decoration-danger="state in ('failed','uncertain')" decoration-muted="state == 'cancelled'">
@@ -177,7 +198,11 @@
     <record id="thread_search_form" model="ir.ui.view">
         <field name="name">dac.zalo.thread.search.form</field><field name="model">dac.zalo.thread.search</field>
         <field name="arch" type="xml"><form string="Tìm nhóm / người Zalo">
-            <field name="searched" invisible="1"/>
+            <field name="searched" invisible="1"/><field name="event_codes" invisible="1"/>
+            <div class="alert alert-info" role="status" invisible="not event_names">
+                <i class="fa fa-bell-o"/> Hội thoại được thêm sẽ nhận sẵn: <strong><field name="event_names" readonly="1" nolabel="1"/></strong>.
+                Với nhóm, sau khi thêm bạn chọn người cần nhắc tên.
+            </div>
             <div class="dac_ui_section_title"><i class="fa fa-search"/> Tìm trong tài khoản Zalo của trợ lý</div>
             <div class="d-flex gap-2 mb-3">
                 <field name="query" placeholder="Gõ một phần tên nhóm hoặc người; để trống để xem tất cả" class="flex-grow-1"/>
