@@ -101,11 +101,12 @@ class ZaloChannel(models.Model):
             channel.last_sent_at = max(sent.mapped('sent_at')) if sent else False
             channel.failed_count = len(channel.message_ids.filtered(lambda m: m.state in ('failed', 'uncertain')))
 
-    def _queue(self, text, key, event_type=False, styles=None, mentions=None):
+    def _queue(self, text, key, event_type=False, styles=None, mentions=None, reply_to=None):
         """Đưa tin vào hàng đợi gửi của riêng kênh này. Idempotent theo key.
 
         `styles`: danh sách {'start', 'len', 'style': 'bold'} (vị trí tính theo ký tự của `text`).
         `mentions`: danh sách {'pos', 'len', 'uid'} nhắc tên thành viên nhóm (xem `_with_mentions`).
+        `reply_to`: tin đã gửi trước đó trong cùng hội thoại; tin mới hiện dưới dạng "trả lời" tin đó trên Zalo.
         """
         self.ensure_one()
         messages = self.env['dac.zalo.channel.message']
@@ -115,7 +116,7 @@ class ZaloChannel(models.Model):
         return messages.create({
             'channel_id': self.id, 'event_key': key, 'text': text[:MAX_TEXT],
             'event_type_id': event_type.id if event_type else False, 'state': 'queued',
-            'styles': styles or False, 'mentions': mentions or False,
+            'styles': styles or False, 'mentions': mentions or False, 'reply_to_id': reply_to.id if reply_to else False,
         })
 
     def _mention_members(self, event_type):
@@ -126,15 +127,23 @@ class ZaloChannel(models.Model):
         rule = self.mention_ids.filtered(lambda r: r.event_type_id == event_type)[:1]
         return rule.member_ids.sorted(lambda m: (m.name or '').lower())[:MAX_MENTIONS]
 
-    def _with_mentions(self, text, members):
-        """Thêm dòng cuối "@An @Bình" và trả (text, mentions) để Zalo gạch tên và báo cho đúng người được nhắc.
+    def _with_mentions(self, text, members, leading=False):
+        """Thêm "@An @Bình" và trả (text, mentions) để Zalo gạch tên và báo cho đúng người được nhắc.
 
-        Dòng nhắc tên nằm cuối nên không làm lệch vị trí chữ đậm đã tính ở đầu tin.
+        Mặc định thêm ở dòng cuối nên không làm lệch vị trí chữ đậm đã tính ở đầu tin.
+        `leading=True`: đặt tên ngay đầu câu ("@An @Bình Bạn đã liên hệ chưa ạ") — dùng cho tin nhắc nhở ngắn.
         """
         if not members:
             return text, None
         tokens = ['@' + ' '.join((m.name or m.uid).split()) for m in members]
         extra = ' '.join(tokens)
+        if leading:
+            body = text[:max(0, MAX_TEXT - len(extra) - 1)]
+            mentions, pos = [], 0
+            for member, token in zip(members, tokens):
+                mentions.append({'pos': pos, 'len': utf16_len(token), 'uid': member.uid})
+                pos += utf16_len(token) + 1
+            return '%s %s' % (extra, body), mentions
         base = text[:max(0, MAX_TEXT - len(extra) - 1)] + '\n'
         pos = utf16_len(base)
         mentions = []
@@ -272,6 +281,8 @@ class ZaloChannelMessage(models.Model):
     text = fields.Text(string='Nội dung', required=True, readonly=True)
     styles = fields.Json(string='Định dạng chữ', readonly=True, help='Các đoạn in đậm: [{"start", "len", "style": "bold"}].')
     mentions = fields.Json(string='Nhắc tên', readonly=True, help='Các lượt nhắc tên thành viên nhóm: [{"pos", "len", "uid"}].')
+    reply_to_id = fields.Many2one('dac.zalo.channel.message', string='Trả lời tin', readonly=True, ondelete='set null',
+        help='Tin này hiện trên Zalo dưới dạng trả lời tin đã gửi trước đó.')
     state = fields.Selection([('queued', 'Chờ gửi'), ('sent', 'Đã gửi'), ('failed', 'Lỗi'),
         ('uncertain', 'Cần kiểm tra gửi'), ('cancelled', 'Đã hủy')], string='Trạng thái', default='queued', required=True, index=True)
     attempts = fields.Integer(string='Số lần thử', readonly=True)
@@ -298,6 +309,13 @@ class ZaloChannelMessage(models.Model):
             except Exception:  # noqa: BLE001 — cron không được raise; không log nội dung tin
                 message.write({'state': 'failed', 'error_message': 'Không xử lý được; quản trị viên cần kiểm tra.'})
 
+    def _queue_reply(self, text, key):
+        """Xếp hàng một tin trả lời tin đã gửi này, nhắc tên đúng những người đã cài cho loại thông báo của nó."""
+        self.ensure_one()
+        channel = self.channel_id
+        text, mentions = channel._with_mentions(text, channel._mention_members(self.event_type_id), leading=True)
+        return channel._queue(text, key, self.event_type_id, mentions=mentions, reply_to=self)
+
     def _send(self, config):
         self.ensure_one()
         payload = {
@@ -307,6 +325,9 @@ class ZaloChannelMessage(models.Model):
             payload['styles'] = self.styles
         if self.mentions:
             payload['mentions'] = self.mentions
+        quoted_id = self.reply_to_id.external_message_id if self.reply_to_id.state == 'sent' else False
+        if quoted_id:
+            payload['quote_message_id'] = quoted_id
         try:
             result = config._bridge_request('/send', payload)
         except UserError as error:
@@ -315,6 +336,8 @@ class ZaloChannelMessage(models.Model):
                 'error_message': str(error)[:200], 'next_attempt_at': fields.Datetime.now() + timedelta(minutes=2 ** attempts)})
             return
         if result.get('delivery') == 'sent':
+            if quoted_id and result.get('quoted') is False:
+                _logger.warning('Zalo: tin %s gửi được nhưng bridge không còn dữ liệu tin gốc nên không có khung trả lời', self.id)
             self.write({'state': 'sent', 'sent_at': fields.Datetime.now(),
                 'external_message_id': result.get('message_id'), 'error_message': False})
         elif result.get('delivery') == 'uncertain':

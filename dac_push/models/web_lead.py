@@ -1,10 +1,18 @@
+import logging
 import re
 import secrets
+from datetime import timedelta
 from urllib.parse import urlsplit
 
 from odoo import api, fields, models
 
 from .push_event import clean
+from .working_time import add_working_minutes
+
+_logger = logging.getLogger(__name__)
+REMIND_AFTER_MINUTES = 30  # phút làm việc chờ trước khi nhắc người nhận lead
+REMINDER_TEXT = 'Bạn đã liên hệ khách chưa ạ'
+REMINDER_GIVE_UP = timedelta(hours=24)  # tin gốc kẹt hàng chờ quá lâu thì bỏ nhắc, tránh nhắc muộn vô nghĩa
 
 CONTACT_STATES = [('new', 'Chưa liên hệ'), ('contacted', 'Đã liên hệ'), ('unreachable', 'Liên hệ không được')]
 FORM_TYPES = [('callback', 'Gọi lại'), ('quote', 'Báo giá'), ('bee_form', 'Bee Form'),
@@ -46,6 +54,11 @@ class WebLead(models.Model):
     received_at = fields.Datetime(string='Nhận lúc', default=fields.Datetime.now, readonly=True)
     contact_state = fields.Selection(CONTACT_STATES, string='Trạng thái liên hệ', default='new', required=True, index=True, copy=False)
     contact_state_at = fields.Datetime(string='Cập nhật liên hệ lúc', readonly=True, copy=False)
+    remind_due_at = fields.Datetime(string='Hạn nhắc liên hệ', readonly=True, copy=False, index=True,
+        help='Sau mốc này (đã tính theo giờ làm việc) mà lead vẫn chưa liên hệ thì nhắc trong nhóm Zalo. Trống = không nhắc.')
+    reminded_at = fields.Datetime(string='Đã nhắc lúc', readonly=True, copy=False)
+    zalo_message_ids = fields.Many2many('dac.zalo.channel.message', 'dac_web_lead_zalo_message_rel', 'lead_id', 'message_id',
+        string='Tin Zalo đã báo lead', readonly=True, copy=False)
     access_token = fields.Char(string='Mã truy cập link', default=lambda self: self._new_access_token(), index=True,
         copy=False, readonly=True, groups='base.group_system',
         help='Ai có link chứa mã này đều xem được lead và đánh dấu liên hệ mà không cần đăng nhập.')
@@ -75,18 +88,55 @@ class WebLead(models.Model):
         assert state in dict(CONTACT_STATES)
         self.write({'contact_state': state, 'contact_state_at': fields.Datetime.now()})
 
+    @api.model
+    def _cron_remind_uncontacted(self):
+        """Nhắc trong nhóm Zalo các lead quá hạn mà chưa ai bấm "Đã liên hệ" / "Liên hệ không được". Không raise."""
+        now = fields.Datetime.now()
+        leads = self.search([('contact_state', '=', 'new'), ('remind_due_at', '!=', False), ('remind_due_at', '<=', now),
+                             ('reminded_at', '=', False)], order='remind_due_at', limit=50)
+        for lead in leads:
+            try:
+                with self.env.cr.savepoint():
+                    lead._send_contact_reminder()
+            except Exception:  # noqa: BLE001 — cron không được raise; không log nội dung lead
+                _logger.exception('Không gửi được nhắc liên hệ cho lead %s', lead.id)
+
+    def _send_contact_reminder(self):
+        """Nhắc một lần: trả lời đúng tin báo lead trong từng nhóm, nhắc tên những người được cài cho thông báo lead."""
+        self.ensure_one()
+        messages = self.zalo_message_ids
+        waiting = messages.filtered(lambda m: m.state == 'queued')
+        if waiting and self.remind_due_at > fields.Datetime.now() - REMINDER_GIVE_UP:
+            return  # tin gốc chưa gửi đi (bridge đang lỗi?) — chưa có gì để trả lời, thử lại ở lần cron sau
+        sent = messages.filtered(lambda m: m.state == 'sent')
+        for message in sent:
+            message._queue_reply(REMINDER_TEXT, 'lead-remind:%s:%s' % (self.id, message.id))
+        self.write({'reminded_at': fields.Datetime.now()})
+        if sent:
+            self.env['dac.zalo.channel']._trigger_send()
+
     def action_mark_contacted(self):
         self._set_contact_state('contacted')
 
     def action_mark_unreachable(self):
         self._set_contact_state('unreachable')
 
+    def _link_slug(self):
+        """Phần cuối của link: <số điện thoại>-<mã ngẫu nhiên>, vd 0912345678-k3Xw9aQz. Số điện thoại để nhìn là biết lead nào;
+        mã ngẫu nhiên mới là thứ bảo vệ (số điện thoại đoán được và một khách có thể có nhiều lead nên không đủ làm khóa)."""
+        self.ensure_one()
+        digits = re.sub(r'\D', '', self.phone or '')
+        if (self.phone or '').startswith('+84') and len(digits) >= 11:
+            digits = '0' + digits[2:]
+        token = self._get_access_token()
+        return '%s-%s' % (digits, token) if 6 <= len(digits) <= 15 else token
+
     def _short_link(self):
-        """Link công khai rút gọn, không có scheme cho gọn (Zalo tự nhận ra thành link): crm.duyan.vn/lead/<mã ngẫu nhiên>."""
+        """Link công khai rút gọn, không có scheme cho gọn (Zalo tự nhận ra thành link): crm.duyan.vn/lead/<sđt>-<mã>."""
         self.ensure_one()
         # sudo(): đọc tham số hệ thống trong luồng webhook/cron (không có user)
         base = self.env['ir.config_parameter'].sudo().get_param('web.base.url', '')
-        return '%s/lead/%s' % (urlsplit(base).netloc or 'crm.duyan.vn', self._get_access_token())
+        return '%s/lead/%s' % (urlsplit(base).netloc or 'crm.duyan.vn', self._link_slug())
 
     def _zalo_message(self):
         """Tin Zalo gọn: tiêu đề in đậm, tên (nếu có), số điện thoại, yêu cầu, ghi chú và link xem chi tiết.
@@ -141,8 +191,9 @@ class PushEventWebLead(models.Model):
         source_parts = [clean(src.get(k), 100) for k in ('utm_source', 'utm_medium', 'utm_campaign') if clean(src.get(k), 100)]
         if not source_parts and clean(src.get('referrer'), 200):
             source_parts = [urlsplit(clean(src.get('referrer'), 200)).hostname or clean(src.get('referrer'), 100)]
+        now = fields.Datetime.now()
         lead = self.env['dac.web.lead'].search([('event_id', '=', self.id)], limit=1) or self.env['dac.web.lead'].create({
-            'event_id': self.id, 'site': clean(data.get('site') or self.source, 100), 'form_type': form_type,
+            'event_id': self.id, 'received_at': now, 'remind_due_at': add_working_minutes(now, REMIND_AFTER_MINUTES), 'site': clean(data.get('site') or self.source, 100), 'form_type': form_type,
             'form_name': clean(data.get('form_name'), 200), 'customer_name': clean(data.get('name'), 200),
             'phone': re.sub(r'[^\d+]', '', str(data.get('phone') or ''))[:20], 'email': clean(data.get('email'), 200),
             'company_name': clean(data.get('company'), 200), 'items': clean(items, 500),
@@ -152,4 +203,5 @@ class PushEventWebLead(models.Model):
             'source_info': ' / '.join(source_parts),
         })
         text, styles = lead._zalo_message()
-        self.env['dac.zalo.channel']._notify('web_lead.created', text, 'push:%s' % self.id, styles=styles)
+        messages = self.env['dac.zalo.channel']._notify('web_lead.created', text, 'push:%s' % self.id, styles=styles)
+        lead.write({'zalo_message_ids': [(4, message.id) for message in messages]})  # để sau này trả lời đúng các tin này

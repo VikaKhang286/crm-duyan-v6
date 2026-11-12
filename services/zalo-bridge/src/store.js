@@ -10,7 +10,17 @@ export class Store {
     if (path !== ':memory:') chmodSync(path, 0o600);
     this.db.exec(`PRAGMA journal_mode=WAL;
       CREATE TABLE IF NOT EXISTS inbox (key TEXT PRIMARY KEY, account TEXT NOT NULL, body TEXT NOT NULL, created INTEGER NOT NULL);
-      CREATE TABLE IF NOT EXISTS outbox (id TEXT PRIMARY KEY, fingerprint TEXT NOT NULL, state TEXT NOT NULL, message_id TEXT);`);
+      CREATE TABLE IF NOT EXISTS outbox (id TEXT PRIMARY KEY, fingerprint TEXT NOT NULL, state TEXT NOT NULL, message_id TEXT);
+      CREATE TABLE IF NOT EXISTS quotes (thread_id TEXT NOT NULL, msg_id TEXT NOT NULL, body TEXT NOT NULL, created INTEGER NOT NULL, PRIMARY KEY (thread_id, msg_id));`);
+  }
+  // Dữ liệu tin do chính tài khoản gửi (lấy từ echo của Zalo) để sau này trả lời đúng tin đó. Giữ 30 ngày.
+  rememberQuote(threadId, msgId, body) {
+    this.db.prepare('INSERT OR REPLACE INTO quotes VALUES (?, ?, ?, ?)').run(threadId, msgId, JSON.stringify(body), Date.now());
+    this.db.prepare('DELETE FROM quotes WHERE created < ?').run(Date.now() - 30 * 24 * 3600 * 1000);
+  }
+  quote(threadId, msgId) {
+    const row = this.db.prepare('SELECT body FROM quotes WHERE thread_id=? AND msg_id=?').get(threadId, msgId);
+    return row ? JSON.parse(row.body) : null;
   }
   enqueue(account, event) {
     const key = `${account}:${event.thread_id}:${event.direction}:${event.message_id}`;

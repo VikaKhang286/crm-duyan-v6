@@ -1,3 +1,5 @@
+import re
+
 from odoo import fields, http
 from odoo.http import request
 
@@ -13,11 +15,21 @@ class LeadLinkController(http.Controller):
         Link mới trong tin Zalo dùng mã ngẫu nhiên (route bên dưới), không dùng số thứ tự vì đoán được."""
         return request.redirect('/odoo/action-dac_push.web_lead_action/%d' % lead_id)
 
-    def _lead_by_token(self, token):
-        if not token or token.isdigit() or len(token) > 64:
+    def _lead_by_token(self, slug):
+        """`slug` là `<số điện thoại>-<mã>` (link mới) hoặc chỉ `<mã>` (link đã gửi trước đây). Chỉ mã quyết định quyền truy cập;
+        số điện thoại trong link để người nhận nhìn là biết lead nào."""
+        if not slug or slug.isdigit() or len(slug) > 80:
             return None
-        # sudo(): khách chưa đăng nhập mở link — quyền truy cập chính là mã ngẫu nhiên trong link, tra đúng một bản ghi theo mã
-        return request.env['dac.web.lead'].sudo().search([('access_token', '=', token)], limit=1) or None
+        candidates = [slug]
+        prefixed = re.match(r'^\d{6,15}-(.+)$', slug)
+        if prefixed:
+            candidates.append(prefixed.group(1))
+        for token in candidates:
+            # sudo(): khách chưa đăng nhập mở link — quyền truy cập chính là mã ngẫu nhiên trong link, tra đúng một bản ghi theo mã
+            lead = request.env['dac.web.lead'].sudo().search([('access_token', '=', token)], limit=1)
+            if lead:
+                return lead
+        return None
 
     @http.route('/lead/<string:token>', type='http', auth='public', methods=['GET'], sitemap=False)
     def lead_public(self, token, done=None, **kwargs):
@@ -52,6 +64,8 @@ class LeadLinkController(http.Controller):
         if not lead or not state:
             return request.make_response('Yêu cầu không hợp lệ.', status=404 if not lead else 400,
                                          headers=[('Content-Type', 'text/plain; charset=utf-8'), *NO_INDEX.items()])
-        # sudo() ở _lead_by_token: người dùng công khai không có quyền ghi dac.web.lead; chỉ ghi trạng thái liên hệ
-        lead._set_contact_state(state)
+        # sudo() ở _lead_by_token: người dùng công khai không có quyền ghi dac.web.lead; chỉ ghi trạng thái liên hệ.
+        # Đã chốt rồi thì giữ nguyên (nút trên trang đã bị khóa; chặn cả bấm đúp và gửi lại); nhân viên muốn sửa thì sửa trong Odoo.
+        if lead.contact_state == 'new':
+            lead._set_contact_state(state)
         return request.redirect('/lead/%s?done=1' % token)

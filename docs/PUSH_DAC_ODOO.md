@@ -49,19 +49,38 @@ Odoo lưu đầy đủ ở lead (tab “Thông tin khách đã nhập”, “Tra
 📞 0999999999
 ➕ Yêu cầu: hạng mục / sản phẩm / dịch vụ khách chọn (nếu có)
 💬 Ghi chú hoặc yêu cầu thêm khách nhập (nếu có)
-Xem chi tiết: crm.duyan.vn/lead/Ab3xK9pQ2wLz
+Xem chi tiết: crm.duyan.vn/lead/0999999999-Ab3xK9pQ2wLz
 ```
 
-Link `/lead/<mã ngẫu nhiên>` **ai có link đều mở được, không cần đăng nhập**. Mã 72 bit lưu ở `dac.web.lead.access_token`
-(chỉ quản trị hệ thống đọc được), không dùng số thứ tự lead vì đoán được. Trang công khai chỉ có thông tin của lead và hai nút:
+Link `/lead/<số điện thoại>-<mã ngẫu nhiên>` **ai có link đều mở được, không cần đăng nhập**. Số điện thoại chỉ để nhìn là biết lead nào
+(`+84…` đổi về `0…`; SĐT không dùng được thì link chỉ có mã). **Mã** mới là thứ bảo vệ: 72 bit, lưu ở `dac.web.lead.access_token`
+(chỉ quản trị hệ thống đọc được); không dùng riêng số điện thoại làm khóa vì đoán được và một khách có thể có nhiều lead. Link chỉ
+có số (`/lead/0999999999`) không mở được lead. Link kiểu `/lead/<mã>` đã gửi trước đây vẫn dùng được. Trang công khai chỉ có thông tin của lead và hai nút:
 **Đã liên hệ** (nút chính, xanh) và **Liên hệ không được** (nút phụ, đỏ). Bấm nút ghi `contact_state` + `contact_state_at`
-rồi hiện lại trang với trạng thái mới; có thể bấm lại để đổi. Nhân viên đã đăng nhập và có quyền xem lead thì được chuyển thẳng sang
+rồi hiện lại trang với trạng thái mới và **khóa cả hai nút** (bấm đúp hay gửi lại cũng giữ quyết định đầu tiên; muốn đổi thì nhân
+viên sửa trong Odoo). Nhân viên đã đăng nhập và có quyền xem lead thì được chuyển thẳng sang
 form đầy đủ trong Odoo (cũng có hai nút này ở đầu form, cột trạng thái ở danh sách và bộ lọc "Chưa liên hệ"). Trang công khai gửi
 `X-Robots-Tag: noindex`, `Referrer-Policy: no-referrer`, `Cache-Control: no-store`.
 
 Lưu ý bảo mật: ai nhận được link đều xem được SĐT khách và đổi được trạng thái, nên đừng đăng link ra ngoài nhóm Zalo nhận tin. Lead
 cũ (tạo trước khi có mã) được cấp mã khi lần đầu cần tới. Link kiểu cũ `/lead/<số>` (tin Zalo đã gửi trước đây) vẫn dùng được nhưng
 bắt đăng nhập. Chữ đậm dùng `styles` của zca-js: bridge chỉ nhận danh sách trắng (hiện chỉ `bold`) và kiểm tra phạm vi.
+
+## Nhắc nhở lead chưa được liên hệ
+
+Lead mới có `remind_due_at` = 30 **phút làm việc** sau lúc nhận (`models/working_time.py`: thứ 2–thứ 7, 8:00–12:00 và 13:30–17:30,
+giờ Việt Nam; nghỉ trưa, ngoài giờ và Chủ nhật không tính — khách đến 11:50 thì hạn 13:50, đến 20:00 thì tính từ 8:00 sáng hôm sau).
+Cron "Lead website: nhắc lead quá hạn chưa liên hệ" (2 phút/lần, `dac.web.lead._cron_remind_uncontacted`) tìm lead quá hạn mà
+`contact_state = new` và nhắc **một lần**: tin `@người_1 @người_2 Bạn đã liên hệ khách chưa ạ` được gửi dưới dạng **trả lời đúng tin
+báo lead** trong từng nhóm đã nhận lead; những người được nhắc là người đã cài ở "Nhắc tên" cho thông báo lead (không cài ai thì vẫn
+nhắc nhưng không gắn tên). Nếu tin báo lead chưa gửi đi được (bridge lỗi) thì chờ và thử lại ở lần cron sau, quá 24 giờ thì bỏ. Lead
+tạo trước khi có chức năng (`remind_due_at` trống) không bị nhắc. Giờ làm việc và 30 phút là hằng số `REMIND_AFTER_MINUTES`,
+`WORK_SHIFTS`, `WORK_DAYS`.
+
+Kỹ thuật "trả lời tin": bridge ghi lại dữ liệu mọi tin do chính tài khoản đã gửi (lấy từ echo của Zalo vì `selfListen` bật) trong
+bảng `quotes` 30 ngày; `/send` nhận thêm `quote_message_id` (= `message_id` bridge đã trả khi gửi tin gốc) và gửi kèm khung trích
+dẫn của zca-js. Không tìm thấy dữ liệu tin gốc (vd tin gửi trước khi nâng cấp bridge) thì vẫn gửi nhắc, không có khung trích dẫn, và
+phản hồi có `quoted: false`.
 
 ## Chọn nơi nhận lead và nhắc tên
 

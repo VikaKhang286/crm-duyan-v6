@@ -10,4 +10,14 @@
         <field name="description">Có khách điền form trên duyan.vn (Bee Form, báo giá, gọi lại, Elementor).</field>
         <field name="sequence">10</field>
     </record>
+    <record id="cron_remind_uncontacted_leads" model="ir.cron">
+        <field name="name">Lead website: nhắc lead quá hạn chưa liên hệ</field>
+        <field name="model_id" ref="model_dac_web_lead"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_remind_uncontacted()</field>
+        <field name="interval_number">2</field>
+        <field name="interval_type">minutes</field>
+        <field name="user_id" ref="base.user_root"/>
+        <field name="active" eval="True"/>
+    </record>
 </odoo>

@@ -43,7 +43,7 @@ export function buildMentions(payload) {
   return mentions;
 }
 
-export function buildContent(payload) {
+export function buildContent(payload, quote = null) {
   const mentions = buildMentions(payload);
   let styles = [];
   if (payload.styles !== undefined && payload.styles !== null) {
@@ -54,8 +54,24 @@ export function buildContent(payload) {
       return { start: item.start, len: item.len, st: code };
     });
   }
-  if (!styles.length && !mentions.length) return payload.text;
-  return { msg: payload.text, ...(styles.length ? { styles } : {}), ...(mentions.length ? { mentions } : {}) };
+  if (!styles.length && !mentions.length && !quote) return payload.text;
+  return { msg: payload.text, ...(styles.length ? { styles } : {}), ...(mentions.length ? { mentions } : {}), ...(quote ? { quote } : {}) };
+}
+
+const MESSAGE_ID = /^\d{1,30}$/;
+// Phản hồi gửi tin của Zalo là JSON thường nên msgId số lớn bị làm tròn theo double của JavaScript, còn echo giữ nguyên chuỗi.
+// Khớp hai bên theo dạng đã làm tròn (cùng một phép tính); msgId nguyên bản vẫn được giữ để gửi cho Zalo làm khung trả lời.
+export const idKey = (id) => { const text = String(id); return /^\d+$/.test(text) ? String(Number(text)) : text; };
+
+// Dữ liệu cần để Zalo hiện "trả lời tin nhắn" cho một tin văn bản do chính tài khoản đã gửi (lấy từ echo của tin đó).
+export function quoteFromEcho(message) {
+  const data = message?.data;
+  if (!message?.isSelf || !message.threadId || !data?.msgId || !data.cliMsgId || typeof data.content !== 'string') return null;
+  return {
+    threadId: String(message.threadId), msgId: idKey(data.msgId),
+    body: { msgId: String(data.msgId), content: data.content, msgType: data.msgType || 'webchat', propertyExt: data.propertyExt,
+      cliMsgId: String(data.cliMsgId), ts: String(data.ts), ttl: Number(data.ttl) || 0 },
+  };
 }
 
 const DUPLICATE_CONNECTION = 3000; // CloseReason.DuplicateConnection của zca-js
@@ -184,7 +200,14 @@ export class Bridge {
       try { this.store.enqueue(this.accountId, event); }
       catch { this.state = 'error'; console.error('Zalo inbox persistence failed; operator action required.'); }
     };
-    api.listener.on('message', (message) => receive(message));
+    api.listener.on('message', (message) => {
+      receive(message);
+      if (this.api !== api) return;
+      try {
+        const sent = quoteFromEcho(message);
+        if (sent) this.store.rememberQuote(sent.threadId, sent.msgId, sent.body);
+      } catch { /* Không lưu được dữ liệu trả lời thì tin nhắc nhở vẫn gửi, chỉ không có khung trích dẫn. */ }
+    });
     api.listener.on('old_messages', (messages, type) => {
       if (type === 0) for (const message of messages) receive(message, true);
     });
@@ -303,7 +326,12 @@ export class Bridge {
       if (typeof payload[field] !== 'string' || !payload[field] || payload[field].length > (field === 'text' ? 12000 : 200)) throw new Error('invalid_payload');
     }
     if (payload.thread_type !== undefined && !['user', 'group'].includes(payload.thread_type)) throw new Error('invalid_payload');
-    const content = buildContent(payload); // kiểm tra kiểu chữ trước khi giữ chỗ request_id
+    if (payload.quote_message_id !== undefined && payload.quote_message_id !== null
+      && (typeof payload.quote_message_id !== 'string' || !MESSAGE_ID.test(payload.quote_message_id))) throw new Error('invalid_payload');
+    const wantsQuote = typeof payload.quote_message_id === 'string';
+    const saved = wantsQuote ? this.store.quote(payload.thread_id, idKey(payload.quote_message_id)) : null;
+    const quote = saved ? { ...saved, uidFrom: payload.account_id } : null;
+    const content = buildContent(payload, quote); // kiểm tra kiểu chữ trước khi giữ chỗ request_id
     if (payload.account_id !== this.accountId) throw new Error('wrong_account');
     if (!this.api || this.state !== 'connected') throw new Error('not_connected');
     const previous = this.store.reserve(payload.request_id, payload);
@@ -317,7 +345,7 @@ export class Bridge {
       const id = result?.message?.msgId;
       if (!id) throw new Error('no_message_id');
       this.store.finish(payload.request_id, 'sent', String(id));
-      return { delivery: 'sent', message_id: String(id) };
+      return { delivery: 'sent', message_id: String(id), ...(wantsQuote ? { quoted: Boolean(quote) } : {}) };
     } catch {
       // A failed network call may already have delivered; never automatically send it twice.
       const api = this.api;

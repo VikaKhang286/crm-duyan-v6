@@ -31,6 +31,7 @@
                     .primary{background:#16a34a;height:58px;font-size:18px}
                     .danger{background:#dc2626;height:48px;font-size:16px}
                     button:active{opacity:.85}
+                    button:disabled{opacity:.4;cursor:not-allowed}
                 </style>
             </head>
             <body>
@@ -58,10 +59,22 @@
                             <t t-elif="lead.contact_state == 'unreachable'">✕ Liên hệ không được<t t-if="state_at"> — <t t-out="state_at"/></t></t>
                             <t t-else="">Chưa liên hệ khách này</t>
                         </div>
-                        <form method="post" t-attf-action="/lead/#{token}/contact" class="actions">
-                            <button class="primary" type="submit" name="result" value="contacted">Đã liên hệ</button>
-                            <button class="danger" type="submit" name="result" value="unreachable">Liên hệ không được</button>
+                        <!-- Đã chốt (hoặc vừa bấm xong) thì hai nút bị khóa; bấm đúp cũng chỉ gửi một lần -->
+                        <form method="post" t-attf-action="/lead/#{token}/contact" class="actions" id="contact-form">
+                            <button class="primary" type="submit" name="result" value="contacted" t-att-disabled="'disabled' if lead.contact_state != 'new' else None">Đã liên hệ</button>
+                            <button class="danger" type="submit" name="result" value="unreachable" t-att-disabled="'disabled' if lead.contact_state != 'new' else None">Liên hệ không được</button>
                         </form>
+                        <script>
+                            document.getElementById('contact-form').addEventListener('submit', function (event) {
+                                var form = event.currentTarget;
+                                if (form.dataset.sent) { event.preventDefault(); return; }
+                                form.dataset.sent = '1';
+                                // Khóa sau khi trình duyệt đã lấy giá trị nút bấm (nút disabled sẽ không được gửi đi)
+                                setTimeout(function () {
+                                    form.querySelectorAll('button').forEach(function (button) { button.disabled = true; });
+                                }, 0);
+                            });
+                        </script>
                     </div>
                 </div>
             </body>

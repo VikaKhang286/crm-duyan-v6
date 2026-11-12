@@ -266,7 +266,7 @@
                 <page name="source" string="Nguồn gửi">
                     <group>
                         <group string="Website"><field name="site"/><field name="page_url" widget="url"/><field name="page_title"/></group>
-                        <group string="Thời gian"><field name="submitted_at"/><field name="received_at"/><field name="source_info"/><field name="phone_only"/></group>
+                        <group string="Thời gian"><field name="submitted_at"/><field name="received_at"/><field name="contact_state_at"/><field name="remind_due_at"/><field name="reminded_at"/><field name="source_info"/><field name="phone_only"/></group>
                     </group>
                 </page>
             </notebook>

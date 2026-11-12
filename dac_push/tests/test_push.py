@@ -2,7 +2,9 @@ import hashlib
 import hmac
 import json
 import time
+from datetime import timedelta
 
+from odoo import fields
 from odoo.tests import HttpCase, tagged
 from odoo.tests.common import TransactionCase
 
@@ -55,6 +57,88 @@ class TestPushEvents(TransactionCase):
         self.assertEqual([m['uid'] for m in message.mentions], ['111', '222'])
         self.assertEqual(message.styles, [{'start': 0, 'len': len('Khách yêu cầu tư vấn'), 'style': 'bold'}], 'the bold title is unchanged')
 
+    def _lead_with_sent_message(self, event_id='rem1', mention=True):
+        if mention:
+            event_type = self.env.ref('dac_push.event_type_web_lead_created')
+            members = self.env['dac.zalo.channel.member'].create([
+                {'channel_id': self.channel.id, 'uid': '111', 'name': 'An'}, {'channel_id': self.channel.id, 'uid': '222', 'name': 'Bình'}])
+            self.env['dac.zalo.channel.mention'].create({'channel_id': self.channel.id, 'event_type_id': event_type.id, 'member_ids': [(6, 0, members.ids)]})
+        event, _ = self.events._receive(envelope(event_id))
+        lead = self.env['dac.web.lead'].search([('event_id', '=', event.id)])
+        lead.zalo_message_ids.write({'state': 'sent', 'external_message_id': 'zm-original'})
+        return lead
+
+    def test_new_lead_gets_a_working_hours_deadline_and_remembers_its_zalo_messages(self):
+        lead = self._lead_with_sent_message('rem0', mention=False)
+        self.assertIn(self.channel.message_ids, lead.zalo_message_ids, 'every channel that received the lead is remembered')
+        self.assertTrue(lead.remind_due_at and lead.remind_due_at > lead.received_at)
+        self.assertFalse(lead.reminded_at)
+
+    def test_overdue_lead_is_reminded_once_as_a_reply_that_tags_the_people_for_leads(self):
+        lead = self._lead_with_sent_message('rem1')
+        original = lead.zalo_message_ids.filtered(lambda m: m.channel_id == self.channel)  # DB thử còn nhóm khác cùng nhận lead
+        leads = self.env['dac.web.lead']
+        leads._cron_remind_uncontacted()
+        self.assertEqual(len(self.channel.message_ids), 1, 'not due yet: nothing is sent')
+        lead.remind_due_at = fields.Datetime.now() - timedelta(minutes=1)
+        leads._cron_remind_uncontacted()
+        reminder = self.channel.message_ids - original
+        self.assertEqual(len(reminder), 1)
+        self.assertEqual(reminder.text, '@An @Bình Bạn đã liên hệ khách chưa ạ')
+        self.assertEqual(reminder.mentions, [{'pos': 0, 'len': 3, 'uid': '111'}, {'pos': 4, 'len': 5, 'uid': '222'}])
+        self.assertEqual(reminder.reply_to_id, original, 'the reminder replies to the original lead message')
+        self.assertTrue(lead.reminded_at)
+        leads._cron_remind_uncontacted()
+        self.assertEqual(len(self.channel.message_ids), 2, 'one reminder only')
+        from unittest.mock import patch
+        config = self.env['dac.zalo.config']._config()
+        config.write({'active': True, 'assistant_uid': 'bot'})
+        with patch.object(type(config), '_bridge_request', return_value={'delivery': 'sent', 'message_id': 'zm2', 'quoted': True}) as bridge:
+            reminder._send(config)
+        payload = bridge.call_args.args[1]
+        self.assertEqual(payload['quote_message_id'], 'zm-original')
+        self.assertEqual(payload['mentions'], reminder.mentions)
+        self.assertEqual(reminder.state, 'sent')
+
+    def test_no_reminder_once_someone_decided_or_when_there_is_no_deadline(self):
+        decided = self._lead_with_sent_message('rem2', mention=False)
+        decided.remind_due_at = fields.Datetime.now() - timedelta(minutes=5)
+        decided._set_contact_state('unreachable')
+        old = self._lead_with_sent_message('rem3', mention=False)
+        old.remind_due_at = False  # lead tạo trước khi có chức năng nhắc
+        self.env['dac.web.lead']._cron_remind_uncontacted()
+        self.assertFalse(decided.reminded_at or old.reminded_at)
+        self.assertEqual(len(self.channel.message_ids), 2, 'only the two original lead messages exist')
+        self.assertFalse(self.env['dac.zalo.channel.message'].search([('reply_to_id', '!=', False)]), 'no reply anywhere')
+
+    def test_reminder_waits_for_an_unsent_original_and_works_without_tagged_people(self):
+        lead = self._lead_with_sent_message('rem4', mention=False)
+        lead.zalo_message_ids.state = 'queued'
+        lead.remind_due_at = fields.Datetime.now() - timedelta(minutes=1)
+        self.env['dac.web.lead']._cron_remind_uncontacted()
+        self.assertFalse(lead.reminded_at, 'the original message has not left yet: nothing to reply to, try again later')
+        lead.zalo_message_ids.state = 'sent'
+        self.env['dac.web.lead']._cron_remind_uncontacted()
+        original = lead.zalo_message_ids.filtered(lambda m: m.channel_id == self.channel)
+        reminder = self.channel.message_ids - original
+        self.assertEqual((reminder.text, reminder.mentions, reminder.reply_to_id), ('Bạn đã liên hệ khách chưa ạ', False, original))
+
+    def test_working_time_skips_lunch_nights_and_sundays(self):
+        from datetime import datetime, timezone
+        from ..models.working_time import TZ, add_working_minutes
+
+        def due(start):
+            utc = datetime.strptime(start, '%Y-%m-%d %H:%M').replace(tzinfo=TZ).astimezone(timezone.utc).replace(tzinfo=None)
+            return add_working_minutes(utc, 30).replace(tzinfo=timezone.utc).astimezone(TZ).strftime('%a %H:%M')
+
+        self.assertEqual(due('2026-11-12 09:00'), 'Thu 09:30')
+        self.assertEqual(due('2026-11-12 11:50'), 'Thu 13:50', '10 minutes in the morning + 20 after lunch')
+        self.assertEqual(due('2026-11-12 12:10'), 'Thu 14:00', 'lunch break is not counted')
+        self.assertEqual(due('2026-11-12 17:20'), 'Fri 08:20')
+        self.assertEqual(due('2026-11-12 20:00'), 'Fri 08:30', 'evening leads count from the next morning')
+        self.assertEqual(due('2026-11-14 17:45'), 'Mon 08:30', 'Saturday is a working day, Sunday is not')
+        self.assertEqual(due('2026-11-15 10:00'), 'Mon 08:30')
+
     def test_push_config_lists_lead_recipients_and_opens_the_picker_with_the_lead_event(self):
         config = self.env['dac.push.config']._config()
         self.assertIn(self.channel, config.lead_channel_ids)
@@ -106,7 +190,8 @@ class TestPushEvents(TransactionCase):
         self.assertEqual(text[:styles[0]['len']], 'Khách yêu cầu tư vấn')
         self.assertEqual(self.channel.message_ids.styles, styles)
         base = self.env['ir.config_parameter'].sudo().get_param('web.base.url')
-        self.assertTrue(text.endswith('Xem chi tiết: %s/lead/%s' % (base.split('://')[-1], lead.sudo().access_token)))
+        self.assertTrue(text.endswith('Xem chi tiết: %s/lead/0901234567-%s' % (base.split('://')[-1], lead.sudo().access_token)),
+                        'link = số điện thoại của lead + mã ngẫu nhiên')
         self.assertNotIn('/lead/%s' % lead.id, text, 'link does not use the guessable sequential id')
         self.assertNotIn('http', text.splitlines()[-1], 'link is shown without a scheme to stay short')
 
@@ -266,6 +351,7 @@ class TestPushController(HttpCase):
         self.assertIn('Chị Hoa', html)
         self.assertIn('Đã liên hệ', html)
         self.assertIn('Liên hệ không được', html)
+        self.assertNotIn('disabled="disabled"', html, 'undecided leads keep both buttons active')
         self.assertNotIn('<b>gấp</b>', html, 'customer text is escaped')
         self.assertNotIn('/web/assets', html, 'standalone page, no Odoo backend assets')
         self.assertIn('noindex', page.headers['X-Robots-Tag'])
@@ -278,10 +364,46 @@ class TestPushController(HttpCase):
         self.assertEqual(done.status_code, 303)
         lead.invalidate_recordset()
         self.assertEqual((lead.contact_state, bool(lead.contact_state_at)), ('contacted', True))
+        self.assertIn('Đã liên hệ —', self.url_open('/lead/%s' % token).text)
+
+    def test_decided_lead_has_locked_buttons_and_ignores_a_second_click(self):
+        lead = self._lead_with_token('pub2b')
+        token = lead.sudo().access_token
         self.url_open('/lead/%s/contact' % token, data={'result': 'unreachable'})
         lead.invalidate_recordset()
         self.assertEqual(lead.contact_state, 'unreachable')
-        self.assertIn('Liên hệ không được —', self.url_open('/lead/%s' % token).text)
+        first_at = lead.contact_state_at
+        html = self.url_open('/lead/%s' % token).text
+        self.assertEqual(html.count('disabled="disabled"'), 2, 'both buttons are locked once someone decided')
+        self.assertIn('Liên hệ không được —', html)
+        # bấm đúp / gửi lại / mở link cũ rồi bấm: giữ nguyên quyết định đầu tiên
+        self.url_open('/lead/%s/contact' % token, data={'result': 'contacted'})
+        lead.invalidate_recordset()
+        self.assertEqual((lead.contact_state, lead.contact_state_at), ('unreachable', first_at))
+
+    def test_link_slug_starts_with_the_phone_and_old_token_only_links_still_work(self):
+        lead = self._lead_with_token('slug1')
+        token = lead.sudo().access_token
+        self.assertEqual(lead._link_slug(), '0933939856-%s' % token)
+        page = self.url_open('/lead/0933939856-%s' % token)
+        self.assertEqual(page.status_code, 200)
+        self.assertIn('/lead/0933939856-%s/contact' % token, page.text, 'the buttons post to the same link the visitor used')
+        self.assertEqual(self.url_open('/lead/%s' % token).status_code, 200, 'links sent before the change keep working')
+        alone = self.url_open('/lead/0933939856', allow_redirects=False)  # chỉ có số = route cũ theo số thứ tự: đòi đăng nhập
+        self.assertIn('/web/login', alone.headers.get('Location', ''), 'the phone alone never shows the lead')
+        self.assertEqual(self.url_open('/lead/0933939856-wrongtoken').status_code, 404)
+        done = self.url_open('/lead/0933939856-%s/contact' % token, data={'result': 'contacted'}, allow_redirects=False)
+        self.assertEqual(done.status_code, 303)
+        self.assertTrue(done.headers['Location'].endswith('/lead/0933939856-%s?done=1' % token))
+        lead.invalidate_recordset()
+        self.assertEqual(lead.contact_state, 'contacted')
+
+    def test_slug_normalises_phones_and_skips_unusable_ones(self):
+        lead = self._lead_with_token('slug2')
+        token = lead.sudo().access_token
+        for phone, expected in (('+84933939856', '0933939856'), ('0933 939 856', '0933939856'), ('123', None), ('', None)):
+            lead.sudo().phone = phone
+            self.assertEqual(lead._link_slug(), '%s-%s' % (expected, token) if expected else token, phone)
 
     def test_public_link_rejects_unknown_tokens_and_bad_results(self):
         lead = self._lead_with_token('pub3')

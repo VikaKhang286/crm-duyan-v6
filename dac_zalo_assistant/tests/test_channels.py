@@ -148,6 +148,29 @@ class TestZaloChannels(TransactionCase):
                                             {'pos': pos_an + 4, 'len': utf16('@Bình Phạm'), 'uid': '222'}])
         self.assertGreater(utf16(text), len(text), 'the text has emoji outside the BMP, so UTF-16 differs from len()')
 
+    def test_reply_reminder_puts_names_first_and_quotes_the_sent_message(self):
+        an, binh = self._members(self.group, ('111', 'An 😀'), ('222', 'Bình'))
+        self._rule(self.group, self.event, an | binh)
+        original = self.channels._notify('unit.lead', 'Có khách mới', 'lead:reply')
+        original.write({'state': 'sent', 'external_message_id': 'zm-1'})
+        reply = original._queue_reply('Bạn đã liên hệ khách chưa ạ', 'remind:reply')
+        self.assertEqual(reply.text, '@An 😀 @Bình Bạn đã liên hệ khách chưa ạ')
+        utf16 = lambda value: len(value.encode('utf-16-le')) // 2
+        self.assertEqual(reply.mentions, [{'pos': 0, 'len': utf16('@An 😀'), 'uid': '111'},
+                                          {'pos': utf16('@An 😀') + 1, 'len': 5, 'uid': '222'}])
+        self.assertEqual(reply.reply_to_id, original)
+        self.assertEqual(original._queue_reply('x', 'remind:reply'), reply, 'idempotent by key')
+        with patch.object(type(self.config), '_bridge_request', return_value={'delivery': 'sent', 'message_id': 'zm-2', 'quoted': True}) as bridge:
+            reply._send(self.config)
+        self.assertEqual(bridge.call_args.args[1]['quote_message_id'], 'zm-1')
+        self.assertEqual(original.reply_to_id.id, False)
+        # tin gốc chưa gửi được thì không đòi trích dẫn
+        unsent = self.channels._notify('unit.lead', 'Khách nữa', 'lead:unsent')
+        later = unsent._queue_reply('Nhắc', 'remind:unsent')
+        with patch.object(type(self.config), '_bridge_request', return_value={'delivery': 'sent', 'message_id': 'zm-3'}) as bridge:
+            later._send(self.config)
+        self.assertNotIn('quote_message_id', bridge.call_args.args[1])
+
     def test_no_mentions_without_rule_for_event_or_for_private_chats(self):
         an = self._members(self.group, ('111', 'An'))
         self._rule(self.group, self.other_event, an)

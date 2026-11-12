@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, rm, readFile, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { Bridge, authorized, normalizeMessage, matchThreads, buildContent } from '../src/bridge.js';
+import { Bridge, authorized, normalizeMessage, matchThreads, buildContent, quoteFromEcho, idKey } from '../src/bridge.js';
 import { Store } from '../src/store.js';
 
 const TOKEN = 'test-secret-that-is-longer-than-thirty-two-characters';
@@ -298,5 +298,39 @@ test('logout cancels a pending reconnect and a replaced account is never reopene
   await bridge.attach(make(second));
   await wait(40);
   assert.equal(replaced.starts.length, 1, 'the old account listener is not reopened');
+  store.close();
+});
+
+test('a reminder can reply to an earlier message of this account: quote data comes from the Zalo echo, and falls back to plain when unknown', async () => {
+  const sent = [];
+  const { bridge, store } = fixture();
+  bridge.api = { sendMessage: async (content) => { sent.push(content); return { message: { msgId: `m${sent.length}` } }; }, getUserInfo: async () => ({}) };
+  const echo = { isSelf: true, threadId: 'G1', type: 1, data: { uidFrom: '0', msgId: '700123', cliMsgId: '1780000000001', ts: '1780000000002', msgType: 'webchat', content: 'Khách yêu cầu', propertyExt: { color: 0 }, ttl: 0 } };
+  assert.equal(quoteFromEcho({ ...echo, isSelf: false }), null, 'only our own messages');
+  assert.equal(quoteFromEcho({ ...echo, data: { ...echo.data, content: { href: 'x' } } }), null, 'only text messages');
+  const saved = quoteFromEcho(echo);
+  assert.equal(saved.msgId, '700123');
+  store.rememberQuote(saved.threadId, saved.msgId, saved.body);
+  const text = '@An Bạn đã liên hệ khách chưa ạ';
+  const base = { ...payload, request_id: 'q1', thread_id: 'G1', thread_type: 'group', text, mentions: [{ pos: 0, len: 3, uid: '111' }] };
+  const first = await bridge.send({ ...base, quote_message_id: '700123' });
+  assert.deepEqual(first, { delivery: 'sent', message_id: 'm1', quoted: true });
+  assert.deepEqual(sent[0].quote, { msgId: '700123', content: 'Khách yêu cầu', msgType: 'webchat', propertyExt: { color: 0 }, cliMsgId: '1780000000001', ts: '1780000000002', ttl: 0, uidFrom: 'assistant' });
+  assert.equal(sent[0].msg, text);
+  assert.deepEqual(sent[0].mentions, [{ pos: 0, len: 3, uid: '111' }]);
+  // msgId lớn: phản hồi gửi tin đã bị làm tròn nhưng vẫn tìm ra đúng tin, và Zalo nhận msgId nguyên bản
+  const big = quoteFromEcho({ ...echo, data: { ...echo.data, msgId: '7123456789012345678', cliMsgId: '1780000000009' } });
+  store.rememberQuote(big.threadId, big.msgId, big.body);
+  assert.notEqual(String(Number('7123456789012345678')), '7123456789012345678', 'the premise: a JS number cannot hold this id');
+  await bridge.send({ ...base, request_id: 'qbig', text: 'Nhắc', mentions: undefined, quote_message_id: String(Number('7123456789012345678')) });
+  assert.equal(sent[1].quote.msgId, '7123456789012345678');
+  assert.equal(idKey('abc'), 'abc');
+  const unknown = await bridge.send({ ...base, request_id: 'q2', text: 'Nhắc lại', mentions: undefined, quote_message_id: '999' });
+  assert.deepEqual(unknown, { delivery: 'sent', message_id: 'm3', quoted: false });
+  assert.equal(sent[2], 'Nhắc lại', 'unknown original: still reminds, without the quote frame');
+  assert.deepEqual(await bridge.send({ ...payload, request_id: 'q3' }), { delivery: 'sent', message_id: 'm4' });
+  for (const bad of ['abc', 12, '', '1'.repeat(31)]) {
+    await assert.rejects(bridge.send({ ...payload, request_id: 'q4', quote_message_id: bad }), /invalid_payload/);
+  }
   store.close();
 });
