@@ -68,19 +68,33 @@ bắt đăng nhập. Chữ đậm dùng `styles` của zca-js: bridge chỉ nh�
 
 ## Nhắc nhở lead chưa được liên hệ
 
-Lead mới có `remind_due_at` = 30 **phút làm việc** sau lúc nhận (`models/working_time.py`: thứ 2–thứ 7, 8:00–12:00 và 13:30–17:30,
-giờ Việt Nam; nghỉ trưa, ngoài giờ và Chủ nhật không tính — khách đến 11:50 thì hạn 13:50, đến 20:00 thì tính từ 8:00 sáng hôm sau).
-Cron "Lead website: nhắc lead quá hạn chưa liên hệ" (2 phút/lần, `dac.web.lead._cron_remind_uncontacted`) tìm lead quá hạn mà
-`contact_state = new` và nhắc **một lần**: tin `@người_1 @người_2 Bạn đã liên hệ khách chưa ạ` được gửi dưới dạng **trả lời đúng tin
-báo lead** trong từng nhóm đã nhận lead; những người được nhắc là người đã cài ở "Nhắc tên" cho thông báo lead (không cài ai thì vẫn
-nhắc nhưng không gắn tên). Nếu tin báo lead chưa gửi đi được (bridge lỗi) thì chờ và thử lại ở lần cron sau, quá 24 giờ thì bỏ. Lead
-tạo trước khi có chức năng (`remind_due_at` trống) không bị nhắc. Giờ làm việc và 30 phút là hằng số `REMIND_AFTER_MINUTES`,
-`WORK_SHIFTS`, `WORK_DAYS`.
+Ba lớp, đều dừng ngay khi có người bấm **Đã liên hệ / Liên hệ không được** trên trang lead hoặc trong Odoo.
 
-Kỹ thuật "trả lời tin": bridge ghi lại dữ liệu mọi tin do chính tài khoản đã gửi (lấy từ echo của Zalo vì `selfListen` bật) trong
-bảng `quotes` 30 ngày; `/send` nhận thêm `quote_message_id` (= `message_id` bridge đã trả khi gửi tin gốc) và gửi kèm khung trích
-dẫn của zca-js. Không tìm thấy dữ liệu tin gốc (vd tin gửi trước khi nâng cấp bridge) thì vẫn gửi nhắc, không có khung trích dẫn, và
-phản hồi có `quoted: false`.
+1. **Nhắc riêng sau 30 phút làm việc** (`remind_due_at`). Giờ làm việc (`models/working_time.py`): thứ 2–thứ 7, 8:00–12:00 và 13:30–17:30,
+   giờ Việt Nam; nghỉ trưa, ngoài giờ và Chủ nhật không tính (11:50 → 13:50; 20:00 → tính từ 8:00 sáng hôm sau). Quá hạn mà vẫn
+   "Chưa liên hệ" thì bot nhắc **một lần**: `@người_1 @người_2 Bạn đã liên hệ khách chưa ạ`, dưới dạng **trả lời đúng tin báo lead** trong
+   từng nhóm đã nhận lead (người được nhắc = người đã cài ở "Nhắc tên" cho thông báo lead; chưa cài ai thì nhắc không gắn tên). Nếu
+   mốc nhắc tổng kế tiếp đến trước hoặc cùng lúc hạn nhắc riêng (vd khách đến 11:10, hạn 11:40, tổng 11:30) thì **không nhắc riêng**
+   (`remind_due_at` để trống), số đó đã nằm trong tin tổng.
+2. **Thả cảm xúc = đã nhận việc.** Nếu **một trong những người được tag** like/thả cảm xúc lên *tin nhắc riêng* đó thì lead ghi nhận
+   `acked_at` / `acked_uid` và **không nhắc thêm nữa** (kể cả nhắc tổng). Người không được tag thả cảm xúc thì không tính; nếu tin
+   nhắc không tag ai thì ai thả cũng tính. Thả cảm xúc lên tin tổng không tính (tin tổng phải còn nhắc đến khi lead được chốt).
+3. **Nhắc tổng** vào các mốc **8:00, 11:30, 14:00, 17:00** (thứ 2–thứ 7): một tin (không phải reply) `@người_1 @người_2 Còn N khách chưa
+   liên hệ:` kèm từng dòng `số – tên (giờ nhận) link`, tối đa 15 dòng. Gồm mọi lead đã nhận trước mốc, còn "Chưa liên hệ", chưa
+   `acked_at`, không quá 7 ngày (kể cả khách điền form buổi tối / Chủ nhật: vào mốc 8:00 kế tiếp). Mỗi mốc xử lý một lần
+   (tham số `dac_push.last_summary_slot`); lần chạy đầu tiên chỉ ghi nhận mốc, không gửi; mốc bị lỡ quá 2 giờ (Odoo ngừng) thì bỏ.
+
+Cron "Lead website: nhắc lead quá hạn chưa liên hệ" chạy 2 phút/lần (`dac.web.lead._cron_remind_uncontacted`). Lead tạo trước khi có
+chức năng (không có `zalo_message_ids`) không bị nhắc. Hằng số: `REMIND_AFTER_MINUTES`, `WORK_SHIFTS`, `WORK_DAYS`, `SUMMARY_SLOTS`,
+`SUMMARY_MAX_LEADS`, `SUMMARY_MAX_AGE`, `SUMMARY_STALE`.
+
+Kỹ thuật "trả lời tin": bridge ghi lại dữ liệu mọi tin do chính tài khoản đã gửi (lấy từ echo của Zalo vì `selfListen` bật; tin có chữ
+đậm đến dưới dạng khác chuỗi nên phần chữ lấy từ bản bridge đã gửi) trong bảng `quotes` 30 ngày; `/send` nhận thêm `quote_message_id`
+(= `message_id` bridge đã trả khi gửi tin gốc). Không tìm thấy dữ liệu tin gốc thì vẫn gửi nhắc, không có khung trích dẫn, phản hồi `quoted: false`.
+
+Kỹ thuật "thả cảm xúc": bridge nghe sự kiện `reaction` của zca-js (bỏ qua của chính tài khoản, của chat riêng và lượt gỡ cảm xúc), xếp vào
+hàng đợi riêng (bảng `reactions`, giữ 3 ngày) và gửi `POST /dac_zalo/bridge/reactions` (cùng bí mật với `/events`). Odoo lưu ở
+`dac.zalo.channel.reaction` (một dòng cho mỗi người mỗi tin) rồi gọi móc `dac.zalo.channel.message._on_reaction`; `dac_push` dùng móc này.
 
 ## Chọn nơi nhận lead và nhắc tên
 

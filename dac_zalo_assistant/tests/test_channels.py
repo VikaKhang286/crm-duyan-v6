@@ -1,7 +1,7 @@
 from unittest.mock import patch
 
 from odoo.exceptions import AccessError, UserError
-from odoo.tests import tagged
+from odoo.tests import HttpCase, tagged
 from odoo.tests.common import TransactionCase, new_test_user
 
 
@@ -171,6 +171,35 @@ class TestZaloChannels(TransactionCase):
             later._send(self.config)
         self.assertNotIn('quote_message_id', bridge.call_args.args[1])
 
+    def test_reactions_are_recorded_once_per_person_and_call_the_hook(self):
+        message = self.channels._notify('unit.lead', 'Có khách mới', 'lead:react')
+        message.write({'state': 'sent', 'external_message_id': '7001'})
+        seen = []
+        original = type(message)._on_reaction
+        with patch.object(type(message), '_on_reaction', lambda rec, reaction: seen.append((rec.id, reaction.uid, reaction.icon))):
+            batch = [{'thread_id': 'G1', 'reactor_uid': '111', 'icon': '/-strong', 'message_ids': ['7001', '9999'], 'timestamp': 1}]
+            saved = self.env['dac.zalo.channel.reaction']._ingest('bot-test', batch)
+            self.assertEqual(len(saved), 1)
+            self.env['dac.zalo.channel.reaction']._ingest('bot-test', [{**batch[0], 'icon': '/-heart'}])  # cùng người thả lại: không gọi hook nữa
+            self.env['dac.zalo.channel.reaction']._ingest('bot-test', [{**batch[0], 'reactor_uid': '222'}])
+            self.assertEqual(seen, [(message.id, '111', '/-strong'), (message.id, '222', '/-strong')])
+        self.assertEqual(message.channel_id.message_ids.filtered(lambda m: m == message).id, message.id)
+        reaction = self.env['dac.zalo.channel.reaction'].search([('message_id', '=', message.id), ('uid', '=', '111')])
+        self.assertEqual(reaction.icon, '/-heart', 'the latest reaction of a person is kept')
+        self.assertIsNone(original(message, reaction), 'default hook does nothing')
+
+    def test_reactions_on_other_threads_unsent_messages_wrong_account_and_own_reactions_are_ignored(self):
+        message = self.channels._notify('unit.lead', 'Có khách mới', 'lead:react2')
+        item = {'thread_id': 'G1', 'reactor_uid': '111', 'icon': '/-strong', 'message_ids': ['7002'], 'timestamp': 1}
+        Reaction = self.env['dac.zalo.channel.reaction']
+        self.assertFalse(Reaction._ingest('bot-test', [item]), 'message is still queued')
+        message.write({'state': 'sent', 'external_message_id': '7002'})
+        self.assertFalse(Reaction._ingest('bot-test', [{**item, 'thread_id': 'G-other'}]))
+        self.assertFalse(Reaction._ingest('someone-else', [item]), 'only the assistant account')
+        self.assertFalse(Reaction._ingest('bot-test', [{**item, 'reactor_uid': 'bot-test'}]), 'the bot reacting to itself')
+        self.assertFalse(Reaction.search([('message_id', '=', message.id)]))
+        self.assertTrue(Reaction._ingest('bot-test', [item]))
+
     def test_no_mentions_without_rule_for_event_or_for_private_chats(self):
         an = self._members(self.group, ('111', 'An'))
         self._rule(self.group, self.other_event, an)
@@ -256,3 +285,26 @@ class TestZaloChannels(TransactionCase):
         message = self.group.message_ids
         self.assertTrue(message.text.endswith('\n@An'))
         self.assertEqual(message.mentions[0]['uid'], '111')
+
+
+@tagged('post_install', '-at_install')
+class TestZaloReactionEndpoint(HttpCase):
+    def test_endpoint_needs_the_bridge_secret_and_validates_the_payload(self):
+        import json
+        config = self.env.ref('dac_zalo_assistant.config_default')
+        config.write({'active': True, 'bridge_token': 'test-secret-over-32-characters-long-for-zalo', 'assistant_uid': 'bot-test'})
+        self.env.cr.flush()
+        event = self.env['dac.zalo.event.type'].create({'name': 'Lead thử', 'code': 'unit.react'})
+        channel = self.env['dac.zalo.channel'].create({'name': 'G', 'thread_id': 'GR1', 'thread_type': 'group', 'event_type_ids': [(6, 0, event.ids)]})
+        message = channel._queue('x', 'unit:react', event)
+        message.write({'state': 'sent', 'external_message_id': '8001'})
+        self.env.cr.flush()
+        good = {'account_id': 'bot-test', 'reactions': [{'thread_id': 'GR1', 'reactor_uid': '111', 'icon': '/-strong', 'message_ids': ['8001']}]}
+        post = lambda body, token='test-secret-over-32-characters-long-for-zalo': self.url_open(
+            '/dac_zalo/bridge/reactions', data=json.dumps(body), headers={'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json'})
+        self.assertEqual(post(good, 'wrong').status_code, 401)
+        self.assertEqual(post({'account_id': 'bot-test', 'reactions': 'x'}).status_code, 400)
+        self.assertEqual(post({'account_id': 'bot-test', 'reactions': [{'thread_id': 'GR1'}]}).status_code, 400)
+        response = post(good)
+        self.assertEqual((response.status_code, response.json()), (200, {'accepted': True}))
+        self.assertEqual(self.env['dac.zalo.channel.reaction'].search_count([('message_id', '=', message.id), ('uid', '=', '111')]), 1)

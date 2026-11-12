@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, rm, readFile, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { Bridge, authorized, normalizeMessage, matchThreads, buildContent, quoteFromEcho, idKey } from '../src/bridge.js';
+import { Bridge, authorized, normalizeMessage, matchThreads, buildContent, quoteFromEcho, idKey, normalizeReaction } from '../src/bridge.js';
 import { Store } from '../src/store.js';
 
 const TOKEN = 'test-secret-that-is-longer-than-thirty-two-characters';
@@ -352,5 +352,38 @@ test('a styled message whose echo has no string content is quoted with the text 
   store.rememberQuote('G1', '555', { ...saved.body, msgId: '555' });
   const plain = await bridge.send({ ...payload, request_id: 's3', thread_id: 'G1', thread_type: 'group', text: 'Nhắc 2', quote_message_id: '555' });
   assert.equal(plain.quoted, false);
+  store.close();
+});
+
+test('reactions of other group members are normalised; own, removed, direct and malformed ones are ignored', () => {
+  const reaction = { isSelf: false, isGroup: true, threadId: 'G1', data: { actionId: 'a1', msgId: 'r1', uidFrom: '111', ts: '1780000000500', content: { rIcon: '/-strong', rType: 0, source: 6, rMsg: [{ gMsgID: '7123456789012345678', cMsgID: '5', msgType: 1 }] } } };
+  const normalized = normalizeReaction(reaction);
+  assert.deepEqual(normalized.event, { thread_id: 'G1', reactor_uid: '111', icon: '/-strong', message_ids: [idKey('7123456789012345678')], timestamp: 1780000000500 });
+  assert.match(normalized.key, /^G1:111:a1:/);
+  for (const bad of [{ ...reaction, isSelf: true }, { ...reaction, isGroup: false },
+    { ...reaction, data: { ...reaction.data, content: { ...reaction.data.content, rIcon: '' } } },
+    { ...reaction, data: { ...reaction.data, uidFrom: 'abc' } },
+    { ...reaction, data: { ...reaction.data, content: { ...reaction.data.content, rMsg: [] } } }, null, {}]) {
+    assert.equal(normalizeReaction(bad), null);
+  }
+});
+
+test('reactions are sent to their own endpoint, kept when Odoo refuses and removed once accepted', async () => {
+  const calls = [];
+  let accept = false;
+  const fetchImpl = async (url, options) => { calls.push([url, JSON.parse(options.body)]); return { ok: accept, json: async () => ({ accepted: accept }) }; };
+  const { bridge, store } = fixture({ fetchImpl });
+  const event = { thread_id: 'G1', reactor_uid: '111', icon: '/-strong', message_ids: ['7001'], timestamp: 1 };
+  store.enqueueReaction('assistant', 'k1', event);
+  store.enqueueReaction('assistant', 'k1', event); // trùng khóa: chỉ một
+  await bridge.flushReactions();
+  assert.equal(calls[0][0], 'https://odoo.invalid/dac_zalo/bridge/reactions');
+  assert.deepEqual(calls[0][1], { account_id: 'assistant', reactions: [event] });
+  assert.equal(store.pendingReactions('assistant').length, 1, 'refused: kept for the next try');
+  accept = true;
+  await bridge.flushReactions();
+  assert.equal(store.pendingReactions('assistant').length, 0);
+  await bridge.flushReactions();
+  assert.equal(calls.length, 2, 'nothing pending: no request');
   store.close();
 });

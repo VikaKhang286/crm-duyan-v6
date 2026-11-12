@@ -75,6 +75,21 @@ export function quoteFromEcho(message) {
   };
 }
 
+// Reaction của người khác trong nhóm (không phải của chính tài khoản, không phải gỡ reaction) lên một hay nhiều tin.
+export function normalizeReaction(reaction) {
+  const data = reaction?.data;
+  const content = data?.content;
+  if (!reaction || reaction.isSelf || !reaction.isGroup || !reaction.threadId) return null;
+  if (!/^\d{1,30}$/.test(String(data?.uidFrom ?? '')) || typeof content?.rIcon !== 'string' || !content.rIcon || !Array.isArray(content.rMsg)) return null;
+  const ids = content.rMsg.map((item) => item?.gMsgID).filter((id) => id !== undefined && id !== null && id !== '').map((id) => idKey(id)).slice(0, 20);
+  if (!ids.length) return null;
+  const threadId = String(reaction.threadId);
+  return {
+    key: `${threadId}:${data.uidFrom}:${data.actionId || data.msgId || data.ts}:${ids[0]}`,
+    event: { thread_id: threadId, reactor_uid: String(data.uidFrom), icon: content.rIcon.slice(0, 20), message_ids: ids, timestamp: Number(data.ts) || Date.now() },
+  };
+}
+
 const DUPLICATE_CONNECTION = 3000; // CloseReason.DuplicateConnection của zca-js
 const THREAD_CACHE_MS = 5 * 60 * 1000;
 const THREAD_LIMIT = 50;
@@ -214,6 +229,15 @@ export class Bridge {
         }
       } catch { /* Không lưu được dữ liệu trả lời thì tin nhắc nhở vẫn gửi, chỉ không có khung trích dẫn. */ }
     });
+    api.listener.on('reaction', (reaction) => {
+      if (this.api !== api) return;
+      try {
+        const normalized = normalizeReaction(reaction);
+        if (!normalized) return;
+        this.store.enqueueReaction(this.accountId, normalized.key, normalized.event);
+        void this.flushReactions();
+      } catch { /* Reaction chỉ để biết người được nhắc đã xem; mất một cái thì chỉ có thêm một lần nhắc. */ }
+    });
     api.listener.on('old_messages', (messages, type) => {
       if (type === 0) for (const message of messages) receive(message, true);
     });
@@ -270,6 +294,21 @@ export class Bridge {
       if (response.ok && (await response.json()).accepted === true) this.store.acknowledge(rows);
     } catch { /* Keep the persisted batch for retry; do not log message bodies or tokens. */ }
     finally { this.flushing = false; }
+  }
+  async flushReactions() {
+    if (this.flushingReactions || !this.accountId) return;
+    this.flushingReactions = true;
+    try {
+      const rows = this.store.pendingReactions(this.accountId);
+      if (!rows.length) return;
+      const response = await this.fetchImpl(`${this.odooUrl}/dac_zalo/bridge/reactions`, {
+        method: 'POST', redirect: 'error', signal: AbortSignal.timeout(30000),
+        headers: { Authorization: `Bearer ${this.token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ account_id: this.accountId, reactions: rows.map((row) => JSON.parse(row.body)) }),
+      });
+      if (response.ok && (await response.json()).accepted === true) this.store.acknowledgeReactions(rows);
+    } catch { /* Giữ lại để thử lại (Odoo đang nâng cấp / chưa có endpoint). */ }
+    finally { this.flushingReactions = false; }
   }
   // Friends + groups of the logged-in account, cached to avoid hammering Zalo (unofficial API).
   async listThreads() {

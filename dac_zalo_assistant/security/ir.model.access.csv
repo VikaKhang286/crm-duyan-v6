@@ -34,3 +34,5 @@ access_channel_member_manager,Zalo channel members manager,model_dac_zalo_channe
 access_channel_member_system,Zalo channel members admin,model_dac_zalo_channel_member,base.group_system,1,1,1,1
 access_channel_mention_manager,Zalo channel mentions manager,model_dac_zalo_channel_mention,dac_erp.group_dac_erp_manager,1,1,1,1
 access_channel_mention_system,Zalo channel mentions admin,model_dac_zalo_channel_mention,base.group_system,1,1,1,1
+access_channel_reaction_manager,Zalo channel reactions manager,model_dac_zalo_channel_reaction,dac_erp.group_dac_erp_manager,1,0,0,0
+access_channel_reaction_system,Zalo channel reactions admin,model_dac_zalo_channel_reaction,base.group_system,1,1,1,1

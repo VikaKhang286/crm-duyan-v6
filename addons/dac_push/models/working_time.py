@@ -30,3 +30,42 @@ def add_working_minutes(start, minutes):
                 remaining -= available
         current = (current + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
     return start + timedelta(minutes=minutes)  # không đến được: nhắc theo giờ thường còn hơn không nhắc
+
+
+# Các mốc nhắc tổng trong ngày làm việc: đầu ngày, trước nghỉ trưa, đầu giờ chiều, trước giờ tan làm.
+SUMMARY_SLOTS = (time(8, 0), time(11, 30), time(14, 0), time(17, 0))
+
+
+def _slot_utc(day, slot):
+    return datetime.combine(day, slot, tzinfo=TZ).astimezone(timezone.utc).replace(tzinfo=None)
+
+
+def latest_summary_slot(now):
+    """Mốc nhắc tổng gần nhất không muộn hơn `now` (naive UTC), hoặc None nếu 8 ngày qua không có (cấu hình ca rỗng)."""
+    local_day = now.replace(tzinfo=timezone.utc).astimezone(TZ).date()
+    best = None
+    for back in range(8):
+        day = local_day - timedelta(days=back)
+        if day.weekday() not in WORK_DAYS:
+            continue
+        for slot in SUMMARY_SLOTS:
+            moment = _slot_utc(day, slot)
+            if moment <= now and (best is None or moment > best):
+                best = moment
+        if best:
+            return best
+    return best
+
+
+def next_summary_slot(after):
+    """Mốc nhắc tổng đầu tiên sau `after` (naive UTC)."""
+    local_day = after.replace(tzinfo=timezone.utc).astimezone(TZ).date()
+    for ahead in range(9):
+        day = local_day + timedelta(days=ahead)
+        if day.weekday() not in WORK_DAYS:
+            continue
+        for slot in SUMMARY_SLOTS:
+            moment = _slot_utc(day, slot)
+            if moment > after:
+                return moment
+    return after + timedelta(days=1)

@@ -309,6 +309,10 @@ class ZaloChannelMessage(models.Model):
             except Exception:  # noqa: BLE001 — cron không được raise; không log nội dung tin
                 message.write({'state': 'failed', 'error_message': 'Không xử lý được; quản trị viên cần kiểm tra.'})
 
+    def _on_reaction(self, reaction):
+        """Móc cho addon khác: một thành viên vừa thả cảm xúc lên tin này (`reaction` là dac.zalo.channel.reaction)."""
+        return None
+
     def _queue_reply(self, text, key):
         """Xếp hàng một tin trả lời tin đã gửi này, nhắc tên đúng những người đã cài cho loại thông báo của nó."""
         self.ensure_one()
@@ -350,6 +354,43 @@ class ZaloChannelMessage(models.Model):
         # Chỉ cho gửi lại tin lỗi rõ ràng; tin "uncertain" cần người kiểm tra trước.
         self.filtered(lambda m: m.state == 'failed').write({'state': 'queued', 'attempts': 0, 'next_attempt_at': False})
         self.env['dac.zalo.channel']._trigger_send()
+
+
+class ZaloChannelReaction(models.Model):
+    """Cảm xúc (like, tim...) mà thành viên nhóm thả lên một tin bot đã gửi. Mỗi người một dòng cho mỗi tin."""
+    _name = 'dac.zalo.channel.reaction'
+    _description = 'Reaction lên tin Zalo đã gửi'
+    _order = 'id desc'
+
+    message_id = fields.Many2one('dac.zalo.channel.message', string='Tin', required=True, ondelete='cascade', index=True)
+    uid = fields.Char(string='Mã Zalo người thả', required=True, index=True)
+    icon = fields.Char(string='Cảm xúc')
+    reacted_at = fields.Datetime(string='Lúc', default=fields.Datetime.now)
+    _sql_constraints = [('message_uid_unique', 'unique(message_id, uid)', 'Người này đã thả cảm xúc lên tin này.')]
+
+    @api.model
+    def _ingest(self, account_id, reactions):
+        """Nhận lô reaction từ bridge (đã xác thực). Chỉ ghi nhận reaction lên tin do tài khoản trợ lý đã gửi vào nhóm."""
+        config = self.env['dac.zalo.config']._config()
+        if not config.assistant_uid or config.assistant_uid != account_id:
+            return self.browse()
+        messages = self.env['dac.zalo.channel.message']
+        saved = self.browse()
+        for item in reactions:
+            uid = item['reactor_uid']
+            if uid == account_id:
+                continue
+            found = messages.search([('channel_id.thread_id', '=', item['thread_id']), ('channel_id.thread_type', '=', 'group'),
+                                     ('external_message_id', 'in', item['message_ids']), ('state', '=', 'sent')])
+            for message in found:
+                reaction = self.search([('message_id', '=', message.id), ('uid', '=', uid)], limit=1)
+                if reaction:
+                    reaction.write({'icon': item['icon']})
+                    continue  # đã xử lý lần đầu; gửi lại cùng lô cũng không làm gì thêm
+                reaction = self.create({'message_id': message.id, 'uid': uid, 'icon': item['icon']})
+                saved |= reaction
+                message._on_reaction(reaction)
+        return saved
 
 
 class ZaloThreadSearch(models.TransientModel):

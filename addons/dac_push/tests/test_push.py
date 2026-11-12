@@ -71,7 +71,7 @@ class TestPushEvents(TransactionCase):
     def test_new_lead_gets_a_working_hours_deadline_and_remembers_its_zalo_messages(self):
         lead = self._lead_with_sent_message('rem0', mention=False)
         self.assertIn(self.channel.message_ids, lead.zalo_message_ids, 'every channel that received the lead is remembered')
-        self.assertTrue(lead.remind_due_at and lead.remind_due_at > lead.received_at)
+        self.assertTrue(not lead.remind_due_at or lead.remind_due_at > lead.received_at)
         self.assertFalse(lead.reminded_at)
 
     def test_overdue_lead_is_reminded_once_as_a_reply_that_tags_the_people_for_leads(self):
@@ -122,6 +122,135 @@ class TestPushEvents(TransactionCase):
         original = lead.zalo_message_ids.filtered(lambda m: m.channel_id == self.channel)
         reminder = self.channel.message_ids - original
         self.assertEqual((reminder.text, reminder.mentions, reminder.reply_to_id), ('Bạn đã liên hệ khách chưa ạ', False, original))
+
+    @staticmethod
+    def _vn(text):
+        from datetime import datetime, timezone
+        from ..models.working_time import TZ
+        return datetime.strptime(text, '%Y-%m-%d %H:%M').replace(tzinfo=TZ).astimezone(timezone.utc).replace(tzinfo=None)
+
+    def _lead_at(self, event_id, when):
+        from unittest.mock import patch
+        with patch.object(fields.Datetime, 'now', return_value=self._vn(when)):
+            event, _ = self.events._receive(envelope(event_id))
+        return self.env['dac.web.lead'].search([('event_id', '=', event.id)])
+
+    def test_summary_slots_run_on_working_days_only(self):
+        from datetime import timezone
+        from ..models.working_time import TZ, latest_summary_slot, next_summary_slot
+
+        def show(value):
+            return value.replace(tzinfo=timezone.utc).astimezone(TZ).strftime('%a %H:%M')
+
+        self.assertEqual(show(latest_summary_slot(self._vn('2026-11-12 11:29'))), 'Thu 08:00')
+        self.assertEqual(show(latest_summary_slot(self._vn('2026-11-12 11:30'))), 'Thu 11:30')
+        self.assertEqual(show(latest_summary_slot(self._vn('2026-11-12 16:59'))), 'Thu 14:00')
+        self.assertEqual(show(latest_summary_slot(self._vn('2026-11-12 07:00'))), 'Wed 17:00', 'before the first slot of the day')
+        self.assertEqual(show(latest_summary_slot(self._vn('2026-11-15 12:00'))), 'Sat 17:00', 'Sunday has no slot')
+        self.assertEqual(show(next_summary_slot(self._vn('2026-11-12 11:30'))), 'Thu 14:00', 'strictly after')
+        self.assertEqual(show(next_summary_slot(self._vn('2026-11-12 17:10'))), 'Fri 08:00')
+        self.assertEqual(show(next_summary_slot(self._vn('2026-11-14 17:10'))), 'Mon 08:00', 'Saturday evening → Monday morning')
+
+    def test_own_reminder_is_skipped_when_a_summary_comes_first(self):
+        due = lambda event_id, when: self._lead_at(event_id, when).remind_due_at
+        self.assertEqual(due('sk1', '2026-11-12 09:00'), self._vn('2026-11-12 09:30'), 'next summary 11:30 is later: remind alone first')
+        self.assertFalse(due('sk2', '2026-11-12 11:10'), '11:40 would come after the 11:30 summary: the summary covers it')
+        self.assertEqual(due('sk3', '2026-11-12 11:45'), self._vn('2026-11-12 13:45'), 'own reminder 13:45 precedes the 14:00 summary')
+        self.assertFalse(due('sk4', '2026-11-12 17:10'), 'would be 08:10 tomorrow, after the 08:00 summary')
+        self.assertFalse(due('sk5', '2026-11-12 11:00'), 'same minute as the summary: the summary wins')
+
+    def _reminded_lead(self, event_id='ack1'):
+        lead = self._lead_with_sent_message(event_id)
+        lead.remind_due_at = fields.Datetime.now() - timedelta(minutes=1)
+        self.env['dac.web.lead']._cron_remind_uncontacted()
+        reminder = lead.reminder_message_ids.filtered(lambda m: m.channel_id == self.channel)
+        reminder.write({'state': 'sent', 'external_message_id': 'zm-remind-%s' % event_id})
+        return lead, reminder
+
+    def test_reaction_of_a_tagged_person_on_the_reminder_stops_all_further_reminders(self):
+        self.env['dac.zalo.config']._config().write({'active': True, 'assistant_uid': 'bot-push'})
+        lead, reminder = self._reminded_lead('ack1')
+        self.assertTrue(reminder, 'the reminder is remembered on the lead')
+        react = lambda uid, ids=None: self.env['dac.zalo.channel.reaction']._ingest('bot-push', [{
+            'thread_id': 'G-push', 'reactor_uid': uid, 'icon': '/-strong', 'message_ids': ids or ['zm-remind-ack1']}])
+        react('999')  # người không được nhắc tên
+        self.assertFalse(lead.acked_at, 'only the tagged people count')
+        react('111', ['zm-original-other'])  # reaction lên tin khác
+        self.assertFalse(lead.acked_at)
+        react('111')
+        self.assertTrue(lead.acked_at)
+        self.assertEqual(lead.acked_uid, '111')
+        before = len(self.channel.message_ids)
+        slot = self._vn('2026-11-12 11:30')
+        lead.received_at = self._vn('2026-11-12 09:00')
+        self.env['dac.web.lead']._send_summary(slot)
+        self.assertEqual(len(self.channel.message_ids), before, 'an acknowledged lead is left out of the summaries')
+
+    def test_reaction_counts_from_anyone_when_nobody_is_tagged(self):
+        self.env['dac.zalo.config']._config().write({'active': True, 'assistant_uid': 'bot-push'})
+        lead = self._lead_with_sent_message('ack2', mention=False)
+        lead.remind_due_at = fields.Datetime.now() - timedelta(minutes=1)
+        self.env['dac.web.lead']._cron_remind_uncontacted()
+        reminder = lead.reminder_message_ids.filtered(lambda m: m.channel_id == self.channel)
+        reminder.write({'state': 'sent', 'external_message_id': 'zm-remind-ack2'})
+        self.env['dac.zalo.channel.reaction']._ingest('bot-push', [{'thread_id': 'G-push', 'reactor_uid': '777', 'icon': '/-heart', 'message_ids': ['zm-remind-ack2']}])
+        self.assertTrue(lead.acked_at)
+
+    def test_summary_lists_every_open_number_to_the_people_for_leads(self):
+        first = self._lead_with_sent_message('sm1')
+        second = self._lead_at('sm2', '2026-11-12 11:10')
+        second.zalo_message_ids.filtered(lambda m: m.channel_id == self.channel).write({'state': 'sent', 'external_message_id': 'zm-sm2'})
+        done = self._lead_at('sm3', '2026-11-12 09:30')
+        done.zalo_message_ids.write({'state': 'sent'})
+        done._set_contact_state('contacted')
+        late = self._lead_at('sm4', '2026-11-12 11:40')  # nhận sau mốc 11:30
+        late.zalo_message_ids.write({'state': 'sent'})
+        first.write({'received_at': self._vn('2026-11-11 16:00'), 'customer_name': 'Chị Hoa', 'phone': '0933939856'})
+        second.write({'customer_name': False, 'phone': '0911222333'})
+        slot = self._vn('2026-11-12 11:30')
+        before = self.channel.message_ids
+        self.env['dac.web.lead']._send_summary(slot)
+        summary = self.channel.message_ids - before
+        self.assertEqual(len(summary), 1)
+        lines = summary.text.splitlines()
+        self.assertEqual(lines[0], '@An @Bình Còn 2 khách chưa liên hệ:')
+        self.assertTrue(lines[1].startswith('1. 0933939856 - Chị Hoa (16:00 11/11) '), lines[1])
+        self.assertTrue(lines[1].endswith(first._short_link()))
+        self.assertTrue(lines[2].startswith('2. 0911222333 (11:10) '), lines[2])
+        self.assertEqual(len(lines), 3, 'contacted and later leads are not listed')
+        self.assertEqual([m['uid'] for m in summary.mentions], ['111', '222'])
+        self.assertFalse(summary.reply_to_id, 'a summary is a normal message, not a reply')
+        self.env['dac.web.lead']._send_summary(slot)
+        self.assertEqual(len(self.channel.message_ids - before), 1, 'the same slot never sends twice')
+
+    def test_summary_cron_sends_once_per_slot_and_not_when_stale_or_on_first_run(self):
+        from unittest.mock import patch
+        Lead = self.env['dac.web.lead']
+        lead = self._lead_with_sent_message('cr1', mention=False)
+        lead.received_at = self._vn('2026-11-12 09:00')
+        params = self.env['ir.config_parameter'].sudo()
+        params.search([('key', '=', 'dac_push.last_summary_slot')]).unlink()
+        before = len(self.channel.message_ids)
+        now = lambda text: patch.object(fields.Datetime, 'now', return_value=self._vn(text))
+        with now('2026-11-12 11:31'):
+            Lead._cron_summary_uncontacted()
+        self.assertEqual(len(self.channel.message_ids), before, 'first run only records the current slot')
+        self.assertEqual(params.get_param('dac_push.last_summary_slot'), fields.Datetime.to_string(self._vn('2026-11-12 11:30')))
+        with now('2026-11-12 11:40'):
+            Lead._cron_summary_uncontacted()
+        self.assertEqual(len(self.channel.message_ids), before, 'same slot again: nothing')
+        with now('2026-11-12 14:01'):
+            Lead._cron_summary_uncontacted()
+            Lead._cron_summary_uncontacted()
+        self.assertEqual(len(self.channel.message_ids), before + 1, 'new slot: exactly one summary')
+        self.assertIn('Còn 1 khách chưa liên hệ', self.channel.message_ids.sorted('id')[-1].text)
+        with now('2026-11-12 19:30'):  # Odoo ngừng qua mốc 17:00 hơn 2 giờ: bỏ mốc đó
+            Lead._cron_summary_uncontacted()
+        self.assertEqual(len(self.channel.message_ids), before + 1, 'a slot missed by hours is skipped')
+        self.assertEqual(params.get_param('dac_push.last_summary_slot'), fields.Datetime.to_string(self._vn('2026-11-12 17:00')))
+        with now('2026-11-13 08:01'):
+            Lead._cron_summary_uncontacted()
+        self.assertEqual(len(self.channel.message_ids), before + 2, 'the next morning slot lists the number again')
 
     def test_working_time_skips_lunch_nights_and_sundays(self):
         from datetime import datetime, timezone
