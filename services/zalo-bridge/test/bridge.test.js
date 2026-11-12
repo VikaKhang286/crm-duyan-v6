@@ -307,7 +307,7 @@ test('a reminder can reply to an earlier message of this account: quote data com
   bridge.api = { sendMessage: async (content) => { sent.push(content); return { message: { msgId: `m${sent.length}` } }; }, getUserInfo: async () => ({}) };
   const echo = { isSelf: true, threadId: 'G1', type: 1, data: { uidFrom: '0', msgId: '700123', cliMsgId: '1780000000001', ts: '1780000000002', msgType: 'webchat', content: 'Khách yêu cầu', propertyExt: { color: 0 }, ttl: 0 } };
   assert.equal(quoteFromEcho({ ...echo, isSelf: false }), null, 'only our own messages');
-  assert.equal(quoteFromEcho({ ...echo, data: { ...echo.data, content: { href: 'x' } } }), null, 'only text messages');
+  assert.equal(quoteFromEcho({ ...echo, data: { ...echo.data, cliMsgId: undefined } }), null, 'needs the client id');
   const saved = quoteFromEcho(echo);
   assert.equal(saved.msgId, '700123');
   store.rememberQuote(saved.threadId, saved.msgId, saved.body);
@@ -332,5 +332,25 @@ test('a reminder can reply to an earlier message of this account: quote data com
   for (const bad of ['abc', 12, '', '1'.repeat(31)]) {
     await assert.rejects(bridge.send({ ...payload, request_id: 'q4', quote_message_id: bad }), /invalid_payload/);
   }
+  store.close();
+});
+
+test('a styled message whose echo has no string content is quoted with the text the bridge sent', async () => {
+  const sent = [];
+  const { bridge, store } = fixture();
+  bridge.api = { sendMessage: async (content) => { sent.push(content); return { message: { msgId: `${7000 + sent.length}` } }; }, getUserInfo: async () => ({}) };
+  const text = 'Khách yêu cầu\n📞 0909';
+  const original = await bridge.send({ ...payload, request_id: 's1', thread_id: 'G1', thread_type: 'group', text, styles: [{ start: 0, len: 13, style: 'bold' }] });
+  const echo = { isSelf: true, threadId: 'G1', type: 1, data: { msgId: original.message_id, cliMsgId: '1780000000100', ts: '1780000000101', msgType: 'chat.webcontent', content: { title: 'x', params: '{}' }, propertyExt: { color: 0 }, ttl: 0 } };
+  const saved = quoteFromEcho(echo);
+  assert.equal(saved.body.content, null);
+  store.rememberQuote(saved.threadId, saved.msgId, saved.body);
+  const reply = await bridge.send({ ...payload, request_id: 's2', thread_id: 'G1', thread_type: 'group', text: 'Nhắc', quote_message_id: original.message_id });
+  assert.equal(reply.quoted, true);
+  assert.deepEqual(sent[1].quote, { msgId: original.message_id, content: text, msgType: 'webchat', propertyExt: undefined, cliMsgId: '1780000000100', ts: '1780000000101', ttl: 0, uidFrom: 'assistant' });
+  // không có chữ đã gửi (tin gửi trước khi nâng cấp) và echo không có chuỗi → gửi nhắc không khung
+  store.rememberQuote('G1', '555', { ...saved.body, msgId: '555' });
+  const plain = await bridge.send({ ...payload, request_id: 's3', thread_id: 'G1', thread_type: 'group', text: 'Nhắc 2', quote_message_id: '555' });
+  assert.equal(plain.quoted, false);
   store.close();
 });

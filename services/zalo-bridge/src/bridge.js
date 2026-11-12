@@ -66,10 +66,11 @@ export const idKey = (id) => { const text = String(id); return /^\d+$/.test(text
 // Dữ liệu cần để Zalo hiện "trả lời tin nhắn" cho một tin văn bản do chính tài khoản đã gửi (lấy từ echo của tin đó).
 export function quoteFromEcho(message) {
   const data = message?.data;
-  if (!message?.isSelf || !message.threadId || !data?.msgId || !data.cliMsgId || typeof data.content !== 'string') return null;
+  if (!message?.isSelf || !message.threadId || !data?.msgId || !data.cliMsgId) return null;
+  // Tin có chữ đậm... đến dưới dạng khác chuỗi: vẫn giữ cliMsgId/ts, phần chữ lấy từ bản bridge đã gửi (xem send)
   return {
     threadId: String(message.threadId), msgId: idKey(data.msgId),
-    body: { msgId: String(data.msgId), content: data.content, msgType: data.msgType || 'webchat', propertyExt: data.propertyExt,
+    body: { msgId: String(data.msgId), content: typeof data.content === 'string' ? data.content : null, msgType: data.msgType || 'webchat', propertyExt: data.propertyExt,
       cliMsgId: String(data.cliMsgId), ts: String(data.ts), ttl: Number(data.ttl) || 0 },
   };
 }
@@ -205,7 +206,12 @@ export class Bridge {
       if (this.api !== api) return;
       try {
         const sent = quoteFromEcho(message);
-        if (sent) this.store.rememberQuote(sent.threadId, sent.msgId, sent.body);
+        if (sent) {
+          this.store.rememberQuote(sent.threadId, sent.msgId, sent.body);
+          const shape = `${message.data.msgType}/${typeof message.data.content}`;
+          if (!this.echoShapes) this.echoShapes = new Set();
+          if (!this.echoShapes.has(shape)) { this.echoShapes.add(shape); console.log(`Zalo echo shape: ${shape}`); } // chỉ kiểu dữ liệu, không có nội dung
+        }
       } catch { /* Không lưu được dữ liệu trả lời thì tin nhắc nhở vẫn gửi, chỉ không có khung trích dẫn. */ }
     });
     api.listener.on('old_messages', (messages, type) => {
@@ -330,7 +336,11 @@ export class Bridge {
       && (typeof payload.quote_message_id !== 'string' || !MESSAGE_ID.test(payload.quote_message_id))) throw new Error('invalid_payload');
     const wantsQuote = typeof payload.quote_message_id === 'string';
     const saved = wantsQuote ? this.store.quote(payload.thread_id, idKey(payload.quote_message_id)) : null;
-    const quote = saved ? { ...saved, uidFrom: payload.account_id } : null;
+    // Echo không có chữ dạng chuỗi (tin có định dạng): dùng chữ đã gửi và coi là tin văn bản thường
+    const savedText = saved && typeof saved.content !== 'string' ? this.store.text(payload.thread_id, idKey(payload.quote_message_id)) : null;
+    const quote = !saved ? null
+      : typeof saved.content === 'string' ? { ...saved, uidFrom: payload.account_id }
+        : savedText ? { ...saved, content: savedText, msgType: 'webchat', propertyExt: undefined, uidFrom: payload.account_id } : null;
     const content = buildContent(payload, quote); // kiểm tra kiểu chữ trước khi giữ chỗ request_id
     if (payload.account_id !== this.accountId) throw new Error('wrong_account');
     if (!this.api || this.state !== 'connected') throw new Error('not_connected');
@@ -345,6 +355,7 @@ export class Bridge {
       const id = result?.message?.msgId;
       if (!id) throw new Error('no_message_id');
       this.store.finish(payload.request_id, 'sent', String(id));
+      try { this.store.rememberText(payload.thread_id, idKey(id), payload.text); } catch { /* chỉ để làm khung trả lời sau này */ }
       return { delivery: 'sent', message_id: String(id), ...(wantsQuote ? { quoted: Boolean(quote) } : {}) };
     } catch {
       // A failed network call may already have delivered; never automatically send it twice.
