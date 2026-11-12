@@ -131,11 +131,9 @@ const designWorkspaceHeader = {
               read.add(item.key);
               saveSet(read);
               close();
-              if (item.open_task && item.order_id) {
+              if (item.order_id) {
                 const result = await orm.call("sale.order", "action_open_design_collaboration", [[item.order_id]]);
                 await action.doAction(result, { clearBreadcrumbs: true });
-              } else if (item.order_id) {
-                await action.doAction({ type: "ir.actions.act_window", res_model: "sale.order", res_id: item.order_id, views: [[false, "form"]], target: "current" });
               }
             };
             list.appendChild(row);

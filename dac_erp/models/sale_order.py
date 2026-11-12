@@ -1148,6 +1148,13 @@ class SaleOrder(models.Model):
         string='Số dòng sản phẩm', compute='_compute_product_line_count', store=False,
     )
     internal_note_draft = fields.Text(string='Ghi chú nội bộ mới', copy=False)
+    design_conversation_draft = fields.Text(string='Tin nhắn trao đổi thiết kế', copy=False)
+    design_conversation_message_ids = fields.One2many(
+        'dac.design.conversation.message', 'order_id', string='Trao đổi thiết kế', copy=False,
+    )
+    design_conversation_html = fields.Html(
+        string='Trao đổi thiết kế', compute='_compute_sidebar_activity', sanitize=False,
+    )
     design_preview_upload = fields.Binary(string='Ảnh preview thiết kế', attachment=False, copy=False)
     design_preview_upload_filename = fields.Char(string='Tên ảnh preview thiết kế', copy=False)
     design_preview_sent = fields.Boolean(

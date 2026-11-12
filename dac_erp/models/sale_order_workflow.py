@@ -327,7 +327,7 @@ class SaleOrderWorkflow(models.Model):
             ))
         if note or attachments:
             self.message_post(
-                body=Markup('<div class="dac-internal-note-message">{}</div>').format(
+                body=Markup('<div class="dac-order-internal-note-message">{}</div>').format(
                     note
                 ),
                 subtype_xmlid='mail.mt_note',
@@ -358,13 +358,78 @@ class SaleOrderWorkflow(models.Model):
         note = (self.internal_note_draft or '').strip()
         if note or attachments:
             self.message_post(
-                body=Markup('<div class="dac-internal-note-message">{}</div>').format(note),
+                body=Markup('<div class="dac-order-internal-note-message">{}</div>').format(note),
                 subtype_xmlid='mail.mt_note', attachments=attachments,
             )
             if attachments and self.env.user.has_group('dac_erp.group_dac_erp_design'):
                 self.design_preview_sent = True
             self._mark_design_revision_from_sale_note(note)
         self.internal_note_draft = False
+        return {'type': 'ir.actions.client', 'tag': 'dac_soft_reload_sale_order'}
+
+    def _post_design_conversation_message(self, body='', attachments=None):
+        """Write to the dedicated Design channel, never to order chatter."""
+        self.ensure_one()
+        attachment_ids = []
+        message = self.env['dac.design.conversation.message'].create({
+            'order_id': self.id,
+            'body': body or '',
+            'author_id': self.env.user.partner_id.id,
+        })
+        for name, content, values in attachments or []:
+            attachment = self.env['ir.attachment'].create({
+                'name': name,
+                'datas': base64.b64encode(content),
+                'mimetype': values.get('mimetype') or 'application/octet-stream',
+                'res_model': 'dac.design.conversation.message',
+                'res_id': message.id,
+            })
+            attachment_ids.append(attachment.id)
+        if attachment_ids:
+            message.write({'attachment_ids': [(6, 0, attachment_ids)]})
+        return message
+
+    def action_post_design_conversation(self):
+        self.ensure_one()
+        note = (self.design_conversation_draft or '').strip()
+        attachments = []
+        if self.design_preview_upload:
+            attachments.append((
+                self.design_preview_upload_filename or 'anh-preview.png',
+                base64.b64decode(self.design_preview_upload),
+                {'mimetype': 'image/*'},
+            ))
+        if note or attachments:
+            self._post_design_conversation_message(note, attachments)
+            if attachments and self.env.user.has_group('dac_erp.group_dac_erp_design'):
+                self.design_preview_sent = True
+            self._mark_design_revision_from_sale_note(note)
+        self.write({
+            'design_conversation_draft': False,
+            'design_preview_upload': False,
+            'design_preview_upload_filename': False,
+        })
+        return {'type': 'ir.actions.client', 'tag': 'dac_soft_reload_sale_order'}
+
+    def action_post_design_conversation_with_images(self, images=None):
+        self.ensure_one()
+        attachments = []
+        for image in (images or [])[:5]:
+            data = (image.get('data') or '').split(',', 1)[-1]
+            if not data or not (image.get('mimetype') or '').startswith('image/'):
+                continue
+            attachments.append((
+                image.get('name') or 'anh-preview.png',
+                base64.b64decode(data),
+                {'mimetype': image['mimetype']},
+            ))
+        note = (self.design_conversation_draft or '').strip()
+        if note or attachments:
+            self._post_design_conversation_message(note, attachments)
+            if attachments and self.env.user.has_group('dac_erp.group_dac_erp_design'):
+                self.design_preview_sent = True
+            self._mark_design_revision_from_sale_note(note)
+        self.design_conversation_draft = False
         return {'type': 'ir.actions.client', 'tag': 'dac_soft_reload_sale_order'}
 
     def _mark_design_revision_from_sale_note(self, note):
@@ -785,13 +850,8 @@ class SaleOrderWorkflow(models.Model):
         if not self.design_deadline:
             vals_done['design_deadline'] = base if self.is_priority_today else (base + timedelta(days=3))
         self.write(vals_done)
-        self.message_post(
-            body=Markup(
-                '<div class="dac-internal-note-message">'
-                'Thiết kế xong. Nhờ Sale kiểm tra và duyệt bản preview.'
-                '</div>'
-            ),
-            subtype_xmlid='mail.mt_note',
+        self._post_design_conversation_message(
+            'Thiết kế xong. Nhờ Sale kiểm tra và duyệt bản preview.'
         )
         return {'type': 'ir.actions.client', 'tag': 'reload'}
 
@@ -815,9 +875,8 @@ class SaleOrderWorkflow(models.Model):
             'design_approved_date': fields.Datetime.now(),
             'design_approved_user_id': self.env.user.id,
         })
-        self.message_post(
-            body=Markup('<div class="dac-internal-note-message">Đã duyệt bản preview. Thiết kế gửi file chính thức giúp mình.</div>'),
-            subtype_xmlid='mail.mt_note',
+        self._post_design_conversation_message(
+            'Đã duyệt bản preview. Thiết kế gửi file chính thức giúp mình.'
         )
         return {'type': 'ir.actions.client', 'tag': 'reload'}
 
@@ -839,14 +898,8 @@ class SaleOrderWorkflow(models.Model):
             'design_final_file_sent': False,
             'design_preview_sent': False,
         })
-        self.message_post(
-            body=Markup(
-                '<div class="dac-internal-note-message">'
-                'Bắt đầu chỉnh sửa tiếp từ bản đã duyệt. '
-                'Sẽ gửi preview mới để Sale duyệt lại.'
-                '</div>'
-            ),
-            subtype_xmlid='mail.mt_note',
+        self._post_design_conversation_message(
+            'Bắt đầu chỉnh sửa tiếp từ bản đã duyệt. Sẽ gửi preview mới để Sale duyệt lại.'
         )
         return {'type': 'ir.actions.client', 'tag': 'reload'}
 

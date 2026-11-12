@@ -58,3 +58,4 @@ from . import material
 
 from . import sale_order_deposit_sync
 from . import sale_order_deposit_reminder
+from . import dac_design_conversation_message

@@ -317,14 +317,12 @@ class SaleOrder(models.Model):
         order_by_id = {order.id: order for order in design_orders}
         design_notifications = []
         if reviewer_partner_ids and order_by_id:
-            messages = self.env['mail.message'].sudo().search([
-                ('model', '=', 'sale.order'),
-                ('res_id', 'in', list(order_by_id)),
+            messages = self.env['dac.design.conversation.message'].sudo().search([
+                ('order_id', 'in', list(order_by_id)),
                 ('author_id', 'in', reviewer_partner_ids),
-                ('body', 'ilike', 'dac-internal-note-message'),
-            ], order='date desc, id desc')
+            ], order='create_date desc, id desc')
             for message in messages:
-                order = order_by_id.get(message.res_id)
+                order = order_by_id.get(message.order_id.id)
                 if not order:
                     continue
                 body = _first_line(message.body)
@@ -339,7 +337,7 @@ class SaleOrder(models.Model):
                 design_notifications.append({
                     'key': f'message-{message.id}',
                     'order_id': order.id,
-                    'notification_at': fields.Datetime.to_string(message.date) if message.date else False,
+                'notification_at': fields.Datetime.to_string(message.create_date) if message.create_date else False,
                     'title': (
                         _('%s đã duyệt %s') % (author, task_name)
                         if is_approval else

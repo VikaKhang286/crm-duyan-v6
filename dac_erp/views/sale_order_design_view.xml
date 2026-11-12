@@ -46,7 +46,7 @@
             <field name="priority">4</field>
             <field name="groups_id" eval="[(6, 0, [ref('dac_erp.group_dac_erp_design')])]"/>
             <field name="arch" type="xml">
-                <list string="Đơn hàng được giao" default_order="date desc" delete="false" create="false" edit="false"
+                <list string="Đơn hàng được giao" js_class="dac_design_assigned_orders_list" default_order="date desc" delete="false" create="false" edit="false"
                       decoration-warning="partner_vip_class == 'vip'"
                       decoration-info="partner_vip_class == 'loyal'"
                       decoration-danger="partner_vip_class == 'premium'"
@@ -166,13 +166,13 @@
                                 </div>
                                 <section class="dac-design-order-card dac-design-order-conversation">
                                     <div class="dac-design-order-card-header"><span><i class="fa fa-comment-o"/> Trao đổi thiết kế</span><div class="dac-design-conversation-header-actions"><span class="dac-design-conversation-status is-working" invisible="design_done or design_review_state == 'revision'"><i class="fa fa-circle"/> Đang thiết kế</span><span class="dac-design-conversation-status is-revision" invisible="design_review_state != 'revision'"><i class="fa fa-circle"/> Cần chỉnh sửa</span><span class="dac-design-conversation-status is-waiting" invisible="not design_done or design_review_state in ['approved', 'revision']"><i class="fa fa-circle"/> Chờ Sale duyệt</span><span class="dac-design-conversation-status is-ready" invisible="design_review_state != 'approved'"><i class="fa fa-circle"/> Đã duyệt</span><button name="action_approve_design" type="object" class="dac-design-order-complete dac-design-order-approve" groups="dac_erp.group_dac_erp_sale,dac_erp.group_dac_erp_manager,base.group_system" invisible="is_design_user or design_review_state != 'pending'"><i class="fa fa-check"/> Duyệt thiết kế</button></div></div>
-                                    <div class="dac-design-order-conversation-body"><field name="internal_notes_html" widget="html" nolabel="1" readonly="1"/></div>
+                                    <div class="dac-design-order-conversation-body"><field name="design_conversation_html" widget="html" nolabel="1" readonly="1"/></div>
                                     <div class="dac-design-order-conversation-tip" invisible="not is_design_user or design_review_state in ['pending', 'approved']">Gửi ảnh preview rồi bấm Thiết kế xong.</div>
                                     <div class="dac-design-order-conversation-compose">
                                         <div class="d-flex align-items-center gap-2 w-100">
                                             <field name="design_preview_upload" title="Đính kèm ảnh preview" widget="binary" nolabel="1" class="dac-design-chat-attach" invisible="not is_design_user or design_review_state == 'approved'"/>
-                                            <field name="internal_note_draft" nolabel="1" widget="text" placeholder="Nhắn tin hoặc dán ảnh..."/>
-                                            <button name="action_post_internal_note" type="object" class="dac-design-order-send" title="Gửi trao đổi" aria-label="Gửi trao đổi"><i class="fa fa-paper-plane-o"/></button>
+                                            <field name="design_conversation_draft" nolabel="1" widget="text" placeholder="Nhắn tin hoặc dán ảnh..."/>
+                                            <button name="action_post_design_conversation" type="object" class="dac-design-order-send" title="Gửi trao đổi" aria-label="Gửi trao đổi"><i class="fa fa-paper-plane-o"/></button>
                                         </div>
                                         <small invisible="not is_design_user or design_review_state == 'approved'">Ctrl / ⌘ V để dán ảnh · Enter để gửi · Shift + Enter để xuống dòng</small>
                                         <small invisible="not is_design_user or design_review_state != 'approved'">Enter để gửi · Shift + Enter để xuống dòng</small>

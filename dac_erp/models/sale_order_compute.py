@@ -102,6 +102,10 @@ class SaleOrderCompute(models.Model):
         'message_ids.body', 'message_ids.date', 'message_ids.author_id',
         'message_ids.tracking_value_ids', 'message_ids.attachment_ids',
         'message_ids.attachment_ids.mimetype',
+        'design_conversation_message_ids.body', 'design_conversation_message_ids.author_id',
+        'design_conversation_message_ids.create_date',
+        'design_conversation_message_ids.attachment_ids',
+        'design_conversation_message_ids.attachment_ids.mimetype',
     )
     def _compute_sidebar_activity(self):
         def _message_text(message):
@@ -111,22 +115,23 @@ class SaleOrderCompute(models.Model):
             messages = order.message_ids.sorted(key=lambda message: message.date or fields.Datetime.now(), reverse=True)
             internal_messages = messages.filtered(
                 lambda message: (
-                    'dac-internal-note-message' in (message.body or '')
+                    'dac-order-internal-note-message' in (message.body or '')
                     and (bool(_message_text(message)) or bool(message.attachment_ids))
                 )
             )
             order.internal_note_count = len(internal_messages)
+            design_messages = order.design_conversation_message_ids.sorted(
+                key=lambda message: message.create_date or fields.Datetime.now()
+            )
 
             note_cards = []
             # The conversation reads chronologically: oldest at the top,
             # newest at the bottom.  Keep the latest 20 messages only.
-            display_messages = internal_messages[:20].sorted(
-                key=lambda message: message.date or fields.Datetime.now()
-            )
+            display_messages = design_messages[-20:]
             for message in display_messages:
                 body = _message_text(message)
                 author = message.author_id.name or 'Nội bộ'
-                time_label = fields.Datetime.context_timestamp(order, message.date).strftime('%d/%m/%Y %H:%M') if message.date else ''
+                time_label = fields.Datetime.context_timestamp(order, message.create_date).strftime('%d/%m/%Y %H:%M') if message.create_date else ''
                 is_designer = message.author_id == order.user_id_design.partner_id
                 # Each viewer sees their own side at right in pale yellow.
                 is_current_party = is_designer if order.is_design_user else not is_designer
@@ -166,12 +171,31 @@ class SaleOrderCompute(models.Model):
                 'Gửi tin nhắn hoặc dán ảnh preview tại đây.'
                 if order.is_design_user else 'Gửi góp ý cho Thiết kế tại đây.'
             )
-            order.internal_notes_html = Markup(''.join(note_cards) or (
+            order.design_conversation_html = Markup(''.join(note_cards) or (
                 '<div class="dac-v6-empty-log">'
                 '<i class="fa fa-comment-o" aria-hidden="true"></i>'
                 f'<strong>{empty_conversation_title}</strong>'
                 f'<span>{empty_conversation_hint}</span>'
                 '</div>'
+            ))
+
+            # The order's own internal chatter remains a separate channel.
+            internal_cards = []
+            for message in internal_messages[:20].sorted(
+                key=lambda item: item.date or fields.Datetime.now()
+            ):
+                body = _message_text(message)
+                author = message.author_id.name or 'Nội bộ'
+                time_label = fields.Datetime.context_timestamp(order, message.date).strftime('%d/%m/%Y %H:%M') if message.date else ''
+                internal_cards.append(
+                    '<article class="dac-v6-internal-card dac-v6-internal-card--other">'
+                    '<div class="dac-v6-internal-bubble">'
+                    f'<header><b>{html_escape(author)}</b><span>{html_escape(time_label)}</span></header>'
+                    f'<p>{html_escape(body)}</p></div></article>'
+                )
+            order.internal_notes_html = Markup(''.join(internal_cards) or (
+                '<div class="dac-v6-empty-log"><i class="fa fa-comment-o" aria-hidden="true"></i>'
+                '<strong>Trò chuyện nội bộ</strong><span>Gửi trao đổi nội bộ tại đây.</span></div>'
             ))
 
             history_items = []

@@ -118,4 +118,8 @@ access_dac_design_revision_manager,dac.design.revision manager,model_dac_design_
 access_dac_design_revision_sale,dac.design.revision sale,model_dac_design_revision,group_dac_erp_sale,1,1,1,0
 access_dac_design_revision_design,dac.design.revision design,model_dac_design_revision,group_dac_erp_design,1,1,1,0
 access_dac_design_revision_production,dac.design.revision production,model_dac_design_revision,group_dac_erp_production,1,0,0,0
+access_dac_design_conversation_manager,dac.design.conversation.message manager,model_dac_design_conversation_message,group_dac_erp_manager,1,1,1,0
+access_dac_design_conversation_sale,dac.design.conversation.message sale,model_dac_design_conversation_message,group_dac_erp_sale,1,1,1,0
+access_dac_design_conversation_design,dac.design.conversation.message design,model_dac_design_conversation_message,group_dac_erp_design,1,1,1,0
+access_dac_design_conversation_system,dac.design.conversation.message system,model_dac_design_conversation_message,base.group_system,1,1,1,1
 access_dac_design_revision_system,dac.design.revision system,model_dac_design_revision,base.group_system,1,1,1,1

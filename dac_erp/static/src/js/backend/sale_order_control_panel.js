@@ -415,12 +415,12 @@ patch(FormController.prototype, {
     const send = async () => {
       const text = input.value.trim();
       if (!text && !pendingImages.length) return;
-      await this.model.root.update({ internal_note_draft: input.value });
+      await this.model.root.update({ design_conversation_draft: input.value });
       const images = pendingImages.splice(0).map((image, index) => ({
         name: image.name || `anh-preview-${Date.now()}-${index + 1}.png`, mimetype: image.type, data: image.data,
       }));
       renderPreview();
-      await this.orm.call("sale.order", "action_post_internal_note_with_images", [[this.model.root.resId], images]);
+      await this.orm.call("sale.order", "action_post_design_conversation_with_images", [[this.model.root.resId], images]);
       await this.model.root.load();
     };
     const addImages = (files) => {

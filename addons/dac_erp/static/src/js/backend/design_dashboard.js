@@ -310,23 +310,13 @@ class DesignDashboard extends Component {
   async openNotification(item) {
     if (!item) return;
     this.markNotificationRead(item.key);
-    if (item.open_task && item.order_id) {
+    if (item.order_id) {
       const action = await this.orm.call(
         "sale.order",
         "action_open_design_collaboration",
         [[item.order_id]]
       );
       await this.action.doAction(action, { clearBreadcrumbs: true });
-      return;
-    }
-    if (item.order_id) {
-      await this.action.doAction({
-        type: "ir.actions.act_window",
-        res_model: "sale.order",
-        res_id: item.order_id,
-        views: [[false, "form"]],
-        target: "current",
-      });
       return;
     }
     await this.openTaskOrOrder(item.task);
@@ -345,7 +335,10 @@ class DesignDashboard extends Component {
   async openTaskOrOrder(task) {
     if (!task || !task.id) return;
     if (task.order_id) {
-      await this.action.doAction({ type: "ir.actions.act_window", res_model: "sale.order", res_id: task.order_id, views: [[false, "form"]], target: "current" });
+      const action = await this.orm.call(
+        "sale.order", "action_open_design_collaboration", [[task.order_id]]
+      );
+      await this.action.doAction(action, { clearBreadcrumbs: true });
     } else {
       await this.action.doAction({
         type: "ir.actions.act_window",
