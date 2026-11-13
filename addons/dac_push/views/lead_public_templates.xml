@@ -1,0 +1,83 @@
+<odoo>
+    <!-- Trang công khai cho link trong tin Zalo: độc lập, không cần đăng nhập, không tải asset của Odoo. -->
+    <template id="lead_public_page" name="Lead website (công khai)">
+        <html lang="vi">
+            <head>
+                <meta charset="utf-8"/>
+                <meta name="viewport" content="width=device-width, initial-scale=1"/>
+                <meta name="robots" content="noindex, nofollow"/>
+                <title>Khách yêu cầu tư vấn</title>
+                <style>
+                    *{box-sizing:border-box}
+                    body{margin:0;background:#f3f4f6;color:#111827;font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+                    .wrap{max-width:480px;margin:0 auto;padding:16px 16px 40px}
+                    .card{background:#fff;border-radius:16px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+                    .top{display:flex;justify-content:space-between;gap:8px;align-items:center;color:#6b7280;font-size:13px;margin-bottom:12px}
+                    .badge{display:inline-block;padding:2px 10px;border-radius:999px;background:#eef2ff;color:#3730a3;font-size:12px;font-weight:600}
+                    h1{font-size:20px;margin:0 0 4px}
+                    .phone{display:block;font-size:30px;font-weight:700;letter-spacing:.5px;color:#111827;text-decoration:none;margin:4px 0 14px}
+                    .row{padding:10px 0;border-top:1px solid #f0f1f3}
+                    .row b{display:block;font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.4px}
+                    .row span{white-space:pre-wrap;word-break:break-word}
+                    details{margin-top:6px;border-top:1px solid #f0f1f3;padding-top:10px;color:#4b5563;font-size:14px}
+                    details pre{white-space:pre-wrap;word-break:break-all;margin:8px 0 0;font:inherit;font-size:13px}
+                    .state{margin:14px 0 0;padding:10px 14px;border-radius:12px;font-size:15px;font-weight:600}
+                    .state.new{background:#fef9c3;color:#854d0e}
+                    .state.contacted{background:#dcfce7;color:#166534}
+                    .state.unreachable{background:#fee2e2;color:#991b1b}
+                    form{margin:0}
+                    .actions{margin-top:16px;display:grid;gap:10px}
+                    button{width:100%;border:0;border-radius:14px;font:inherit;font-weight:700;cursor:pointer;color:#fff}
+                    .primary{background:#16a34a;height:58px;font-size:18px}
+                    .danger{background:#dc2626;height:48px;font-size:16px}
+                    button:active{opacity:.85}
+                    button:disabled{opacity:.4;cursor:not-allowed}
+                </style>
+            </head>
+            <body>
+                <div class="wrap">
+                    <div class="card">
+                        <div class="top">
+                            <span class="badge"><t t-out="form_label or 'Khách yêu cầu'"/></span>
+                            <span><t t-out="received"/></span>
+                        </div>
+                        <h1><t t-out="lead.customer_name or 'Khách yêu cầu tư vấn'"/></h1>
+                        <a t-if="lead.phone" class="phone" t-attf-href="tel:#{lead.phone}"><t t-out="lead.phone"/></a>
+                        <div class="row" t-if="lead.company_name"><b>Công ty</b><span><t t-out="lead.company_name"/></span></div>
+                        <div class="row" t-if="lead.email"><b>Email</b><span><t t-out="lead.email"/></span></div>
+                        <div class="row" t-if="lead.items"><b>Hạng mục</b><span><t t-out="lead.items"/></span></div>
+                        <div class="row" t-if="lead.message"><b>Nội dung khách nhập</b><span><t t-out="lead.message"/></span></div>
+                        <div class="row" t-if="extra"><b>Thông tin khác</b><span><t t-out="'\n'.join(extra)"/></span></div>
+                        <details t-if="visited or lead.source_info or lead.page_url">
+                            <summary>Nguồn và trang khách đã xem</summary>
+                            <pre t-if="lead.source_info">Nguồn: <t t-out="lead.source_info"/></pre>
+                            <pre t-if="lead.page_url">Trang gửi: <t t-out="lead.page_url"/></pre>
+                            <pre t-if="visited"><t t-out="'\n'.join(visited)"/></pre>
+                        </details>
+                        <div t-attf-class="state #{lead.contact_state}">
+                            <t t-if="lead.contact_state == 'contacted'">✓ Đã liên hệ<t t-if="state_at"> — <t t-out="state_at"/></t></t>
+                            <t t-elif="lead.contact_state == 'unreachable'">✕ Liên hệ không được<t t-if="state_at"> — <t t-out="state_at"/></t></t>
+                            <t t-else="">Chưa liên hệ khách này</t>
+                        </div>
+                        <!-- Đã chốt (hoặc vừa bấm xong) thì hai nút bị khóa; bấm đúp cũng chỉ gửi một lần -->
+                        <form method="post" t-attf-action="/lead/#{token}/contact" class="actions" id="contact-form">
+                            <button class="primary" type="submit" name="result" value="contacted" t-att-disabled="'disabled' if lead.contact_state != 'new' else None">Đã liên hệ</button>
+                            <button class="danger" type="submit" name="result" value="unreachable" t-att-disabled="'disabled' if lead.contact_state != 'new' else None">Liên hệ không được</button>
+                        </form>
+                        <script>
+                            document.getElementById('contact-form').addEventListener('submit', function (event) {
+                                var form = event.currentTarget;
+                                if (form.dataset.sent) { event.preventDefault(); return; }
+                                form.dataset.sent = '1';
+                                // Khóa sau khi trình duyệt đã lấy giá trị nút bấm (nút disabled sẽ không được gửi đi)
+                                setTimeout(function () {
+                                    form.querySelectorAll('button').forEach(function (button) { button.disabled = true; });
+                                }, 0);
+                            });
+                        </script>
+                    </div>
+                </div>
+            </body>
+        </html>
+    </template>
+</odoo>

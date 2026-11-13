@@ -1,0 +1,298 @@
+<odoo>
+    <!-- ═══ Cấu hình kết nối website (singleton) ═══════════════════════════════ -->
+    <record id="config_form" model="ir.ui.view">
+        <field name="name">dac.push.config.form</field><field name="model">dac.push.config</field>
+        <field name="arch" type="xml"><form string="Kết nối website" create="0" delete="0"><sheet>
+            <div class="oe_button_box" name="button_box">
+                <button class="oe_stat_button" type="object" name="action_open_leads" icon="fa-user-plus">
+                    <field name="lead_count" widget="statinfo" string="Lead từ website"/>
+                </button>
+                <button class="oe_stat_button" type="object" name="action_open_events" icon="fa-exchange">
+                    <field name="events_24h" widget="statinfo" string="Dữ liệu 24 giờ"/>
+                </button>
+                <button class="oe_stat_button text-danger" type="object" name="action_open_events" icon="fa-exclamation-triangle"
+                        invisible="failed_event_count == 0">
+                    <field name="failed_event_count" widget="statinfo" string="Dữ liệu lỗi"/>
+                </button>
+            </div>
+            <div class="dac_ui_hero">
+                <div class="dac_ui_hero_icon is-brand"><i class="fa fa-globe" role="img" aria-label="Website"/></div>
+                <div class="dac_ui_hero_body">
+                    <div class="dac_ui_hero_title"><label for="name" class="d-none"/><h1><field name="name"/></h1></div>
+                    <div class="dac_ui_hero_meta">
+                        <span class="dac_ui_pill is-ok" invisible="not active or not last_event_at"><i class="fa fa-check-circle"/> Đang nhận dữ liệu</span>
+                        <span class="dac_ui_pill is-warn" invisible="not active or last_event_at"><i class="fa fa-hourglass-half"/> Chờ dữ liệu đầu tiên</span>
+                        <span class="dac_ui_pill" invisible="active"><i class="fa fa-pause"/> Đang tắt</span>
+                        <span invisible="not last_event_at"><i class="fa fa-clock-o"/> Nhận gần nhất <field name="last_event_at" readonly="1" nolabel="1"/></span>
+                    </div>
+                </div>
+                <div class="dac_ui_hero_side">
+                    <label for="active" string="Bật nhận dữ liệu"/>
+                    <field name="active" widget="boolean_toggle" nolabel="1"/>
+                </div>
+            </div>
+
+            <div class="dac_ui_section_title"><i class="fa fa-plug"/> Cách kết nối với duyan.vn <small>làm một lần trên WordPress</small></div>
+            <div class="dac_ui_steps is-wide">
+                <div class="dac_ui_step">
+                    <strong>Cài plugin</strong>
+                    <span class="dac_ui_step_hint">Cài và bật plugin <strong>Push DAC Odoo</strong> trên duyan.vn, mở trang cài đặt của plugin.</span>
+                </div>
+                <div class="dac_ui_step">
+                    <strong>Dán địa chỉ nhận</strong>
+                    <span class="dac_ui_step_hint">Bấm vào ô bên dưới để chép, rồi dán vào plugin.</span>
+                    <field name="endpoint_url" widget="CopyClipboardChar" readonly="1" nolabel="1"/>
+                </div>
+                <div class="dac_ui_step">
+                    <strong>Dán khóa bí mật</strong>
+                    <span class="dac_ui_step_hint">Khóa dùng để ký dữ liệu (HMAC). Chép khóa này vào plugin và lưu lại.</span>
+                    <span class="dac_ui_pill is-warn" invisible="secret"><i class="fa fa-exclamation-triangle"/> Chưa có khóa — bấm “Tạo khóa mới”</span>
+                    <field name="secret" password="True" widget="CopyClipboardChar" nolabel="1" invisible="not secret"/>
+                    <button name="action_generate_secret" type="object" string="Tạo khóa mới" icon="fa-key" class="btn-secondary mt-2"
+                        confirm="Tạo khóa mới sẽ làm plugin hiện tại bị từ chối cho đến khi bạn cập nhật khóa trên WordPress. Tiếp tục?"/>
+                </div>
+            </div>
+            <div class="dac_ui_section_title"><i class="fa fa-users"/> Nơi nhận lead trên Zalo <small>nhóm hoặc người nhận tin khi có lead mới</small></div>
+            <div class="d-flex flex-wrap gap-2 mb-2">
+                <button name="action_add_lead_channel" type="object" string="Thêm cuộc hội thoại nhận lead" icon="fa-plus" class="btn-primary"/>
+                <button name="action_open_lead_channels" type="object" string="Chọn người nhắc tên / quản lý nơi nhận" icon="fa-at" class="btn-secondary"
+                        invisible="not lead_channel_count"/>
+            </div>
+            <field name="lead_channel_count" invisible="1"/>
+            <div class="alert alert-warning" role="status" invisible="lead_channel_count">
+                <i class="fa fa-exclamation-triangle"/> Chưa có nơi nào nhận lead. Bấm “Thêm cuộc hội thoại nhận lead”, chọn nhóm hoặc người từ danh sách hội thoại của tài khoản Zalo.
+            </div>
+            <field name="lead_channel_ids" nolabel="1" readonly="1" invisible="not lead_channel_count">
+                <list decoration-muted="not active">
+                    <field name="name"/>
+                    <field name="thread_type" widget="badge" decoration-info="thread_type == 'user'" decoration-primary="thread_type == 'group'"/>
+                    <field name="mention_summary" string="Nhắc tên"/>
+                    <field name="active" widget="boolean" string="Đang nhận"/>
+                </list>
+            </field>
+            <div class="text-muted"><i class="fa fa-info-circle"/> Có lead mới, Odoo lưu lại và báo vào các hội thoại trên. Với nhóm, bạn có thể nhắc tên một hoặc nhiều thành viên để họ được Zalo báo ngay.</div>
+        </sheet></form></field>
+    </record>
+    <record id="config_action" model="ir.actions.act_window">
+        <field name="name">Cấu hình kết nối website</field><field name="res_model">dac.push.config</field>
+        <field name="view_mode">form</field><field name="res_id" ref="config_default"/>
+    </record>
+
+    <!-- Thẻ "Website" ngay trong Trung tâm kết nối của Trợ lý Zalo -->
+    <record id="zalo_config_website_card" model="ir.ui.view">
+        <field name="name">dac.zalo.config.form.website.card</field><field name="model">dac.zalo.config</field>
+        <field name="inherit_id" ref="dac_zalo_assistant.config_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@name='connection_cards']" position="inside">
+                <div class="dac_ui_card" name="card_website" groups="base.group_system">
+                    <div class="dac_ui_card_head">
+                        <span class="dac_ui_card_icon is-web"><i class="fa fa-globe" title="Website"/></span>
+                        <div>
+                            <div class="dac_ui_card_title">Website duyan.vn</div>
+                            <div class="dac_ui_card_sub">Lead từ form → báo vào Zalo</div>
+                        </div>
+                    </div>
+                    <div class="dac_ui_card_body">
+                        <span invisible="push_state != 'ok'">Nhận gần nhất <field name="push_last_event_at" readonly="1" nolabel="1"/>.</span>
+                        <span invisible="push_state != 'waiting'">Đã bật, chưa nhận dữ liệu nào từ plugin.</span>
+                        <span invisible="push_state != 'off'">Chưa bật nhận dữ liệu từ website.</span>
+                    </div>
+                    <div class="dac_ui_card_foot d-flex align-items-center gap-2">
+                        <span class="dac_ui_pill is-ok" invisible="push_state != 'ok'"><i class="fa fa-check"/> Đang nhận</span>
+                        <span class="dac_ui_pill is-warn" invisible="push_state != 'waiting'"><i class="fa fa-hourglass-half"/> Chờ dữ liệu</span>
+                        <span class="dac_ui_pill" invisible="push_state != 'off'"><i class="fa fa-pause"/> Đang tắt</span>
+                        <button name="action_open_push_config" type="object" string="Cấu hình" icon="fa-cog" class="btn-link ms-auto p-0"/>
+                    </div>
+                </div>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- ═══ Dữ liệu nhận được ═════════════════════════════════════════════════ -->
+    <record id="event_list" model="ir.ui.view">
+        <field name="name">dac.push.event.list</field><field name="model">dac.push.event</field>
+        <field name="arch" type="xml"><list create="0" decoration-danger="state == 'failed'" decoration-muted="state == 'ignored'">
+            <field name="create_date"/><field name="source"/><field name="event_type" widget="badge"/><field name="event_id" optional="hide"/>
+            <field name="state" widget="badge" decoration-success="state == 'processed'" decoration-danger="state == 'failed'" decoration-warning="state == 'received'"/>
+            <field name="error_message"/>
+        </list></field>
+    </record>
+    <record id="event_search" model="ir.ui.view">
+        <field name="name">dac.push.event.search</field><field name="model">dac.push.event</field>
+        <field name="arch" type="xml"><search><field name="event_type"/><field name="source"/><field name="event_id"/>
+            <filter name="failed" string="Lỗi" domain="[('state','=','failed')]"/>
+            <filter name="ignored" string="Bị bỏ qua" domain="[('state','=','ignored')]"/>
+            <filter name="processed" string="Đã xử lý" domain="[('state','=','processed')]"/>
+            <group expand="0" string="Nhóm theo">
+                <filter name="by_state" string="Trạng thái" context="{'group_by': 'state'}"/>
+                <filter name="by_type" string="Loại dữ liệu" context="{'group_by': 'event_type'}"/>
+                <filter name="by_day" string="Ngày nhận" context="{'group_by': 'create_date:day'}"/>
+            </group>
+        </search></field>
+    </record>
+    <record id="event_form" model="ir.ui.view">
+        <field name="name">dac.push.event.form</field><field name="model">dac.push.event</field>
+        <field name="arch" type="xml"><form create="0"><header>
+            <button name="action_reprocess" type="object" string="Xử lý lại" icon="fa-repeat" class="btn-primary" invisible="state not in ('failed','ignored')"/>
+            <field name="state" widget="statusbar"/></header><sheet>
+            <div class="dac_ui_hero">
+                <div class="dac_ui_hero_icon is-muted"><i class="fa fa-inbox" role="img" aria-label="Dữ liệu"/></div>
+                <div class="dac_ui_hero_body">
+                    <div class="dac_ui_hero_title"><h1><field name="event_type" readonly="1"/></h1></div>
+                    <div class="dac_ui_hero_meta">
+                        <span class="dac_ui_pill is-info"><field name="source" readonly="1" nolabel="1"/></span>
+                        <span invisible="not handled_at"><i class="fa fa-clock-o"/> Xử lý lúc <field name="handled_at" readonly="1" nolabel="1"/></span>
+                    </div>
+                </div>
+            </div>
+            <div class="alert alert-danger" role="alert" invisible="not error_message"><i class="fa fa-exclamation-triangle" title="Cảnh báo"/> <field name="error_message" readonly="1" nolabel="1"/></div>
+            <group><field name="event_id"/></group>
+            <notebook class="dac_ui_tabs" groups="base.group_system">
+                <page name="payload" string="Dữ liệu gốc"><field name="payload" widget="text" nolabel="1"/></page>
+            </notebook>
+        </sheet></form></field>
+    </record>
+    <record id="event_action" model="ir.actions.act_window">
+        <field name="name">Dữ liệu nhận được</field><field name="res_model">dac.push.event</field><field name="view_mode">list,form</field>
+        <field name="help" type="html"><p class="o_view_nocontent_smiling_face">Chưa nhận dữ liệu nào từ website</p>
+            <p>Vào “Cấu hình kết nối” để lấy địa chỉ nhận và khóa dán vào plugin Push DAC Odoo.</p></field>
+    </record>
+
+    <!-- ═══ Lead từ website ═════════════════════════════════════════════════════ -->
+    <record id="web_lead_kanban" model="ir.ui.view">
+        <field name="name">dac.web.lead.kanban</field><field name="model">dac.web.lead</field>
+        <field name="arch" type="xml">
+            <kanban default_order="received_at desc, id desc" create="0" sample="1">
+                <field name="customer_name"/><field name="phone"/><field name="form_type"/><field name="site"/>
+                <field name="items"/><field name="source_info"/><field name="received_at"/><field name="phone_only"/><field name="contact_state"/>
+                <templates>
+                    <t t-name="card">
+                        <div class="dac_ui_kcard">
+                            <div class="dac_ui_khead">
+                                <span class="dac_ui_kavatar is-lead"><i t-attf-class="fa #{record.phone_only.raw_value ? 'fa-phone' : 'fa-user'}" role="img"/></span>
+                                <div class="dac_ui_ktitle">
+                                    <span t-if="record.customer_name.raw_value"><field name="customer_name"/></span>
+                                    <span t-else=""><field name="phone"/></span>
+                                    <div class="dac_ui_ksub"><field name="form_type"/> · <field name="site"/></div>
+                                </div>
+                                <div class="dac_ui_kside">
+                                    <span t-if="record.contact_state.raw_value == 'contacted'" class="dac_ui_pill is-ok">Đã liên hệ</span>
+                                    <span t-elif="record.contact_state.raw_value == 'unreachable'" class="dac_ui_pill is-danger">Không liên hệ được</span>
+                                    <span t-elif="record.phone_only.raw_value" class="dac_ui_pill is-warn">Chỉ có SĐT</span>
+                                    <span t-else="" class="dac_ui_pill is-warn">Chưa liên hệ</span>
+                                </div>
+                            </div>
+                            <div t-if="record.customer_name.raw_value and record.phone.raw_value" class="dac_ui_kline"><i class="fa fa-phone" title="Điện thoại"/> <field name="phone"/></div>
+                            <div t-if="record.items.raw_value" class="dac_ui_kline"><i class="fa fa-tag" title="Hạng mục"/> <field name="items"/></div>
+                            <div class="dac_ui_kfoot">
+                                <span><i class="fa fa-clock-o" title="Thời gian"/> <field name="received_at" widget="datetime"/></span>
+                                <span t-if="record.source_info.raw_value" class="dac_ui_pill is-info ms-auto"><field name="source_info"/></span>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+    <record id="web_lead_list" model="ir.ui.view">
+        <field name="name">dac.web.lead.list</field><field name="model">dac.web.lead</field>
+        <field name="arch" type="xml"><list create="0">
+            <field name="received_at"/>
+            <field name="contact_state" widget="badge" decoration-success="contact_state == 'contacted'" decoration-danger="contact_state == 'unreachable'" decoration-warning="contact_state == 'new'"/>
+            <field name="is_test" optional="show"/>
+            <field name="customer_name"/>
+            <field name="phone" widget="phone"/>
+            <field name="items"/>
+            <field name="form_type" widget="badge" decoration-success="form_type == 'quote'" decoration-warning="form_type == 'callback'" decoration-info="form_type in ('bee_form', 'elementor')"/>
+            <field name="source_info" optional="show"/>
+            <field name="site" optional="show"/>
+            <field name="phone_only" optional="hide"/><field name="page_url" optional="hide"/>
+        </list></field>
+    </record>
+    <record id="web_lead_search" model="ir.ui.view">
+        <field name="name">dac.web.lead.search</field><field name="model">dac.web.lead</field>
+        <field name="arch" type="xml"><search>
+            <field name="customer_name" filter_domain="['|', '|', ('customer_name','ilike',self), ('phone','ilike',self), ('company_name','ilike',self)]" string="Khách / SĐT / công ty"/>
+            <field name="items"/><field name="source_info"/><field name="page_url"/>
+            <filter name="last_24h" string="24 giờ qua" domain="[('received_at','&gt;=', (datetime.datetime.now() - datetime.timedelta(hours=24)).strftime('%Y-%m-%d %H:%M:%S'))]"/>
+            <filter name="phone_only" string="Chỉ để lại SĐT" domain="[('phone_only','=',True)]"/>
+            <filter name="not_contacted" string="Chưa liên hệ" domain="[('contact_state','=','new')]"/>
+            <filter name="test_leads" string="Lead test" domain="[('is_test','=',True)]"/>
+            <filter name="real_leads" string="Lead thật" domain="[('is_test','=',False)]"/>
+            <filter name="unreachable" string="Liên hệ không được" domain="[('contact_state','=','unreachable')]"/>
+            <separator/>
+            <filter name="quote" string="Báo giá" domain="[('form_type','=','quote')]"/>
+            <filter name="callback" string="Gọi lại" domain="[('form_type','=','callback')]"/>
+            <group expand="0" string="Nhóm theo">
+                <filter name="by_form" string="Loại form" context="{'group_by': 'form_type'}"/>
+                <filter name="by_source" string="Nguồn truy cập" context="{'group_by': 'source_info'}"/>
+                <filter name="by_site" string="Website" context="{'group_by': 'site'}"/>
+                <filter name="by_day" string="Ngày nhận" context="{'group_by': 'received_at:day'}"/>
+            </group>
+        </search></field>
+    </record>
+    <record id="web_lead_form" model="ir.ui.view">
+        <field name="name">dac.web.lead.form</field><field name="model">dac.web.lead</field>
+        <field name="arch" type="xml"><form create="0"><header>
+            <button name="action_mark_contacted" type="object" string="Đã liên hệ" class="btn-primary" invisible="contact_state == 'contacted'"/>
+            <button name="action_mark_unreachable" type="object" string="Liên hệ không được" class="btn-danger" invisible="contact_state == 'unreachable'"/>
+            <field name="contact_state" widget="statusbar"/>
+        </header><sheet>
+            <div class="dac_ui_hero">
+                <div class="dac_ui_hero_icon is-brand"><i class="fa fa-user" role="img" aria-label="Khách hàng"/></div>
+                <div class="dac_ui_hero_body">
+                    <div class="dac_ui_hero_title"><h1><field name="customer_name" placeholder="(Khách chưa nhập tên)"/></h1></div>
+                    <div class="dac_ui_hero_meta">
+                        <span><i class="fa fa-phone" title="Điện thoại"/> <field name="phone" readonly="1" nolabel="1"/></span>
+                        <span class="dac_ui_pill is-warn" invisible="not phone_only"><i class="fa fa-info-circle"/> Chỉ để lại số điện thoại</span>
+                        <span class="dac_ui_pill is-info"><field name="form_type" readonly="1" nolabel="1"/></span>
+                        <span invisible="not source_info"><i class="fa fa-bullseye" title="Nguồn"/> <field name="source_info" readonly="1" nolabel="1"/></span>
+                        <span><i class="fa fa-clock-o" title="Thời gian"/> <field name="received_at" readonly="1" nolabel="1"/></span>
+                    </div>
+                </div>
+            </div>
+            <notebook class="dac_ui_tabs">
+                <page name="request" string="Liên hệ &amp; yêu cầu">
+                    <group>
+                        <group string="Liên hệ"><field name="phone" widget="phone"/><field name="email" widget="email"/><field name="company_name"/></group>
+                        <group string="Yêu cầu"><field name="items"/><field name="form_type"/><field name="form_name"/></group>
+                    </group>
+                    <div class="dac_ui_section_title" invisible="not message"><i class="fa fa-commenting-o"/> Nội dung khách nhập</div>
+                    <field name="message" nolabel="1" invisible="not message"/>
+                    <div class="dac_ui_section_title" invisible="not extra_info"><i class="fa fa-list-ul"/> Thông tin khác trong form</div>
+                    <field name="extra_info" nolabel="1" invisible="not extra_info"/>
+                </page>
+                <page name="journey" string="Hành trình khách">
+                    <div class="dac_ui_section_title"><i class="fa fa-road"/> Trang khách đã xem <small>24 giờ gần nhất, cũ → mới</small></div>
+                    <field name="visited_urls" nolabel="1" placeholder="Không có dữ liệu trang đã xem."/>
+                </page>
+                <page name="source" string="Nguồn gửi">
+                    <group>
+                        <group string="Website"><field name="site"/><field name="page_url" widget="url"/><field name="page_title"/></group>
+                        <group string="Thời gian"><field name="is_test"/><field name="submitted_at"/><field name="received_at"/><field name="contact_state_at"/><field name="remind_due_at"/><field name="reminded_at"/><field name="acked_at"/><field name="source_info"/><field name="phone_only"/></group>
+                    </group>
+                </page>
+            </notebook>
+        </sheet></form></field>
+    </record>
+    <record id="web_lead_action" model="ir.actions.act_window">
+        <field name="name">Lead từ website</field><field name="res_model">dac.web.lead</field><field name="view_mode">kanban,list,form</field>
+        <field name="help" type="html"><p class="o_view_nocontent_smiling_face">Chưa có lead từ website</p>
+            <p>Khi khách điền form trên duyan.vn, lead hiện ở đây và được báo vào Zalo.</p></field>
+    </record>
+
+    <!-- ═══ Menu: Ứng dụng → Nhóm → Mục ══════════════════════════════════════════ -->
+    <menuitem id="menu_push_root" name="Lead Website" sequence="96" groups="dac_erp.group_dac_erp_manager,base.group_system"/>
+    <menuitem id="menu_section_lead" name="Lead" parent="menu_push_root" sequence="10"/>
+    <menuitem id="menu_web_lead" name="Lead từ website" parent="menu_section_lead" action="web_lead_action" sequence="10"/>
+    <menuitem id="menu_section_link" name="Kết nối" parent="menu_push_root" sequence="20"/>
+    <menuitem id="menu_push_config" name="Cấu hình kết nối" parent="menu_section_link" action="config_action" groups="base.group_system" sequence="10"/>
+    <menuitem id="menu_push_event" name="Dữ liệu nhận được" parent="menu_section_link" action="event_action" sequence="20"/>
+
+    <!-- Icon sidebar (đọc bởi Chameleon: navbar_v6.js dacMenuFaIcon) -->
+    <record id="menu_section_lead" model="ir.ui.menu"><field name="web_icon">fa-bullseye</field></record>
+    <record id="menu_web_lead" model="ir.ui.menu"><field name="web_icon">fa-user-plus</field></record>
+    <record id="menu_section_link" model="ir.ui.menu"><field name="web_icon">fa-plug</field></record>
+    <record id="menu_push_config" model="ir.ui.menu"><field name="web_icon">fa-sliders</field></record>
+    <record id="menu_push_event" model="ir.ui.menu"><field name="web_icon">fa-inbox</field></record>
+</odoo>

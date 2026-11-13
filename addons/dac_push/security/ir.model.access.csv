@@ -1,0 +1,6 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_push_config_system,Push config admin,model_dac_push_config,base.group_system,1,1,0,0
+access_push_event_system,Push events admin,model_dac_push_event,base.group_system,1,1,0,1
+access_push_event_manager,Push events manager,model_dac_push_event,dac_erp.group_dac_erp_manager,1,0,0,0
+access_web_lead_system,Web leads admin,model_dac_web_lead,base.group_system,1,1,1,1
+access_web_lead_manager,Web leads manager,model_dac_web_lead,dac_erp.group_dac_erp_manager,1,1,0,0

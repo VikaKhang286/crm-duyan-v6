@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="cron_gsheet_auto_check" model="ir.cron">
+            <field name="name">AI Sheet: kiểm tra Google Sheet ↔ đơn xe đẩy</field>
+            <field name="model_id" ref="model_dac_gsheet_source"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_auto_check()</field>
+            <field name="interval_number">10</field>
+            <field name="interval_type">minutes</field>
+            <field name="active" eval="True"/>
+        </record>
+        <record id="cron_gsheet_reflect" model="ir.cron">
+            <field name="name">AI Sheet: rút kinh nghiệm các phiên chat</field>
+            <field name="model_id" ref="model_dac_gsheet_agent_session"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_reflect_sessions()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="nextcall" eval="(DateTime.now() + timedelta(days=1)).strftime('%Y-%m-%d 16:00:00')"/>
+            <field name="active" eval="True"/>
+        </record>
+    </data>
+</odoo>

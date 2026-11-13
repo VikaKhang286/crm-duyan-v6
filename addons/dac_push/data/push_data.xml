@@ -1,0 +1,33 @@
+<odoo noupdate="1">
+    <record id="config_default" model="dac.push.config">
+        <field name="name">Push DAC Odoo</field>
+        <field name="active" eval="False"/>
+    </record>
+    <record id="event_type_web_lead_created" model="dac.zalo.event.type">
+        <field name="name">Khách mới từ form website</field>
+        <field name="code">web_lead.created</field>
+        <field name="group_name">Website</field>
+        <field name="description">Có khách điền form trên duyan.vn (Bee Form, báo giá, gọi lại, Elementor).</field>
+        <field name="sequence">10</field>
+    </record>
+    <record id="cron_reprocess_failed_events" model="ir.cron">
+        <field name="name">Lead website: tự xử lý lại dữ liệu website bị lỗi</field>
+        <field name="model_id" ref="model_dac_push_event"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_reprocess_failed()</field>
+        <field name="interval_number">2</field>
+        <field name="interval_type">minutes</field>
+        <field name="user_id" ref="base.user_root"/>
+        <field name="active" eval="True"/>
+    </record>
+    <record id="cron_remind_uncontacted_leads" model="ir.cron">
+        <field name="name">Lead website: nhắc lead quá hạn chưa liên hệ</field>
+        <field name="model_id" ref="model_dac_web_lead"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_remind_uncontacted()</field>
+        <field name="interval_number">2</field>
+        <field name="interval_type">minutes</field>
+        <field name="user_id" ref="base.user_root"/>
+        <field name="active" eval="True"/>
+    </record>
+</odoo>

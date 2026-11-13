@@ -18,7 +18,22 @@ access_pref_system,Zalo admin preferences,model_dac_zalo_preference,base.group_s
 access_notification_user,Zalo own notifications,model_dac_zalo_notification,base.group_user,1,0,0,0
 access_notification_manager,Zalo manager notifications,model_dac_zalo_notification,dac_erp.group_dac_erp_manager,1,0,0,0
 access_notification_system,Zalo admin notifications,model_dac_zalo_notification,base.group_system,1,1,1,1
-access_event_type_manager,Zalo manager event types,model_dac_zalo_event_type,dac_erp.group_dac_erp_manager,1,0,0,0
-access_event_type_system,Zalo admin event types,model_dac_zalo_event_type,base.group_system,1,1,1,1
 access_watch_manager,Zalo manager event status,model_dac_zalo_event_state,dac_erp.group_dac_erp_manager,1,0,0,0
 access_watch_system,Zalo admin event status,model_dac_zalo_event_state,base.group_system,1,1,1,1
+access_event_type_manager,Zalo event types manager,model_dac_zalo_event_type,dac_erp.group_dac_erp_manager,1,0,0,0
+access_event_type_system,Zalo event types admin,model_dac_zalo_event_type,base.group_system,1,1,1,1
+access_channel_manager,Zalo channels manager,model_dac_zalo_channel,dac_erp.group_dac_erp_manager,1,1,1,1
+access_channel_system,Zalo channels admin,model_dac_zalo_channel,base.group_system,1,1,1,1
+access_channel_message_manager,Zalo channel messages manager,model_dac_zalo_channel_message,dac_erp.group_dac_erp_manager,1,1,1,0
+access_channel_message_system,Zalo channel messages admin,model_dac_zalo_channel_message,base.group_system,1,1,1,1
+access_thread_search_manager,Zalo thread search manager,model_dac_zalo_thread_search,dac_erp.group_dac_erp_manager,1,1,1,1
+access_thread_search_system,Zalo thread search admin,model_dac_zalo_thread_search,base.group_system,1,1,1,1
+access_thread_search_line_manager,Zalo thread search line manager,model_dac_zalo_thread_search_line,dac_erp.group_dac_erp_manager,1,1,1,1
+access_thread_search_line_system,Zalo thread search line admin,model_dac_zalo_thread_search_line,base.group_system,1,1,1,1
+access_channel_member_manager,Zalo channel members manager,model_dac_zalo_channel_member,dac_erp.group_dac_erp_manager,1,1,1,1
+access_channel_member_system,Zalo channel members admin,model_dac_zalo_channel_member,base.group_system,1,1,1,1
+access_channel_mention_manager,Zalo channel mentions manager,model_dac_zalo_channel_mention,dac_erp.group_dac_erp_manager,1,1,1,1
+access_channel_mention_system,Zalo channel mentions admin,model_dac_zalo_channel_mention,base.group_system,1,1,1,1
+access_channel_reaction_manager,Zalo channel reactions manager,model_dac_zalo_channel_reaction,dac_erp.group_dac_erp_manager,1,0,0,0
+access_channel_reaction_system,Zalo channel reactions admin,model_dac_zalo_channel_reaction,base.group_system,1,1,1,1
+access_gemini_model_system,Zalo Gemini models admin,model_dac_zalo_gemini_model,base.group_system,1,1,1,1

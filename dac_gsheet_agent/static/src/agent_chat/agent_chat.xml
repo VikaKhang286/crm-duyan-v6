@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="dac_gsheet_agent.AgentChat">
+        <div class="o_gsa">
+            <t t-if="state.loading">
+                <div class="o_gsa_loading"><i class="fa fa-spinner fa-spin"/> Đang tải…</div>
+            </t>
+            <t t-else="">
+                <!-- Sidebar: các phiên chat -->
+                <aside class="o_gsa_sidebar" t-att-class="{'o_gsa_sidebar--closed': !state.sidebarOpen}">
+                    <button class="btn btn-primary w-100 mb-2" t-on-click="newSession">
+                        <i class="fa fa-plus"/> Phiên mới
+                    </button>
+                    <div class="o_gsa_sessions">
+                        <t t-foreach="state.sessions" t-as="s" t-key="s.id">
+                            <div class="o_gsa_session" t-att-class="{'active': current and s.id === current.id}"
+                                 t-on-click="() => this.selectSession(s.id)">
+                                <div class="o_gsa_session_name">
+                                    <i t-if="s.is_auto" class="fa fa-clock-o me-1" title="Phiên tự động"/>
+                                    <t t-esc="s.name"/>
+                                </div>
+                                <div class="o_gsa_session_meta">
+                                    <span t-esc="s.last"/>
+                                    <span t-if="s.pending" class="badge text-bg-warning ms-1" t-esc="s.pending"/>
+                                    <i class="fa fa-trash o_gsa_session_del" title="Xoá"
+                                       t-on-click="(ev) => this.deleteSession(s.id, ev)"/>
+                                </div>
+                            </div>
+                        </t>
+                    </div>
+                    <div class="o_gsa_sidebar_links">
+                        <a href="#" t-on-click.prevent="openRules"><i class="fa fa-lightbulb-o"/> Quy tắc đã học</a>
+                        <a href="#" t-on-click.prevent="openSources"><i class="fa fa-table"/> Thiết lập Google Sheet</a>
+                    </div>
+                </aside>
+
+                <main class="o_gsa_main">
+                    <!-- Thanh ngữ cảnh -->
+                    <section class="o_gsa_context">
+                        <div class="o_gsa_ctx_row">
+                            <span class="o_gsa_ctx_label"><b>1</b> Đơn hàng xe đẩy</span>
+                            <div class="o_gsa_chips">
+                                <t t-foreach="current.orders" t-as="o" t-key="o.id">
+                                    <span class="o_gsa_chip">
+                                        <a href="#" t-on-click.prevent="() => this.openOrder(o.id)"
+                                           t-att-title="o.partner + ' — ' + o.state">
+                                            <t t-esc="o.number or o.name"/> · <t t-esc="o.partner"/>
+                                        </a>
+                                        <i class="fa fa-times" t-on-click="() => this.removeOrder(o.id)"/>
+                                    </span>
+                                </t>
+                                <span t-if="!current.orders.length" class="text-muted small">Tất cả đơn xe đẩy</span>
+                                <div class="o_gsa_picker">
+                                    <input type="text" class="form-control form-control-sm"
+                                           placeholder="+ Thêm đơn (số ĐH, tên, SĐT)…"
+                                           t-att-value="state.orderQuery" t-on-input="onOrderQuery"
+                                           t-on-focus="openPicker" t-on-blur="closePicker"/>
+                                    <div t-if="state.pickerOpen and state.orderResults.length" class="o_gsa_picker_menu">
+                                        <t t-foreach="state.orderResults" t-as="r" t-key="r.id">
+                                            <div class="o_gsa_picker_item" t-on-mousedown="() => this.addOrder(r)">
+                                                <b t-esc="r.number or r.name"/> · <t t-esc="r.partner"/>
+                                                <span class="text-muted ms-1" t-esc="r.state"/>
+                                            </div>
+                                        </t>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="o_gsa_ctx_row">
+                            <span class="o_gsa_ctx_label"><b>2</b> File Google Sheet</span>
+                            <div class="o_gsa_chips">
+                                <t t-foreach="state.sources" t-as="src" t-key="src.id">
+                                    <button class="o_gsa_source btn btn-sm"
+                                            t-att-class="isSourceSelected(src.id) ? 'btn-primary' : 'btn-outline-secondary'"
+                                            t-on-click="() => this.toggleSource(src.id)">
+                                        <i t-att-class="src.access_mode === 'write' ? 'fa fa-pencil' : 'fa fa-eye'"
+                                           t-att-title="src.access_mode === 'write' ? 'AI được chỉnh sửa' : 'AI chỉ xem'"/>
+                                        <t t-esc="src.name"/>
+                                    </button>
+                                </t>
+                                <span t-if="!state.sources.length" class="text-muted small">
+                                    Chưa có file nào — <a href="#" t-on-click.prevent="openSources">thêm file Google Sheet</a>
+                                </span>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Tin nhắn -->
+                    <section class="o_gsa_messages" t-ref="messages">
+                        <div t-if="!current.messages.length" class="o_gsa_empty">
+                            <h4>Trợ lý đồng bộ đơn xe đẩy ↔ Google Sheet</h4>
+                            <p class="text-muted">Chọn đơn và file ở trên, rồi hỏi hoặc chọn một yêu cầu mẫu:</p>
+                            <div class="o_gsa_quick">
+                                <t t-foreach="quickPrompts" t-as="qp" t-key="qp_index">
+                                    <button class="btn btn-outline-primary btn-sm" t-on-click="() => this.useQuickPrompt(qp)"
+                                            t-esc="qp"/>
+                                </t>
+                            </div>
+                        </div>
+                        <t t-foreach="current.messages" t-as="m" t-key="m.id">
+                            <div t-attf-class="o_gsa_msg o_gsa_msg--{{m.role}}">
+                                <div class="o_gsa_bubble">
+                                    <div class="o_gsa_text" t-esc="m.content"/>
+                                    <div class="o_gsa_meta">
+                                        <span t-if="m.tools" class="o_gsa_tools" t-esc="m.tools"/>
+                                        <span t-esc="m.time"/>
+                                    </div>
+                                </div>
+                                <t t-foreach="proposalsFor(m.id)" t-as="p" t-key="p.id">
+                                    <t t-call="dac_gsheet_agent.ProposalCard"/>
+                                </t>
+                            </div>
+                        </t>
+                        <t t-foreach="orphanProposals" t-as="p" t-key="p.id">
+                            <t t-call="dac_gsheet_agent.ProposalCard"/>
+                        </t>
+                        <div t-if="state.busy" class="o_gsa_msg o_gsa_msg--assistant">
+                            <div class="o_gsa_bubble o_gsa_typing">
+                                <i class="fa fa-circle-o-notch fa-spin"/> Đang đọc dữ liệu và suy nghĩ…
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Ô nhập -->
+                    <section class="o_gsa_composer">
+                        <div class="o_gsa_composer_actions">
+                            <button t-if="pendingCount" class="btn btn-sm btn-success" t-on-click="applyAll"
+                                    t-att-disabled="state.busy">
+                                <i class="fa fa-check-square-o"/> Duyệt tất cả (<t t-esc="pendingCount"/>)
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary" t-on-click="reflect"
+                                    t-att-disabled="state.busy or !current.messages.length"
+                                    title="AI xem lại phiên này và ghi nhớ quy tắc để lần sau làm tốt hơn">
+                                <i class="fa fa-lightbulb-o"/> Rút kinh nghiệm
+                            </button>
+                            <span t-if="current.rules_learned.length" class="small text-muted">
+                                Đã học <t t-esc="current.rules_learned.length"/> quy tắc trong phiên này
+                            </span>
+                        </div>
+                        <div class="o_gsa_input">
+                            <textarea class="form-control" rows="2" t-model="state.input" t-on-keydown="onKeydown"
+                                      t-att-disabled="state.busy"
+                                      placeholder="Hỏi về tiến độ, yêu cầu đối chiếu, hoặc dạy AI một quy tắc… (Enter để gửi)"/>
+                            <button class="btn btn-primary" t-on-click="send" t-att-disabled="state.busy or !state.input.trim()">
+                                <i class="fa fa-paper-plane"/>
+                            </button>
+                        </div>
+                    </section>
+                </main>
+            </t>
+        </div>
+    </t>
+
+    <t t-name="dac_gsheet_agent.ProposalCard">
+        <div t-attf-class="o_gsa_proposal o_gsa_proposal--{{p.state}}">
+            <div class="o_gsa_proposal_head">
+                <span class="badge text-bg-light" t-esc="p.kind_label"/>
+                <a t-if="p.order" href="#" t-on-click.prevent="() => this.openOrder(p.order.id)" t-esc="p.order.name"/>
+                <span t-if="p.sheet_row" class="text-muted small">dòng <t t-esc="p.sheet_row"/> · <t t-esc="p.source"/></span>
+                <span class="ms-auto small">
+                    <t t-if="p.state === 'applied'"><i class="fa fa-check text-success"/> Đã áp dụng</t>
+                    <t t-elif="p.state === 'rejected'"><i class="fa fa-times text-muted"/> Đã từ chối</t>
+                    <t t-elif="p.state === 'failed'"><i class="fa fa-exclamation-triangle text-danger"/> Lỗi</t>
+                    <t t-else=""><i class="fa fa-hourglass-half text-warning"/> Chờ duyệt</t>
+                </span>
+            </div>
+            <table class="table table-sm mb-1">
+                <tbody>
+                    <t t-foreach="p.lines" t-as="line" t-key="line_index">
+                        <tr>
+                            <td class="text-muted" t-esc="line.label"/>
+                            <td><del t-if="line.old" t-esc="line.old"/></td>
+                            <td><b t-esc="line.new"/></td>
+                        </tr>
+                    </t>
+                </tbody>
+            </table>
+            <div t-if="p.reason" class="small text-muted mb-1"><i class="fa fa-info-circle"/> <t t-esc="p.reason"/></div>
+            <div t-if="p.error" class="small text-danger mb-1" t-esc="p.error"/>
+            <div t-if="p.reject_reason" class="small text-muted mb-1">Lý do từ chối: <t t-esc="p.reject_reason"/></div>
+            <div t-if="p.state === 'pending' or p.state === 'failed'" class="o_gsa_proposal_actions">
+                <t t-if="state.rejectingId === p.id">
+                    <input type="text" class="form-control form-control-sm" t-model="state.rejectReason"
+                           placeholder="Vì sao sai? (AI sẽ học từ lý do này)"/>
+                    <button class="btn btn-sm btn-danger" t-on-click="() => this.proposalAction(p.id, 'reject')">Từ chối</button>
+                    <button class="btn btn-sm btn-link" t-on-click="() => (state.rejectingId = null)">Huỷ</button>
+                </t>
+                <t t-else="">
+                    <button t-if="p.state === 'pending'" class="btn btn-sm btn-success"
+                            t-on-click="() => this.proposalAction(p.id, 'apply')">
+                        <i class="fa fa-check"/> Duyệt
+                    </button>
+                    <button t-if="p.state === 'failed'" class="btn btn-sm btn-outline-secondary"
+                            t-on-click="() => this.proposalAction(p.id, 'retry')">Thử lại</button>
+                    <button class="btn btn-sm btn-outline-danger" t-on-click="() => this.startReject(p.id)">
+                        <i class="fa fa-times"/> Từ chối
+                    </button>
+                </t>
+            </div>
+        </div>
+    </t>
+</templates>

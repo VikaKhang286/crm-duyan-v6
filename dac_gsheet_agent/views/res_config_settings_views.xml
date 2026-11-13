@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_gsheet_agent_settings_form" model="ir.ui.view">
+        <field name="name">res.config.settings.gsheet.agent</field>
+        <field name="model">res.config.settings</field>
+        <field name="priority">99</field>
+        <field name="arch" type="xml">
+            <form string="Cấu hình Trợ lý AI Sheet" class="oe_form_configuration">
+                <header>
+                    <button string="Lưu" type="object" name="execute" class="btn-primary"/>
+                    <button string="Huỷ" type="object" name="cancel" special="cancel"/>
+                </header>
+                <sheet>
+                    <h2>1. Google Service Account</h2>
+                    <div class="text-muted mb-2">
+                        Tạo service account trong Google Cloud (bật Google Sheets API) → tạo key JSON → dán vào đây.
+                        Sau đó chia sẻ từng file Google Sheet cho email service account:
+                        quyền <b>Người xem</b> (AI chỉ xem) hoặc <b>Người chỉnh sửa</b> (AI được ghi).
+                    </div>
+                    <group>
+                        <field name="gsa_service_account_json" widget="text" password="True"
+                               placeholder='{"type": "service_account", "client_email": "...", "private_key": "..."}'/>
+                        <field name="gsa_service_account_email" readonly="1"/>
+                    </group>
+                    <button name="action_gsa_check_service_account" type="object"
+                            string="Kiểm tra service account" class="btn-secondary"/>
+
+                    <h2 class="mt-4">2. AI model</h2>
+                    <div class="text-muted mb-2">
+                        Claude: để trống Base URL, model mặc định <code>claude-opus-5-5</code>.
+                        9router / gateway OpenAI-compatible: chọn loại tương ứng, Base URL dạng
+                        <code>https://9router.duyan.vn/v1</code>.
+                    </div>
+                    <group>
+                        <field name="gsa_llm_provider"/>
+                        <field name="gsa_llm_base_url"/>
+                        <field name="gsa_llm_api_key" password="True"/>
+                        <field name="gsa_llm_model"/>
+                        <field name="gsa_llm_effort" invisible="gsa_llm_provider != 'anthropic'"/>
+                        <field name="gsa_llm_use_fallbacks" invisible="gsa_llm_provider != 'anthropic'"/>
+                    </group>
+                    <button name="action_gsa_test_llm" type="object" string="Thử kết nối AI" class="btn-secondary"/>
+
+                    <h2 class="mt-4">3. Tự học</h2>
+                    <group>
+                        <field name="gsa_rule_require_review"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_gsheet_agent_settings" model="ir.actions.act_window">
+        <field name="name">Cấu hình Trợ lý AI Sheet</field>
+        <field name="res_model">res.config.settings</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_gsheet_agent_settings_form"/>
+        <field name="target">inline</field>
+    </record>
+</odoo>

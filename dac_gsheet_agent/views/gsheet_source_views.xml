@@ -1,0 +1,243 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ============ Nguồn Google Sheet ============ -->
+    <record id="view_gsheet_source_list" model="ir.ui.view">
+        <field name="name">dac.gsheet.source.list</field>
+        <field name="model">dac.gsheet.source</field>
+        <field name="arch" type="xml">
+            <list string="File Google Sheet">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="spreadsheet_title"/>
+                <field name="worksheet_name"/>
+                <field name="access_mode" widget="badge"
+                       decoration-info="access_mode == 'read'" decoration-warning="access_mode == 'write'"/>
+                <field name="auto_check" widget="boolean_toggle"/>
+                <field name="last_check_at"/>
+                <field name="last_status" widget="badge"
+                       decoration-success="last_status == 'ok'" decoration-danger="last_status == 'error'"/>
+                <field name="open_discrepancy_count" string="Chênh lệch mở"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_gsheet_source_form" model="ir.ui.view">
+        <field name="name">dac.gsheet.source.form</field>
+        <field name="model">dac.gsheet.source</field>
+        <field name="arch" type="xml">
+            <form string="File Google Sheet">
+                <header>
+                    <button name="action_test_connection" type="object" string="Kiểm tra kết nối &amp; đọc cột"
+                            class="btn-primary"/>
+                    <button name="action_run_check" type="object" string="Đối chiếu ngay" class="btn-secondary"/>
+                    <button name="action_open_chat" type="object" string="Chat với AI" class="btn-secondary"
+                            icon="fa-comments"/>
+                    <field name="last_status" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_open_discrepancies" type="object" class="oe_stat_button"
+                                icon="fa-exclamation-triangle">
+                            <field name="open_discrepancy_count" widget="statinfo" string="Chênh lệch mở"/>
+                        </button>
+                    </div>
+                    <widget name="web_ribbon" title="Đã lưu trữ" bg_color="text-bg-danger" invisible="active"/>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="Ví dụ: Theo dõi đơn xe đẩy 2026"/></h1>
+                    </div>
+                    <div class="alert alert-info" role="alert">
+                        Chia sẻ file cho <b><field name="service_account_email" readonly="1" class="d-inline"/></b>
+                        với quyền <b invisible="access_mode != 'read'">Người xem</b>
+                        <b invisible="access_mode != 'write'">Người chỉnh sửa</b>.
+                    </div>
+                    <div class="alert alert-danger" role="alert" invisible="not last_error">
+                        <field name="last_error" readonly="1"/>
+                    </div>
+                    <group>
+                        <group string="File">
+                            <field name="url" widget="url" placeholder="https://docs.google.com/spreadsheets/d/..."/>
+                            <field name="spreadsheet_title"/>
+                            <field name="worksheet_name"/>
+                            <field name="header_row"/>
+                            <field name="header_preview"/>
+                            <field name="active" invisible="1"/>
+                        </group>
+                        <group string="Quyền &amp; kiểm tra tự động">
+                            <field name="access_mode" widget="radio"/>
+                            <field name="sheet_write_needs_approval" invisible="access_mode != 'write'"/>
+                            <field name="auto_check"/>
+                            <field name="check_interval_minutes" invisible="not auto_check"/>
+                            <field name="auto_ai_review" invisible="not auto_check"/>
+                            <field name="responsible_user_id"/>
+                            <field name="track_from_date"/>
+                            <field name="last_check_at"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Ánh xạ cột" name="columns">
+                            <group>
+                                <field name="key_header" placeholder="Tên cột chứa Số đặt hàng"/>
+                            </group>
+                            <field name="column_ids">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="header"/>
+                                    <field name="odoo_field"/>
+                                    <field name="compare"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Ánh xạ trạng thái" name="states">
+                            <div class="text-muted mb-2">
+                                Cách nhân sự ghi trạng thái trên sheet (vd "Đang SX", "Đã giao") tương ứng trạng thái Odoo.
+                                AI cũng tự học thêm các cách ghi khác vào playbook.
+                            </div>
+                            <field name="state_map_ids">
+                                <list editable="bottom">
+                                    <field name="sheet_value"/>
+                                    <field name="state"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Mô tả cho AI" name="ai_notes">
+                            <field name="ai_notes"
+                                   placeholder="Ví dụ: Mỗi dòng là 1 đơn xe đẩy. Cột 'Tiến độ' do xưởng cập nhật. Dòng tô đỏ là đơn gấp..."/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_gsheet_source" model="ir.actions.act_window">
+        <field name="name">Thiết lập Google Sheet</field>
+        <field name="res_model">dac.gsheet.source</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Thêm file Google Sheet đầu tiên</p>
+            <p>Dán link file, chọn quyền Chỉ xem / Chỉnh sửa, rồi bấm "Kiểm tra kết nối".</p>
+        </field>
+    </record>
+
+    <!-- ============ Lần kiểm tra ============ -->
+    <record id="view_gsheet_check_run_list" model="ir.ui.view">
+        <field name="name">dac.gsheet.check.run.list</field>
+        <field name="model">dac.gsheet.check.run</field>
+        <field name="arch" type="xml">
+            <list create="0" decoration-danger="state == 'error'">
+                <field name="create_date" string="Thời gian"/>
+                <field name="source_id"/>
+                <field name="trigger"/>
+                <field name="state" widget="badge"/>
+                <field name="row_count"/>
+                <field name="order_count"/>
+                <field name="matched_count"/>
+                <field name="discrepancy_count"/>
+                <field name="new_discrepancy_count"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_gsheet_check_run_form" model="ir.ui.view">
+        <field name="name">dac.gsheet.check.run.form</field>
+        <field name="model">dac.gsheet.check.run</field>
+        <field name="arch" type="xml">
+            <form create="0" edit="0">
+                <sheet>
+                    <h2><field name="name"/></h2>
+                    <div class="alert alert-danger" role="alert" invisible="state != 'error'">
+                        <field name="error_message"/>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="source_id"/>
+                            <field name="trigger"/>
+                            <field name="state"/>
+                        </group>
+                        <group>
+                            <field name="row_count"/>
+                            <field name="order_count"/>
+                            <field name="matched_count"/>
+                            <field name="new_discrepancy_count"/>
+                        </group>
+                    </group>
+                    <field name="summary" invisible="not summary"/>
+                    <field name="discrepancy_ids">
+                        <list>
+                            <field name="kind"/>
+                            <field name="sheet_key"/>
+                            <field name="row_number"/>
+                            <field name="order_id"/>
+                            <field name="field_label"/>
+                            <field name="sheet_value"/>
+                            <field name="odoo_value"/>
+                            <field name="state" widget="badge"/>
+                        </list>
+                    </field>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_gsheet_check_run" model="ir.actions.act_window">
+        <field name="name">Lịch sử kiểm tra</field>
+        <field name="res_model">dac.gsheet.check.run</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- ============ Chênh lệch ============ -->
+    <record id="view_gsheet_discrepancy_list" model="ir.ui.view">
+        <field name="name">dac.gsheet.discrepancy.list</field>
+        <field name="model">dac.gsheet.discrepancy</field>
+        <field name="arch" type="xml">
+            <list create="0" decoration-muted="state in ('ignored', 'superseded')"
+                  decoration-success="state == 'resolved'">
+                <field name="create_date" string="Phát hiện" optional="show"/>
+                <field name="source_id" optional="hide"/>
+                <field name="kind"/>
+                <field name="sheet_key"/>
+                <field name="row_number"/>
+                <field name="order_id"/>
+                <field name="field_label"/>
+                <field name="sheet_value"/>
+                <field name="odoo_value"/>
+                <field name="state" widget="badge"
+                       decoration-warning="state == 'open'" decoration-success="state == 'resolved'"/>
+                <button name="action_resolve" type="object" string="Đã xử lý" icon="fa-check"
+                        invisible="state != 'open'"/>
+                <button name="action_ignore" type="object" string="Bỏ qua" icon="fa-eye-slash"
+                        invisible="state != 'open'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_gsheet_discrepancy_search" model="ir.ui.view">
+        <field name="name">dac.gsheet.discrepancy.search</field>
+        <field name="model">dac.gsheet.discrepancy</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="sheet_key"/>
+                <field name="order_id"/>
+                <field name="source_id"/>
+                <filter name="open" string="Cần xử lý" domain="[('state', '=', 'open')]"/>
+                <filter name="ignored" string="Đã bỏ qua" domain="[('state', '=', 'ignored')]"/>
+                <separator/>
+                <filter name="missing_odoo" string="Thiếu trên Odoo" domain="[('kind', '=', 'missing_in_odoo')]"/>
+                <filter name="missing_sheet" string="Thiếu trên sheet" domain="[('kind', '=', 'missing_in_sheet')]"/>
+                <filter name="mismatch" string="Lệch dữ liệu" domain="[('kind', 'in', ('field_mismatch', 'unmapped_state'))]"/>
+                <group expand="0" string="Nhóm theo">
+                    <filter name="group_kind" string="Loại" context="{'group_by': 'kind'}"/>
+                    <filter name="group_source" string="File" context="{'group_by': 'source_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_gsheet_discrepancy" model="ir.actions.act_window">
+        <field name="name">Chênh lệch Sheet ↔ Odoo</field>
+        <field name="res_model">dac.gsheet.discrepancy</field>
+        <field name="view_mode">list</field>
+        <field name="context">{'search_default_open': 1, 'search_default_group_kind': 1}</field>
+    </record>
+</odoo>

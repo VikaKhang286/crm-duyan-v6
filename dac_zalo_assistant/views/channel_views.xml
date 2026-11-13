@@ -1,0 +1,248 @@
+<odoo>
+    <!-- ═══ Đích nhận thông báo (nhóm / chat Zalo) ═════════════════════════════ -->
+    <record id="channel_kanban" model="ir.ui.view">
+        <field name="name">dac.zalo.channel.kanban</field><field name="model">dac.zalo.channel</field>
+        <field name="arch" type="xml">
+            <kanban default_order="sequence, name" sample="1">
+                <field name="name"/><field name="thread_type"/><field name="members"/><field name="active"/>
+                <field name="event_type_ids"/><field name="failed_count"/><field name="last_sent_at"/><field name="note"/>
+                <templates>
+                    <t t-name="card">
+                        <div t-attf-class="dac_ui_kcard #{!record.active.raw_value ? 'dac_ui_is_paused' : ''}">
+                            <div class="dac_ui_khead">
+                                <span t-attf-class="dac_ui_kavatar #{record.thread_type.raw_value == 'group' ? 'is-group' : ''}">
+                                    <i t-attf-class="fa #{record.thread_type.raw_value == 'group' ? 'fa-users' : 'fa-user'}" role="img"/>
+                                </span>
+                                <div class="dac_ui_ktitle">
+                                    <field name="name"/>
+                                    <div class="dac_ui_ksub">
+                                        <t t-if="record.thread_type.raw_value == 'group'">Nhóm Zalo<t t-if="record.members.raw_value"> · <t t-esc="record.members.raw_value"/> thành viên</t></t>
+                                        <t t-else="">Chat riêng</t>
+                                    </div>
+                                </div>
+                                <div class="dac_ui_kside"><field name="active" widget="boolean_toggle"/></div>
+                            </div>
+                            <div t-if="record.event_type_ids.raw_value.length"><field name="event_type_ids" widget="many2many_tags"/></div>
+                            <div t-else="" class="dac_ui_kwarn"><i class="fa fa-exclamation-triangle"/> Chưa chọn loại thông báo nào</div>
+                            <div t-if="record.note.raw_value" class="dac_ui_ksub"><field name="note"/></div>
+                            <div class="dac_ui_kfoot">
+                                <span t-if="record.last_sent_at.raw_value"><i class="fa fa-paper-plane-o"/> Gửi gần nhất <t t-esc="record.last_sent_at.value"/></span>
+                                <span t-else=""><i class="fa fa-paper-plane-o"/> Chưa gửi tin nào</span>
+                                <span t-if="record.failed_count.raw_value" class="dac_ui_pill is-danger ms-auto"><i class="fa fa-exclamation-circle" title="Lỗi"/> <t t-esc="record.failed_count.raw_value"/> tin lỗi</span>
+                                <span t-elif="!record.active.raw_value" class="dac_ui_pill ms-auto"><i class="fa fa-pause"/> Tạm dừng</span>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+    <record id="channel_list" model="ir.ui.view">
+        <field name="name">dac.zalo.channel.list</field><field name="model">dac.zalo.channel</field>
+        <field name="arch" type="xml"><list decoration-muted="not active">
+            <field name="sequence" widget="handle"/>
+            <field name="name"/>
+            <field name="thread_type" widget="badge" decoration-info="thread_type == 'user'" decoration-primary="thread_type == 'group'"/>
+            <field name="members" optional="show"/>
+            <field name="is_test" optional="show"/>
+            <field name="event_type_ids" widget="many2many_tags"/>
+            <field name="last_sent_at"/>
+            <field name="failed_count" decoration-danger="failed_count &gt; 0"/>
+            <field name="active" widget="boolean_toggle"/>
+        </list></field>
+    </record>
+    <record id="channel_form" model="ir.ui.view">
+        <field name="name">dac.zalo.channel.form</field><field name="model">dac.zalo.channel</field>
+        <field name="arch" type="xml"><form string="Đích nhận thông báo">
+            <header><button name="action_send_test" type="object" string="Gửi tin thử" icon="fa-paper-plane" class="btn-primary"
+                invisible="not id" confirm="Gửi một tin thử vào hội thoại này? Những người đã cài nhắc tên cũng sẽ được nhắc."/></header>
+            <sheet>
+                <widget name="web_ribbon" title="Tạm dừng" bg_color="text-bg-warning" invisible="active"/>
+                <div class="dac_ui_hero">
+                    <div class="dac_ui_hero_icon is-group" invisible="thread_type != 'group'"><i class="fa fa-users" title="Nhóm"/></div>
+                    <div class="dac_ui_hero_icon is-user" invisible="thread_type == 'group'"><i class="fa fa-user" title="Cá nhân"/></div>
+                    <div class="dac_ui_hero_body">
+                        <div class="dac_ui_hero_title"><label for="name" class="d-none"/><h1><field name="name" placeholder="Vd: Nhóm Sale"/></h1></div>
+                        <div class="dac_ui_hero_meta">
+                            <span class="dac_ui_pill is-info" invisible="thread_type != 'group'"><i class="fa fa-users"/> Nhóm Zalo</span>
+                            <span class="dac_ui_pill is-info" invisible="thread_type == 'group'"><i class="fa fa-user"/> Chat riêng</span>
+                            <span invisible="not members or thread_type != 'group'"><field name="members" readonly="1" nolabel="1"/> thành viên</span>
+                            <span class="dac_ui_pill is-danger" invisible="failed_count == 0"><i class="fa fa-exclamation-circle" title="Lỗi"/> <field name="failed_count" readonly="1" nolabel="1"/> tin lỗi</span>
+                            <span invisible="not last_sent_at"><i class="fa fa-paper-plane-o"/> Gửi gần nhất <field name="last_sent_at" readonly="1" nolabel="1"/></span>
+                        </div>
+                    </div>
+                    <div class="dac_ui_hero_side">
+                        <label for="active" string="Đang nhận tin"/>
+                        <field name="active" widget="boolean_toggle" nolabel="1"/>
+                    </div>
+                </div>
+                <notebook class="dac_ui_tabs">
+                    <page name="events" string="Thông báo nhận">
+                        <div class="dac_ui_section_title"><i class="fa fa-bell-o"/> Loại thông báo gửi vào đây <small>tick để bật</small></div>
+                        <div class="dac_ui_checkgrid"><field name="event_type_ids" widget="many2many_checkboxes" nolabel="1"/></div>
+                        <div invisible="thread_type != 'group' or not id">
+                            <div class="dac_ui_section_title"><i class="fa fa-at"/> Nhắc tên (@tag) <small>báo đúng người khi có thông báo trong nhóm</small></div>
+                            <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                                <button name="action_sync_members" type="object" string="Tải danh sách thành viên" icon="fa-refresh" class="btn-secondary"/>
+                                <span class="text-muted"><field name="member_count" readonly="1" nolabel="1"/> thành viên<span invisible="not members_synced_at"> · cập nhật <field name="members_synced_at" readonly="1" nolabel="1"/></span></span>
+                            </div>
+                            <div class="alert alert-info" role="status" invisible="member_count">
+                                Chưa có danh sách thành viên. Bấm “Tải danh sách thành viên” (trợ lý phải đang ở trong nhóm), rồi thêm dòng bên dưới.
+                            </div>
+                            <field name="mention_ids" nolabel="1" context="{'default_channel_id': id}">
+                                <list editable="bottom">
+                                    <field name="channel_id" column_invisible="1"/>
+                                    <field name="event_type_id" string="Khi có thông báo" options="{'no_create': True, 'no_open': True}"
+                                           domain="[('id', 'in', parent.event_type_ids)]" placeholder="Chọn loại thông báo (tick ở trên trước)"/>
+                                    <field name="member_ids" string="Nhắc tên" widget="dac_zalo_member_tags"
+                                           options="{'no_create': True, 'no_open': True}" domain="[('channel_id', '=', channel_id)]"
+                                           placeholder="＋ Thêm người cần nhắc tên"/>
+                                </list>
+                            </field>
+                            <div class="text-muted small"><i class="fa fa-info-circle"/> Tin gửi vào nhóm sẽ có thêm dòng cuối “@Tên …”; Zalo gạch tên và báo cho những người này. Tối đa 30 người mỗi tin.</div>
+                        </div>
+                    </page>
+                    <page name="messages" string="Tin đã gửi">
+                        <field name="message_ids" readonly="1" nolabel="1"><list decoration-danger="state in ('failed','uncertain')" decoration-muted="state == 'cancelled'">
+                            <field name="create_date"/><field name="event_type_id"/><field name="text"/>
+                            <field name="state" widget="badge" decoration-success="state == 'sent'" decoration-danger="state in ('failed', 'uncertain')" decoration-warning="state == 'queued'"/>
+                            <field name="error_message" optional="show"/>
+                            <button name="action_retry" type="object" string="Gửi lại" icon="fa-refresh" invisible="state != 'failed'"/>
+                        </list></field>
+                    </page>
+                    <page name="zalo_info" string="Thông tin Zalo">
+                        <group>
+                            <group string="Hội thoại"><field name="thread_type"/><field name="thread_id"/><field name="members"/><field name="is_test"/></group>
+                            <group string="Ghi chú"><field name="note" placeholder="Vd: Nhóm nhận lead để gọi lại trong 15 phút"/></group>
+                        </group>
+                    </page>
+                </notebook>
+            </sheet>
+        </form></field>
+    </record>
+    <record id="channel_search" model="ir.ui.view">
+        <field name="name">dac.zalo.channel.search</field><field name="model">dac.zalo.channel</field>
+        <field name="arch" type="xml"><search><field name="name"/><field name="thread_id"/><field name="event_type_ids"/>
+            <filter name="receiving" string="Đang nhận tin" domain="[('active','=',True)]"/>
+            <filter name="inactive" string="Tạm dừng" domain="[('active','=',False)]"/>
+            <separator/>
+            <filter name="test_channels" string="Thử nghiệm" domain="[('is_test','=',True)]"/>
+            <filter name="real_channels" string="Thật" domain="[('is_test','=',False)]"/>
+            <filter name="groups" string="Nhóm" domain="[('thread_type','=','group')]"/>
+            <filter name="users" string="Chat riêng" domain="[('thread_type','=','user')]"/>
+            <filter name="has_failed" string="Có tin lỗi" domain="[('message_ids.state','in',['failed','uncertain'])]"/>
+            <group expand="0" string="Nhóm theo">
+                <filter name="by_type" string="Loại hội thoại" context="{'group_by': 'thread_type'}"/>
+            </group>
+        </search></field>
+    </record>
+    <record id="channel_action" model="ir.actions.act_window">
+        <field name="name">Đích nhận thông báo</field><field name="res_model">dac.zalo.channel</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="context">{'active_test': False}</field>
+        <field name="help" type="html"><p class="o_view_nocontent_smiling_face">Chưa có nơi nào nhận thông báo</p>
+            <p>Vào “Tìm nhóm / người Zalo” để chọn nhóm hoặc người, rồi tick các loại thông báo cần gửi.</p></field>
+    </record>
+
+    <!-- ═══ Loại thông báo ═════════════════════════════════════════════════════ -->
+    <record id="event_type_kanban" model="ir.ui.view">
+        <field name="name">dac.zalo.event.type.kanban</field><field name="model">dac.zalo.event.type</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="group_name" group_create="0" group_delete="0" group_edit="0" records_draggable="0" create="0">
+                <field name="name"/><field name="code"/><field name="description"/><field name="icon"/>
+                <field name="channel_count"/><field name="group_name"/>
+                <templates>
+                    <t t-name="card">
+                        <div class="dac_ui_kcard">
+                            <div class="dac_ui_khead">
+                                <span class="dac_ui_kavatar is-event"><i t-attf-class="fa #{record.icon.raw_value}" role="img"/></span>
+                                <div class="dac_ui_ktitle"><field name="name"/><div class="dac_ui_ksub"><field name="code"/></div></div>
+                            </div>
+                            <div t-if="record.description.raw_value" class="dac_ui_ksub"><field name="description"/></div>
+                            <div class="dac_ui_kfoot">
+                                <span t-if="record.channel_count.raw_value" class="dac_ui_pill is-ok"><i class="fa fa-users" title="Nhóm"/> <t t-esc="record.channel_count.raw_value"/> nơi đang nhận</span>
+                                <span t-else="" class="dac_ui_pill is-warn"><i class="fa fa-exclamation-triangle"/> Chưa có nơi nhận</span>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+    <record id="event_type_list" model="ir.ui.view">
+        <field name="name">dac.zalo.event.type.list</field><field name="model">dac.zalo.event.type</field>
+        <field name="arch" type="xml"><list create="0" delete="0">
+            <field name="group_name"/><field name="name"/><field name="code" optional="show"/>
+            <field name="channel_ids" widget="many2many_tags"/>
+        </list></field>
+    </record>
+    <record id="event_type_form" model="ir.ui.view">
+        <field name="name">dac.zalo.event.type.form</field><field name="model">dac.zalo.event.type</field>
+        <field name="arch" type="xml"><form create="0" delete="0"><sheet>
+            <div class="dac_ui_hero">
+                <div class="dac_ui_hero_icon is-brand"><i class="fa fa-bell" title="Thông báo"/></div>
+                <div class="dac_ui_hero_body">
+                    <div class="dac_ui_hero_title"><h1><field name="name"/></h1></div>
+                    <div class="dac_ui_hero_meta">
+                        <span class="dac_ui_pill is-info"><field name="group_name" readonly="1" nolabel="1"/></span>
+                        <span>Mã: <field name="code" readonly="1" nolabel="1"/></span>
+                    </div>
+                </div>
+            </div>
+            <group><field name="description"/>
+                <field name="channel_ids" widget="many2many_tags" string="Hội thoại nhận tin"/></group>
+        </sheet></form></field>
+    </record>
+    <record id="event_type_action" model="ir.actions.act_window">
+        <field name="name">Loại thông báo</field><field name="res_model">dac.zalo.event.type</field><field name="view_mode">kanban,list,form</field>
+    </record>
+
+    <!-- ═══ Tìm nhóm / người Zalo (wizard) ═════════════════════════════════════ -->
+    <record id="thread_search_form" model="ir.ui.view">
+        <field name="name">dac.zalo.thread.search.form</field><field name="model">dac.zalo.thread.search</field>
+        <field name="arch" type="xml"><form string="Tìm nhóm / người Zalo">
+            <field name="searched" invisible="1"/><field name="event_codes" invisible="1"/>
+            <div class="alert alert-info" role="status" invisible="not event_names">
+                <i class="fa fa-bell-o"/> Hội thoại được thêm sẽ nhận sẵn: <strong><field name="event_names" readonly="1" nolabel="1"/></strong>.
+                Với nhóm, sau khi thêm bạn chọn người cần nhắc tên.
+            </div>
+            <div class="dac_ui_section_title"><i class="fa fa-search"/> Tìm trong tài khoản Zalo của trợ lý</div>
+            <div class="d-flex gap-2 mb-3">
+                <field name="query" placeholder="Gõ một phần tên nhóm hoặc người; để trống để xem tất cả" class="flex-grow-1"/>
+                <button name="action_search" type="object" string="Tìm" class="btn-primary" icon="fa-search"/>
+            </div>
+            <div class="text-muted" invisible="searched"><i class="fa fa-info-circle"/> Danh sách lấy từ bạn bè và nhóm mà tài khoản trợ lý đã tham gia. Trợ lý phải ở trong nhóm mới gửi được tin.</div>
+            <div class="alert alert-warning" role="alert" invisible="not searched or line_ids"><i class="fa fa-search-minus"/> Không tìm thấy hội thoại phù hợp.</div>
+            <field name="line_ids" nolabel="1" invisible="not searched or not line_ids">
+                <list editable="bottom" create="0" delete="0" decoration-muted="added">
+                    <field name="selected" widget="boolean_toggle" readonly="added"/>
+                    <field name="name"/>
+                    <field name="thread_type" widget="badge" decoration-info="thread_type == 'user'" decoration-primary="thread_type == 'group'"/>
+                    <field name="members"/>
+                    <field name="added" widget="boolean" string="Đã thêm"/>
+                    <field name="thread_id" optional="hide"/>
+                </list>
+            </field>
+            <footer>
+                <button name="action_add" type="object" string="Thêm hội thoại đã chọn" class="btn-primary" icon="fa-plus" invisible="not line_ids"/>
+                <button string="Đóng" special="cancel" class="btn-secondary"/>
+            </footer>
+        </form></field>
+    </record>
+    <record id="thread_search_action" model="ir.actions.server">
+        <field name="name">Tìm nhóm / người Zalo</field><field name="model_id" ref="model_dac_zalo_channel"/>
+        <field name="state">code</field><field name="code">action = model.action_open_search()</field>
+    </record>
+
+    <menuitem id="menu_channels" name="Đích nhận thông báo" parent="menu_section_notify" action="channel_action"
+        groups="dac_erp.group_dac_erp_manager,base.group_system" sequence="10"/>
+    <menuitem id="menu_thread_search" name="Tìm nhóm / người Zalo" parent="menu_section_notify" action="thread_search_action"
+        groups="dac_erp.group_dac_erp_manager,base.group_system" sequence="20"/>
+    <menuitem id="menu_event_types" name="Loại thông báo" parent="menu_section_notify" action="event_type_action"
+        groups="base.group_system" sequence="30"/>
+
+    <!-- Icon sidebar (đọc bởi Chameleon: navbar_v6.js dacMenuFaIcon) -->
+    <record id="menu_channels" model="ir.ui.menu"><field name="web_icon">fa-users</field></record>
+    <record id="menu_thread_search" model="ir.ui.menu"><field name="web_icon">fa-search</field></record>
+    <record id="menu_event_types" model="ir.ui.menu"><field name="web_icon">fa-tags</field></record>
+</odoo>

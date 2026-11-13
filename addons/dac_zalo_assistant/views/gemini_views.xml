@@ -1,0 +1,33 @@
+<odoo>
+    <!-- Gemini: AI hiểu câu nhân viên trả lời tin báo lead và tự chốt trạng thái lead -->
+    <record id="config_form_gemini" model="ir.ui.view">
+        <field name="name">dac.zalo.config.form.gemini</field>
+        <field name="model">dac.zalo.config</field>
+        <field name="inherit_id" ref="dac_zalo_assistant.config_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//page[@name='ai']" position="after">
+                <page name="gemini" string="Gemini duyệt phản hồi" groups="base.group_system">
+                    <div class="alert alert-secondary" role="note">
+                        Khi nhân viên trả lời (reply) tin báo khách, Gemini đọc câu trả lời và quyết định: đã liên hệ, liên hệ không được,
+                        hay không liên quan. Nếu rõ ràng, lead được cập nhật trạng thái và trợ lý trả lời lại “Em cảm ơn ạ”.
+                        Chỉ nội dung câu trả lời của nhân viên được gửi tới Google, không gửi số điện thoại hay thông tin khách.
+                        Khi Gemini tắt hoặc lỗi, hệ thống vẫn nhận ra các câu đơn giản như “đã gọi”, “đã liên hệ”.
+                    </div>
+                    <group>
+                        <group string="Kết nối">
+                            <field name="gemini_enabled" widget="boolean_toggle"/>
+                            <field name="gemini_api_key" password="True" placeholder="Dán API key từ Google AI Studio"/>
+                            <button name="action_gemini_load_models" type="object" string="Lấy danh sách model" icon="fa-refresh"
+                                    class="btn-primary" invisible="not gemini_api_key"/>
+                            <field name="gemini_model_id" options="{'no_create': True, 'no_open': True}"
+                                   placeholder="Bấm “Lấy danh sách model” rồi chọn"/>
+                            <field name="gemini_models_at" readonly="1" invisible="not gemini_models_at"/>
+                            <button name="action_gemini_test" type="object" string="Kiểm tra kết nối Gemini" icon="fa-flask"
+                                    class="btn-secondary" invisible="not gemini_api_key or not gemini_model_id"/>
+                        </group>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

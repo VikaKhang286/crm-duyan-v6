@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Nút mở trợ lý AI trên danh sách Đơn hàng Xe đẩy (không cần chọn dòng) -->
+    <record id="view_sale_order_cart_list_gsheet_agent" model="ir.ui.view">
+        <field name="name">sale.order.cart.list.gsheet.agent</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="dac_erp.dac_sale_order_cart_view_list"/>
+        <field name="arch" type="xml">
+            <xpath expr="//list" position="inside">
+                <header>
+                    <button name="action_open_gsheet_agent" type="object" string="Trợ lý AI Sheet"
+                            icon="fa-magic" display="always" class="btn-secondary"/>
+                </header>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Nút trên form đơn xe đẩy -->
+    <record id="view_sale_order_form_gsheet_agent" model="ir.ui.view">
+        <field name="name">sale.order.form.gsheet.agent</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="dac_erp.dac_sale_order_custom_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='cart_design_link']" position="after">
+                <button name="action_open_gsheet_agent" type="object" string="Hỏi trợ lý AI về đơn này"
+                        icon="fa-magic" class="btn-secondary mt-2"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

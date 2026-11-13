@@ -1,0 +1,93 @@
+<odoo>
+    <record id="pos_connection_list" model="ir.ui.view">
+        <field name="name">dac.pancake.pos.connection.list</field><field name="model">dac.pancake.pos.connection</field>
+        <field name="arch" type="xml"><list decoration-muted="not active" decoration-success="pancake_pos_check_status == 'ok' and check_is_current">
+            <field name="name"/><field name="company_id" groups="base.group_multi_company"/>
+            <field name="pancake_pos_shop_id"/><field name="pancake_pos_shop_name"/><field name="pancake_pos_page_id"/>
+            <field name="pancake_pos_check_status" widget="badge"/><field name="check_is_current"/>
+            <field name="pancake_pos_checked_at"/><field name="active" optional="hide"/>
+        </list></field>
+    </record>
+    <record id="pos_connection_form" model="ir.ui.view">
+        <field name="name">dac.pancake.pos.connection.form</field><field name="model">dac.pancake.pos.connection</field>
+        <field name="arch" type="xml"><form>
+
+            <sheet>
+                <widget name="web_ribbon" title="Đã lưu trữ" bg_color="text-bg-secondary" invisible="active"/>
+                <field name="active" invisible="1"/>
+                <div class="oe_title"><label for="name"/><h1><field name="name" placeholder="Ví dụ: Xưởng xe đẩy gấp gọn"/></h1></div>
+                <div class="alert alert-info">Mỗi dòng là một kết nối shop POS với API key riêng. Nếu dùng API key tài khoản cho nhiều shop, tạo mỗi shop một dòng và nhập cùng key với Shop ID tương ứng. Thêm kết nối mới không thay shop mặc định.</div>
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    <button name="action_check_connection" type="object" string="Kiểm tra và lấy Shop ID" class="btn btn-primary" groups="base.group_system"/>
+                    <button name="action_open_api_logs" type="object" string="Lịch sử API của kết nối" class="btn btn-secondary" groups="base.group_system,dac_erp.group_dac_erp_manager"/>
+                </div>
+                <group>
+                    <group string="1 · Khóa và shop">
+                        <field name="company_id" groups="base.group_multi_company"/>
+                        <field name="company_id" invisible="1" groups="!base.group_multi_company"/>
+                        <field name="pancake_pos_api_key" password="True" groups="base.group_system" placeholder="Dán API key của shop này"/>
+                        <field name="pancake_pos_shop_id" placeholder="Có thể để trống để tự tra từ key"/>
+                        <field name="pancake_pos_shop_name"/>
+                    </group>
+                    <group string="2 · Page, kho và dòng hàng">
+                        <field name="pancake_pos_page_id"/>
+                        <field name="pancake_pos_warehouse_id"/>
+                        <field name="pancake_pos_item_mode"/>
+                        <field name="pancake_pos_item_name" invisible="pancake_pos_item_mode != 'one_time'" required="pancake_pos_item_mode == 'one_time'"/>
+                        <field name="pancake_pos_summary_sku" invisible="pancake_pos_item_mode != 'service_sku'"/>
+                        <div colspan="2" class="text-muted" invisible="pancake_pos_item_mode != 'one_time'">Dùng sản phẩm nhập nhanh riêng trên đơn, không gọi API tạo sản phẩm danh mục. Tên dòng hàng được thêm mã đơn Odoo; số lượng 1, giá bằng tổng tiền VND của đơn. Không cần SKU hoặc quyền Tạo sản phẩm.</div>
+                        <div colspan="2" class="text-muted" invisible="pancake_pos_item_mode != 'service_sku'">Chọn SKU dịch vụ tổng giá trị đơn, số lượng 1; giá bằng tổng tiền VND trong CRM. Không dùng SKU/kho của shop khác.</div>
+                    </group>
+                </group>
+                <notebook>
+                    <page string="Kiểm tra kết nối">
+                        <p>Bấm Lưu trước khi kiểm tra. Nếu key chỉ truy cập một shop, nút kiểm tra tự điền Shop ID và tên shop. Nếu có nhiều shop, chọn ID trong danh sách trả về rồi kiểm tra lại.</p>
+                        <group><field name="pancake_pos_check_status" widget="badge"/><field name="check_is_current"/><field name="pancake_pos_checked_at"/></group>
+                        <field name="pancake_pos_check_message" nolabel="1"/>
+                        <field name="available_shops" nolabel="1"/>
+                        <p class="text-muted">Đây là kiểm tra đọc. Nó không tạo đơn, gửi Purchase hoặc xác minh doanh thu Meta.</p>
+                    </page>
+                    <page string="CAPI và thông báo">
+                        <ol><li>Trên đúng shop POS, mở Cấu hình → Cửa hàng → Sự kiện chuyển đổi → Sự kiện Facebook; bật Đồng bộ sự kiện Facebook, kiểm tra Purchase khi Đã xác nhận và Dataset của đúng Page.</li><li>Vào Cấu hình → Thông báo → Pancake, tắt Tự động gửi hóa đơn cùng các thông báo theo trạng thái và Botcake liên quan.</li><li>Chọn kho và cách nhập dòng hàng. Với sản phẩm dịch vụ có sẵn, xác nhận SKU bên dưới. Lưu và kiểm tra lại.</li></ol>
+                        <group><field name="pancake_pos_capi_ready"/><field name="pancake_pos_silent_ready"/><field name="pancake_pos_product_ready" invisible="pancake_pos_item_mode != 'service_sku'"/></group>
+                        <p>Những ô này là xác nhận của quản trị viên sau khi thao tác trên POS, không phải kết quả API tự xác minh.</p>
+                        <a href="https://docs.pancake.biz/pos/st-f10/st-p1?lang=vi" target="_blank" rel="noopener noreferrer" class="btn btn-link">Hướng dẫn CAPI</a>
+                        <a href="https://docs.pancake.biz/pos/st-f11/st-p4?lang=vi" target="_blank" rel="noopener noreferrer" class="btn btn-link">Hóa đơn và thông báo</a>
+                    </page>
+                    <page string="Lấy API key">
+                        <p>Mở Pancake POS, chọn đúng shop → Cấu hình → Ứng dụng / Nâng cao → Kết nối bên thứ 3 → Webhook/API → API Key → Thêm mới. Đặt tên Odoo và dán key vào ô của kết nối này.</p>
+                        <a href="https://pos.pancake.vn/" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">Mở Pancake POS</a>
+                        <a href="https://pos.pages.fm/developers/api/en/authentication" target="_blank" rel="noopener noreferrer" class="btn btn-link">Tài liệu lấy API key</a>
+                        <p class="mt-3">Khóa chỉ cho quản trị viên xem/nhập và được che trên màn hình. Không dán key vào tên kết nối hoặc gửi qua chat.</p>
+                    </page>
+                </notebook>
+            </sheet>
+        </form></field>
+    </record>
+    <record id="pos_connection_search" model="ir.ui.view">
+        <field name="name">dac.pancake.pos.connection.search</field><field name="model">dac.pancake.pos.connection</field>
+        <field name="arch" type="xml"><search>
+            <field name="name"/><field name="pancake_pos_shop_id"/><field name="pancake_pos_shop_name"/><field name="pancake_pos_page_id"/>
+            <filter name="archived" string="Đã lưu trữ" domain="[('active','=',False)]"/>
+            <filter name="by_company" string="Công ty" context="{'group_by':'company_id'}" groups="base.group_multi_company"/>
+        </search></field>
+    </record>
+    <record id="action_pancake_pos_connections" model="ir.actions.act_window">
+        <field name="name">Các shop POS</field><field name="res_model">dac.pancake.pos.connection</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html"><p class="o_view_nocontent_smiling_face">Thêm kết nối Pancake POS đầu tiên</p><p>Mỗi shop có API key, Page, kho/SKU và lịch sử riêng.</p></field>
+    </record>
+    <record id="sale_order_pos_connection" model="ir.ui.view">
+        <field name="name">sale.order.pancake.pos.connection</field><field name="model">sale.order</field>
+        <field name="inherit_id" ref="dac_erp.dac_sale_order_custom_view_form"/>
+        <field name="arch" type="xml"><xpath expr="//notebook" position="inside">
+            <page name="pancake_pos_routing" string="Shop POS">
+                <group><field name="company_id" invisible="1"/><field name="pancake_pos_route_locked" invisible="1"/>
+                    <field name="pancake_pos_connection_id" readonly="pancake_pos_route_locked" options="{'no_create':True}"/>
+                    <field name="pancake_export_reference"/>
+                </group>
+                <p>Chọn shop trước khi lưu đơn mới. Để trống sẽ dùng shop mặc định của công ty khi xếp hàng gửi. Khi đã xếp hàng, sự kiện giữ nguyên kết nối đã chọn để tránh gửi qua nhiều shop.</p>
+            </page>
+        </xpath></field>
+    </record>
+</odoo>

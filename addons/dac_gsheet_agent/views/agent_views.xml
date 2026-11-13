@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Giao diện chat (OWL client action) -->
+    <record id="action_gsheet_agent_chat" model="ir.actions.client">
+        <field name="name">Trợ lý AI Xe đẩy</field>
+        <field name="tag">dac_gsheet_agent.chat</field>
+    </record>
+
+    <!-- ============ Playbook quy tắc ============ -->
+    <record id="view_gsheet_rule_list" model="ir.ui.view">
+        <field name="name">dac.gsheet.agent.rule.list</field>
+        <field name="model">dac.gsheet.agent.rule</field>
+        <field name="arch" type="xml">
+            <list decoration-muted="state == 'archived'" decoration-warning="state == 'proposed'">
+                <field name="category"/>
+                <field name="content"/>
+                <field name="source_id" optional="show"/>
+                <field name="origin" optional="show"/>
+                <field name="helpful_count" string="+"/>
+                <field name="harmful_count" string="−"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'active'" decoration-warning="state == 'proposed'"/>
+                <field name="last_used_at" optional="hide"/>
+                <button name="action_activate" type="object" string="Dùng" icon="fa-check"
+                        invisible="state == 'active'" groups="dac_erp.group_dac_erp_manager,base.group_system"/>
+                <button name="action_archive_rule" type="object" string="Bỏ" icon="fa-ban"
+                        invisible="state == 'archived'" groups="dac_erp.group_dac_erp_manager,base.group_system"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_gsheet_rule_form" model="ir.ui.view">
+        <field name="name">dac.gsheet.agent.rule.form</field>
+        <field name="model">dac.gsheet.agent.rule</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_activate" type="object" string="Đưa vào dùng" class="btn-primary"
+                            invisible="state == 'active'"/>
+                    <button name="action_archive_rule" type="object" string="Bỏ quy tắc"
+                            invisible="state == 'archived'"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <group>
+                        <field name="content"/>
+                        <field name="category"/>
+                        <field name="source_id"/>
+                        <field name="origin"/>
+                        <field name="helpful_count"/>
+                        <field name="harmful_count"/>
+                        <field name="session_id"/>
+                        <field name="last_used_at"/>
+                    </group>
+                    <field name="history" invisible="not history"/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_gsheet_rule_search" model="ir.ui.view">
+        <field name="name">dac.gsheet.agent.rule.search</field>
+        <field name="model">dac.gsheet.agent.rule</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="content"/>
+                <field name="source_id"/>
+                <filter name="active_rules" string="Đang dùng" domain="[('state', '=', 'active')]"/>
+                <filter name="proposed" string="Chờ duyệt" domain="[('state', '=', 'proposed')]"/>
+                <filter name="archived" string="Đã bỏ" domain="[('state', '=', 'archived')]"/>
+                <group expand="0" string="Nhóm theo">
+                    <filter name="group_category" string="Nhóm" context="{'group_by': 'category'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_gsheet_rule" model="ir.actions.act_window">
+        <field name="name">Quy tắc AI đã học</field>
+        <field name="res_model">dac.gsheet.agent.rule</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_group_category': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Chưa có quy tắc nào</p>
+            <p>Khi bạn dạy hoặc sửa AI trong khung chat, nó sẽ tự ghi nhớ quy tắc tại đây.</p>
+        </field>
+    </record>
+
+    <!-- ============ Đề xuất ============ -->
+    <record id="view_gsheet_proposal_list" model="ir.ui.view">
+        <field name="name">dac.gsheet.agent.proposal.list</field>
+        <field name="model">dac.gsheet.agent.proposal</field>
+        <field name="arch" type="xml">
+            <list create="0" decoration-danger="state == 'failed'" decoration-muted="state == 'rejected'">
+                <field name="create_date" string="Thời gian"/>
+                <field name="user_id"/>
+                <field name="kind"/>
+                <field name="summary"/>
+                <field name="reason" optional="show"/>
+                <field name="state" widget="badge"
+                       decoration-warning="state == 'pending'" decoration-success="state == 'applied'"/>
+                <field name="error_message" optional="hide"/>
+                <button name="action_apply" type="object" string="Duyệt" icon="fa-check" class="btn-link text-success"
+                        invisible="state != 'pending'"/>
+                <button name="action_reject" type="object" string="Từ chối" icon="fa-times"
+                        invisible="state not in ('pending', 'failed')"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_gsheet_proposal_search" model="ir.ui.view">
+        <field name="name">dac.gsheet.agent.proposal.search</field>
+        <field name="model">dac.gsheet.agent.proposal</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="order_id"/>
+                <filter name="pending" string="Chờ duyệt" domain="[('state', '=', 'pending')]"/>
+                <filter name="mine" string="Của tôi" domain="[('user_id', '=', uid)]"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_gsheet_proposal" model="ir.actions.act_window">
+        <field name="name">Đề xuất chờ duyệt</field>
+        <field name="res_model">dac.gsheet.agent.proposal</field>
+        <field name="view_mode">list</field>
+        <field name="context">{'search_default_pending': 1}</field>
+    </record>
+</odoo>
