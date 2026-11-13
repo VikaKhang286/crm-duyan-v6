@@ -1353,13 +1353,13 @@
 .dac-design-order-review-status {
   display: inline-flex;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
   margin-left: auto;
-  padding: 10px 15px;
+  padding: 6px 10px;
   border-radius: 22px;
   background: #eaf2ff;
   color: #2d73eb;
-  font-size: 16px;
+  font-size: 12px;
   font-weight: 800;
 }
 
@@ -2228,9 +2228,16 @@ html body.o_web_client .dac-design-order-file .dac-design-final-file-source .o_s
 .dac-v6-sale-design-task-card:hover { border-color: #aebfd9; background: #fff; }
 .dac-v6-sale-design-task-header, .dac-v6-sale-design-task-meta { display: flex; align-items: center; gap: 24px; }
 .dac-v6-sale-design-task-header { justify-content: space-between; }
-.dac-v6-sale-design-task-header strong { color: #315f9f; font-size: 22px; }
-.dac-v6-sale-design-task-meta { margin-top: 22px; color: #71809a; font-size: 16px; }
-.dac-v6-sale-design-task-meta b { color: #344054; }
+.dac-v6-sale-design-task-title {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #315f9f;
+  font-size: 22px;
+  font-weight: 800;
+  text-align: left;
+}
+.dac-v6-sale-design-task-meta { margin-top: 22px; color: #6f7e96 !important; font-size: 13px !important; }
 
 .dac-v6-design-task-card-link,
 .dac-v6-design-task-card-meta {
@@ -2264,6 +2271,21 @@ html body.o_web_client .dac-design-order-file .dac-design-final-file-source .o_s
 }
 
 .dac-v6-design-task-approve:hover {
+  background: #ffc107;
+}
+
+.dac-v6-sale-design-task-approve {
+  flex: 0 0 auto;
+  padding: 16px 30px;
+  border: 1px solid #eba900;
+  border-radius: 18px;
+  background: #ffc629;
+  color: #3f3206;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.dac-v6-sale-design-task-approve:hover {
   background: #ffc107;
 }
 
@@ -2302,8 +2324,8 @@ html body.o_web_client .dac-design-order-file .dac-design-final-file-source .o_s
 }
 
 .dac-v6-design-task-status.is-revision {
-  background: #fff0d6;
-  color: #a86f00;
+  background: #fff0f3;
+  color: #d92d4c;
 }
 
 .dac-v6-design-approval-card {
