@@ -1,11 +1,15 @@
 # -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
+import logging
 import math
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 from odoo import models, fields, api
 from odoo.exceptions import ValidationError
+
+
+_logger = logging.getLogger(__name__)
 
 
 def haversine_distance(lat1, lon1, lat2, lon2):
@@ -214,6 +218,56 @@ class HrAttendanceWithGeolocation(models.Model):
             or 'Asia/Ho_Chi_Minh'
         )
 
+    def _get_attendance_day_bounds(self, employee, target_dt):
+        """Return the UTC bounds of the employee's local attendance day."""
+        if isinstance(target_dt, str):
+            target_dt = fields.Datetime.from_string(target_dt)
+        employee_tz = ZoneInfo(self._get_employee_timezone(employee))
+        localized_dt = target_dt.replace(tzinfo=ZoneInfo('UTC')).astimezone(employee_tz)
+        local_day_start = datetime.combine(
+            localized_dt.date(), time.min, tzinfo=employee_tz)
+        local_next_day_start = local_day_start + timedelta(days=1)
+        return (
+            local_day_start.astimezone(ZoneInfo('UTC')).replace(tzinfo=None),
+            local_next_day_start.astimezone(ZoneInfo('UTC')).replace(tzinfo=None),
+        )
+
+    def _get_workday_attendance(self, employee, check_in_dt, exclude_ids=None):
+        """Find an attendance already started on the employee's local day."""
+        day_start, next_day_start = self._get_attendance_day_bounds(employee, check_in_dt)
+        domain = [
+            ('employee_id', '=', employee.id),
+            ('check_in', '>=', day_start),
+            ('check_in', '<', next_day_start),
+        ]
+        if exclude_ids:
+            domain.append(('id', 'not in', exclude_ids))
+        return self.sudo().search(domain, limit=1)
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        """Create or update the single attendance record for each local day."""
+        employee_ids = sorted({
+            vals.get('employee_id') for vals in vals_list if vals.get('employee_id')
+        })
+        for employee_id in employee_ids:
+            # A transaction-scoped PostgreSQL advisory lock also covers two
+            # simultaneous browser/API requests for the same employee.
+            self.env.cr.execute('SELECT pg_advisory_xact_lock(%s, %s)', [9182, employee_id])
+        attendances = self.browse()
+        Employee = self.env['hr.employee'].sudo()
+        for vals in vals_list:
+            employee_id = vals.get('employee_id')
+            check_in = vals.get('check_in')
+            if employee_id and check_in:
+                existing = self._get_workday_attendance(Employee.browse(employee_id), check_in)
+                if existing:
+                    existing.write(vals)
+                    attendances |= existing
+                    continue
+            attendances |= super(HrAttendanceWithGeolocation, self).create([vals])
+        return attendances
+
     def _get_workday_bounds(self, employee, target_dt=None):
         target_dt = target_dt or fields.Datetime.now()
         if isinstance(target_dt, str):
@@ -287,6 +341,122 @@ class HrAttendanceWithGeolocation(models.Model):
             'early_minutes': early_minutes,
             'planned_end': planned_end,
         }
+
+    @api.model
+    def _cron_auto_check_out_at_midnight(self):
+        """Close attendances left open when their next local day has begun.
+
+        The cron is scheduled at midnight (Asia/Ho_Chi_Minh).  Computing the
+        cutoff from each employee's calendar timezone keeps the persisted
+        checkout time at exactly 00:00 even if the scheduler starts a little
+        late.  It also makes a delayed cron safe: an attendance is closed at
+        the first midnight following its check-in, rather than at the time the
+        cron happened to run.
+        """
+        now_utc = fields.Datetime.now()
+        utc_tz = ZoneInfo('UTC')
+        closed_count = 0
+
+        open_attendances = self.sudo().search([
+            ('check_out', '=', False),
+            ('check_in', '!=', False),
+        ])
+        for attendance in open_attendances:
+            employee = attendance.employee_id
+            try:
+                employee_tz = ZoneInfo(self._get_employee_timezone(employee))
+                check_in_local = attendance.check_in.replace(
+                    tzinfo=utc_tz).astimezone(employee_tz)
+                next_midnight_local = datetime.combine(
+                    check_in_local.date() + timedelta(days=1), time.min,
+                    tzinfo=employee_tz,
+                )
+                cutoff_utc = next_midnight_local.astimezone(utc_tz).replace(tzinfo=None)
+
+                # Do not close an attendance before its local day has ended.
+                if now_utc < cutoff_utc:
+                    continue
+
+                # Determine the early-leave flag against the workday being
+                # closed (not against the newly started day at 00:00).
+                checkout_status = self._build_check_out_status(
+                    employee, cutoff_utc - timedelta(microseconds=1))
+                attendance.write({
+                    'check_out': cutoff_utc,
+                    'is_early_leave': checkout_status['is_early_leave'],
+                })
+                closed_count += 1
+            except Exception:
+                _logger.exception(
+                    'Unable to auto check-out attendance %s for employee %s',
+                    attendance.id, employee.id,
+                )
+
+        _logger.info('DAC Attendance: automatically checked out %s open attendance(s)', closed_count)
+        return closed_count
+
+    @api.model
+    def _cron_normalize_overnight_attendances(self):
+        """One-time repair for historical attendances spanning midnight.
+
+        Before the midnight auto-checkout rule existed, an employee who forgot
+        to check out could leave a closed attendance spanning several days.
+        The agreed business rule is that every attendance ends at the first
+        local midnight after its check-in, so historical records follow that
+        same rule.  The scheduled action disables itself once complete.
+        """
+        utc_tz = ZoneInfo('UTC')
+        repaired_count = 0
+        failed_count = 0
+        attendances = self.sudo().search([
+            ('check_in', '!=', False),
+            ('check_out', '!=', False),
+        ])
+
+        for attendance in attendances:
+            employee = attendance.employee_id
+            try:
+                employee_tz = ZoneInfo(self._get_employee_timezone(employee))
+                check_in_local = attendance.check_in.replace(
+                    tzinfo=utc_tz).astimezone(employee_tz)
+                next_midnight_local = datetime.combine(
+                    check_in_local.date() + timedelta(days=1), time.min,
+                    tzinfo=employee_tz,
+                )
+                cutoff_utc = next_midnight_local.astimezone(utc_tz).replace(tzinfo=None)
+
+                if attendance.check_out > cutoff_utc:
+                    checkout_status = self._build_check_out_status(
+                        employee, cutoff_utc - timedelta(microseconds=1))
+                    attendance.write({
+                        'check_out': cutoff_utc,
+                        'is_early_leave': checkout_status['is_early_leave'],
+                    })
+                    repaired_count += 1
+            except Exception:
+                failed_count += 1
+                _logger.exception(
+                    'Unable to normalize overnight attendance %s for employee %s',
+                    attendance.id, employee.id,
+                )
+
+        cron = self.env.ref(
+            'dac_attendance.cron_normalize_overnight_attendances',
+            raise_if_not_found=False,
+        )
+        if cron and not failed_count:
+            # ir.cron locks its own row while executing, so ORM write() is
+            # rejected here. Updating within the current transaction safely
+            # marks this one-shot repair job inactive.
+            self.env.cr.execute(
+                'UPDATE ir_cron SET active = FALSE WHERE id = %s',
+                [cron.id],
+            )
+        _logger.info(
+            'DAC Attendance: normalized %s historical overnight attendance(s); %s failed',
+            repaired_count, failed_count,
+        )
+        return repaired_count
 
     def _validate_gps_location(self, employee_id, latitude, longitude, accuracy=None):
         """
@@ -422,17 +592,10 @@ class HrAttendanceWithGeolocation(models.Model):
             if not employee:
                 return {'success': False, 'message': 'Không tìm thấy nhân viên cho user hiện tại'}
 
-            # Check if already checked in
-            # The standard employee attendance group is read-only.  Elevate
-            # only this lookup and the write below, while keeping the domain
-            # locked to the employee linked to the current user.
+            # Writes are elevated only after resolving the employee bound to
+            # the current user. A repeated check-in overwrites that employee's
+            # single record for the local workday.
             Attendance = self.sudo()
-            open_att = Attendance.search([
-                ('employee_id', '=', employee.id),
-                ('check_out', '=', False),
-            ], limit=1)
-            if open_att:
-                return {'success': False, 'message': 'Bạn đã check-in rồi. Hãy check-out trước.'}
 
             Config = self.env['hr.employee.attendance.config']
             config = Config.get_config_for_employee(employee.id)
@@ -502,7 +665,23 @@ class HrAttendanceWithGeolocation(models.Model):
                         vals['check_in_latitude'] = metadata['latitude']
                         vals['check_in_longitude'] = metadata['longitude']
 
-            attendance = Attendance.create(vals)
+            existing_today = Attendance._get_workday_attendance(employee, check_in_time)
+            if existing_today:
+                vals.update({
+                    'check_out': False,
+                    'check_out_photo': False,
+                    'check_out_photo_timestamp': False,
+                    'check_out_photo_metadata': False,
+                    'check_out_latitude': 0.0,
+                    'check_out_longitude': 0.0,
+                    'check_out_gps_accuracy': 0.0,
+                    'is_early_leave': False,
+                })
+                existing_today.write(vals)
+                attendance = existing_today
+                success_message = 'Đã ghi đè giờ check-in hôm nay. Hãy check-out lại khi kết thúc làm việc.'
+            else:
+                attendance = Attendance.create(vals)
             return {
                 'success': True,
                 'message': success_message,

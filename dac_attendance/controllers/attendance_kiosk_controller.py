@@ -73,14 +73,6 @@ class AttendanceKioskController(http.Controller):
             if not employee:
                 return {'success': False, 'message': 'Không tìm thấy nhân viên cho user hiện tại'}
 
-            # Check if already checked in
-            open_attendance = request.env['hr.attendance'].search([
-                ('employee_id', '=', employee.id),
-                ('check_out', '=', False),
-            ], limit=1)
-            if open_attendance:
-                return {'success': False, 'message': 'Bạn đã check-in rồi. Hãy check-out trước.'}
-
             Config = request.env['hr.employee.attendance.config']
             config = Config.get_config_for_employee(employee.id)
             method = config.check_in_method if config else 'location'
@@ -152,11 +144,29 @@ class AttendanceKioskController(http.Controller):
                         vals['check_in_latitude'] = metadata['latitude']
                         vals['check_in_longitude'] = metadata['longitude']
 
-            attendance = request.env['hr.attendance'].create(vals)
+            Attendance = request.env['hr.attendance'].sudo()
+            existing_today = Attendance._get_workday_attendance(employee, vals['check_in'])
+            if existing_today:
+                vals.update({
+                    'check_out': False,
+                    'check_out_photo': False,
+                    'check_out_photo_timestamp': False,
+                    'check_out_photo_metadata': False,
+                    'check_out_latitude': 0.0,
+                    'check_out_longitude': 0.0,
+                    'check_out_gps_accuracy': 0.0,
+                    'is_early_leave': False,
+                })
+                existing_today.write(vals)
+                attendance = existing_today
+                message = 'Đã ghi đè giờ check-in hôm nay. Hãy check-out lại khi kết thúc làm việc.'
+            else:
+                attendance = Attendance.create(vals)
+                message = 'Check-in thành công!'
 
             return {
                 'success': True,
-                'message': 'Check-in thành công!',
+                'message': message,
                 'attendance_id': attendance.id,
                 'check_in_time': str(attendance.check_in),
             }

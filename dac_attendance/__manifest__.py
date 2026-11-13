@@ -19,6 +19,7 @@
         'views/dac_attendance_amendment_views.xml',
         'views/dashboard_actions.xml',
         'data/no_role_home_action.xml',
+        'data/attendance_cron.xml',
         'views/attendance_menu.xml',
     ],
     'assets': {

@@ -1,6 +1,6 @@
 /** @odoo-module **/
 
-import { Component, useState, onWillStart } from "@odoo/owl";
+import { Component, useState, onWillStart, onWillUnmount } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
 import { useService } from "@web/core/utils/hooks";
@@ -12,6 +12,13 @@ export class DacAttendanceSystray extends Component {
         this.orm = useService("orm");
         this.notification = useService("notification");
         this.dialog = useService("dialog");
+        this.midnightRefreshTimer = null;
+        this.statusRefreshInterval = null;
+        this.visibilityChangeHandler = () => {
+            if (document.visibilityState === "visible") {
+                this.loadConfig();
+            }
+        };
         this.state = useState({
             checkedIn: false,
             checkInTime: false,
@@ -29,7 +36,43 @@ export class DacAttendanceSystray extends Component {
 
         onWillStart(async () => {
             await this.loadConfig();
+            this._startStatusRefresh();
         });
+
+        onWillUnmount(() => this._stopStatusRefresh());
+    }
+
+    _startStatusRefresh() {
+        this._scheduleMidnightRefresh();
+        // This is a fallback if Odoo's scheduled job starts a little after
+        // midnight, or if a browser delays the midnight timeout in background.
+        this.statusRefreshInterval = window.setInterval(() => this.loadConfig(), 60 * 1000);
+        document.addEventListener("visibilitychange", this.visibilityChangeHandler);
+    }
+
+    _stopStatusRefresh() {
+        if (this.midnightRefreshTimer) {
+            window.clearTimeout(this.midnightRefreshTimer);
+            this.midnightRefreshTimer = null;
+        }
+        if (this.statusRefreshInterval) {
+            window.clearInterval(this.statusRefreshInterval);
+            this.statusRefreshInterval = null;
+        }
+        document.removeEventListener("visibilitychange", this.visibilityChangeHandler);
+    }
+
+    _scheduleMidnightRefresh() {
+        if (this.midnightRefreshTimer) {
+            window.clearTimeout(this.midnightRefreshTimer);
+        }
+        const now = new Date();
+        const nextMidnight = new Date(now);
+        nextMidnight.setHours(24, 0, 5, 0);
+        this.midnightRefreshTimer = window.setTimeout(async () => {
+            await this.loadConfig();
+            this._scheduleMidnightRefresh();
+        }, nextMidnight.getTime() - now.getTime());
     }
 
     async loadConfig() {
