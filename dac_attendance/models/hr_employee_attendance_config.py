@@ -211,6 +211,13 @@ class HrEmployeeAttendanceConfig(models.Model):
                 ('employee_id', '=', employee.id),
                 ('check_out', '=', False),
             ], limit=1, order='check_in desc')
+
+            # The scheduled action is the primary reset mechanism.  The
+            # systray polling path closes only this user's stale open record
+            # as a fallback, so a delayed cron cannot leave the UI stuck on
+            # "checked in" after the employee-local midnight.
+            if open_att and open_att._auto_check_out_if_past_midnight():
+                open_att = Attendance.browse()
             
             if open_att:
                 result['checked_in'] = True

@@ -354,7 +354,6 @@ class HrAttendanceWithGeolocation(models.Model):
         cron happened to run.
         """
         now_utc = fields.Datetime.now()
-        utc_tz = ZoneInfo('UTC')
         closed_count = 0
 
         open_attendances = self.sudo().search([
@@ -362,38 +361,51 @@ class HrAttendanceWithGeolocation(models.Model):
             ('check_in', '!=', False),
         ])
         for attendance in open_attendances:
-            employee = attendance.employee_id
             try:
-                employee_tz = ZoneInfo(self._get_employee_timezone(employee))
-                check_in_local = attendance.check_in.replace(
-                    tzinfo=utc_tz).astimezone(employee_tz)
-                next_midnight_local = datetime.combine(
-                    check_in_local.date() + timedelta(days=1), time.min,
-                    tzinfo=employee_tz,
-                )
-                cutoff_utc = next_midnight_local.astimezone(utc_tz).replace(tzinfo=None)
-
-                # Do not close an attendance before its local day has ended.
-                if now_utc < cutoff_utc:
-                    continue
-
-                # Determine the early-leave flag against the workday being
-                # closed (not against the newly started day at 00:00).
-                checkout_status = self._build_check_out_status(
-                    employee, cutoff_utc - timedelta(microseconds=1))
-                attendance.write({
-                    'check_out': cutoff_utc,
-                    'is_early_leave': checkout_status['is_early_leave'],
-                })
-                closed_count += 1
+                if attendance._auto_check_out_if_past_midnight(now_utc):
+                    closed_count += 1
             except Exception:
                 _logger.exception(
                     'Unable to auto check-out attendance %s for employee %s',
-                    attendance.id, employee.id,
+                    attendance.id, attendance.employee_id.id,
                 )
 
         _logger.info('DAC Attendance: automatically checked out %s open attendance(s)', closed_count)
         return closed_count
+
+    def _auto_check_out_if_past_midnight(self, now_utc=None):
+        """Close this open attendance at its employee-local midnight if due.
+
+        Besides the scheduled action, this is intentionally called while the
+        systray refreshes the current employee's state.  It is a narrowly
+        scoped fallback: a delayed/disabled cron must not leave an employee
+        shown as checked in after their attendance day has ended.
+        """
+        self.ensure_one()
+        if self.check_out or not self.check_in:
+            return False
+
+        now_utc = now_utc or fields.Datetime.now()
+        employee = self.employee_id
+        employee_tz = ZoneInfo(self._get_employee_timezone(employee))
+        check_in_local = self.check_in.replace(
+            tzinfo=ZoneInfo('UTC')).astimezone(employee_tz)
+        next_midnight_local = datetime.combine(
+            check_in_local.date() + timedelta(days=1), time.min,
+            tzinfo=employee_tz,
+        )
+        cutoff_utc = next_midnight_local.astimezone(ZoneInfo('UTC')).replace(tzinfo=None)
+        if now_utc < cutoff_utc:
+            return False
+
+        # Evaluate early leave against the day being closed, not the new day.
+        checkout_status = self._build_check_out_status(
+            employee, cutoff_utc - timedelta(microseconds=1))
+        self.write({
+            'check_out': cutoff_utc,
+            'is_early_leave': checkout_status['is_early_leave'],
+        })
+        return True
 
     @api.model
     def _cron_normalize_overnight_attendances(self):
