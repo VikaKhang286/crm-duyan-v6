@@ -484,7 +484,10 @@
     overflow-y: auto;
   }
 
-  html body .o_action_manager {
+  /* The current v6 shell is a grid.  This fallback offset is only for the
+     legacy navbar layout; applying it to the grid makes list columns slide
+     underneath the sidebar. */
+  html body.o_web_client:not(:has(> aside.dac_v6_shell)) .o_action_manager {
     width: calc(100vw - var(--dac-v6-sidebar-width)) !important;
     min-width: 0;
     margin-left: var(--dac-v6-sidebar-width) !important;

@@ -2226,6 +2226,120 @@ html body.o_web_client .dac-design-order-file .dac-design-final-file-source .o_s
   text-align: left;
 }
 .dac-v6-sale-design-task-card:hover { border-color: #aebfd9; background: #fff; }
+
+/* Assigned-order list: preserve each label/name instead of squeezing columns
+   into ellipses.  Narrow screens scroll horizontally rather than clipping. */
+.dac-design-assigned-orders-list.o_list_view {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.dac-design-assigned-orders-list .o_list_renderer {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.dac-design-assigned-orders-list .o_list_table {
+  width: max-content;
+  min-width: 1780px;
+  table-layout: auto;
+}
+
+.dac-design-assigned-orders-list .o_list_table th,
+.dac-design-assigned-orders-list .o_list_table td {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.dac-design-assigned-orders-list .o_list_table th[data-name="partner_id"],
+.dac-design-assigned-orders-list .o_list_table td[name="partner_id"] {
+  min-width: 280px;
+}
+
+.dac-design-assigned-orders-list .o_list_table th[data-name="order_number"],
+.dac-design-assigned-orders-list .o_list_table td[name="order_number"] {
+  min-width: 150px;
+}
+
+.dac-design-assigned-orders-list .o_list_table th[data-name="design_order_date_display"],
+.dac-design-assigned-orders-list .o_list_table td[name="design_order_date_display"] {
+  min-width: 180px;
+}
+
+.dac-design-assigned-orders-list .o_list_table th[data-name="design_sale_user_display"],
+.dac-design-assigned-orders-list .o_list_table td[name="design_sale_user_display"],
+.dac-design-assigned-orders-list .o_list_table th[data-name="design_assignee_display"],
+.dac-design-assigned-orders-list .o_list_table td[name="design_assignee_display"],
+.dac-design-assigned-orders-list .o_list_table th[data-name="design_production_user_display"],
+.dac-design-assigned-orders-list .o_list_table td[name="design_production_user_display"] {
+  min-width: 160px;
+}
+
+.dac-design-assigned-orders-list .o_list_table th[data-name="order_state_badge"],
+.dac-design-assigned-orders-list .o_list_table td[name="order_state_badge"],
+.dac-design-assigned-orders-list .o_list_table th[data-name="design_priority_display"],
+.dac-design-assigned-orders-list .o_list_table td[name="design_priority_display"],
+.dac-design-assigned-orders-list .o_list_table th[data-name="design_deadline"],
+.dac-design-assigned-orders-list .o_list_table td[name="design_deadline"] {
+  min-width: 150px;
+}
+
+.dac-design-assigned-orders-list .o_list_table td .o_field_widget,
+.dac-design-assigned-orders-list .o_list_table td .o_field_many2one,
+.dac-design-assigned-orders-list .o_list_table td .o_field_badge,
+.dac-design-assigned-orders-list .o_list_table td .badge {
+  max-width: none !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: normal !important;
+}
+
+/* Odoo wraps each value in a Bootstrap `.text-truncate` element.  Override
+   that inner element too; styling only the table cell still leaves `…`. */
+.dac-design-assigned-orders-list .o_list_table td .o_field_widget *,
+.dac-design-assigned-orders-list .o_list_table td .o_field_many2one *,
+.dac-design-assigned-orders-list .o_list_table td .o_field_badge *,
+.dac-design-assigned-orders-list .o_list_table td .badge * {
+  max-width: none !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: normal !important;
+}
+
+/* Odoo does not retain the `class` attribute from every list-view arch.  The
+   unique display field below anchors these rules to the assigned Design list. */
+.o_action_manager:has(.o_list_table th[data-name="design_sale_user_display"]) .o_list_renderer {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow-x: auto !important;
+}
+
+.o_action_manager:has(.o_list_table th[data-name="design_sale_user_display"]) .o_list_table {
+  width: max-content !important;
+  min-width: 1780px !important;
+}
+
+.o_action_manager:has(.o_list_table th[data-name="design_sale_user_display"]) .o_list_table th[data-name="order_number"],
+.o_action_manager:has(.o_list_table th[data-name="design_sale_user_display"]) .o_list_table td[name="order_number"] { min-width: 150px !important; }
+.o_action_manager:has(.o_list_table th[data-name="design_sale_user_display"]) .o_list_table th[data-name="design_order_date_display"],
+.o_action_manager:has(.o_list_table th[data-name="design_sale_user_display"]) .o_list_table td[name="design_order_date_display"] { min-width: 180px !important; }
+.o_action_manager:has(.o_list_table th[data-name="design_sale_user_display"]) .o_list_table th[data-name="partner_id"],
+.o_action_manager:has(.o_list_table th[data-name="design_sale_user_display"]) .o_list_table td[name="partner_id"] { min-width: 280px !important; }
+.o_action_manager:has(.o_list_table th[data-name="design_sale_user_display"]) .o_list_table th[data-name="design_sale_user_display"],
+.o_action_manager:has(.o_list_table th[data-name="design_sale_user_display"]) .o_list_table td[name="design_sale_user_display"],
+.o_action_manager:has(.o_list_table th[data-name="design_sale_user_display"]) .o_list_table th[data-name="design_assignee_display"],
+.o_action_manager:has(.o_list_table th[data-name="design_sale_user_display"]) .o_list_table td[name="design_assignee_display"],
+.o_action_manager:has(.o_list_table th[data-name="design_sale_user_display"]) .o_list_table th[data-name="design_production_user_display"],
+.o_action_manager:has(.o_list_table th[data-name="design_sale_user_display"]) .o_list_table td[name="design_production_user_display"] { min-width: 160px !important; }
+
+.o_action_manager:has(.o_list_table th[data-name="user_id_design"]) .o_list_table th[data-name="user_id"],
+.o_action_manager:has(.o_list_table th[data-name="user_id_design"]) .o_list_table td[name="user_id"],
+.o_action_manager:has(.o_list_table th[data-name="user_id_design"]) .o_list_table th[data-name="user_id_design"],
+.o_action_manager:has(.o_list_table th[data-name="user_id_design"]) .o_list_table td[name="user_id_design"] { min-width: 160px !important; }
 .dac-v6-sale-design-task-header, .dac-v6-sale-design-task-meta { display: flex; align-items: center; gap: 24px; }
 .dac-v6-sale-design-task-header { justify-content: space-between; }
 .dac-v6-sale-design-task-title {

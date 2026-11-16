@@ -23,6 +23,13 @@ class SaleOrderCompute(models.Model):
                 f'{order_code} · {customer_name}' if customer_name else order_code
             )
 
+    @api.depends('date')
+    def _compute_design_order_date_display(self):
+        """List-safe order timestamp for Design: never show seconds."""
+        for order in self:
+            timestamp = fields.Datetime.context_timestamp(order, order.date) if order.date else False
+            order.design_order_date_display = timestamp.strftime('%d/%m/%Y %H:%M') if timestamp else ''
+
     @api.depends_context('uid')
     @api.depends('task_ids.name', 'task_ids.task_type', 'task_ids.state', 'task_ids.assigned_user_id')
     def _compute_design_task_title(self):

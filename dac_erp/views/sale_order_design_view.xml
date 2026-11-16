@@ -46,7 +46,7 @@
             <field name="priority">4</field>
             <field name="groups_id" eval="[(6, 0, [ref('dac_erp.group_dac_erp_design')])]"/>
             <field name="arch" type="xml">
-                <list string="Đơn hàng được giao" js_class="dac_design_assigned_orders_list" default_order="date desc" delete="false" create="false" edit="false"
+                <list string="Đơn hàng được giao" js_class="dac_design_assigned_orders_list" class="dac-design-assigned-orders-list" default_order="date desc" delete="false" create="false" edit="false"
                       decoration-warning="partner_vip_class == 'vip'"
                       decoration-info="partner_vip_class == 'loyal'"
                       decoration-danger="partner_vip_class == 'premium'"
@@ -57,7 +57,11 @@
                     <field name="currency_id" invisible="1" optional="hide"/>
                     <field name="pricelist_id" invisible="1" optional="hide"/>
                     <field name="order_number" string="Mã đơn" readonly="1"/>
+                    <field name="design_order_date_display" string="Ngày đơn hàng" readonly="1"/>
                     <field name="partner_id" widget="many2one" string="Khách hàng" options="{'no_open': True}" readonly="1"/>
+                    <field name="user_id" widget="many2one_avatar_user" string="Sale phụ trách" options="{'no_open': True}" readonly="1"/>
+                    <field name="user_id_design" widget="many2one_avatar_user" string="Người thiết kế" options="{'no_open': True}" readonly="1"/>
+                    <field name="user_id_production" widget="many2one_avatar_user" string="Người sản xuất" options="{'no_open': True}" readonly="1"/>
                     <field name="order_state_badge" widget="html" string="Trạng thái" readonly="1"/>
                     <field name="design_priority_display" string="Ưu tiên" widget="badge" class="dac-design-priority-badge"
                            decoration-muted="design_priority_display == 'normal'"

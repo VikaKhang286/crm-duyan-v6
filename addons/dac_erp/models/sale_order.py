@@ -1133,6 +1133,18 @@ class SaleOrder(models.Model):
     order_display_title = fields.Char(
         string='Tiêu đề đơn hàng', compute='_compute_order_display_title', store=False,
     )
+    design_order_date_display = fields.Char(
+        string='Ngày đơn hàng', compute='_compute_design_order_date_display', store=False,
+    )
+    design_sale_user_display = fields.Char(
+        related='user_id.name', string='Sale phụ trách', readonly=True,
+    )
+    design_assignee_display = fields.Char(
+        related='user_id_design.name', string='Người thiết kế', readonly=True,
+    )
+    design_production_user_display = fields.Char(
+        related='user_id_production.name', string='Người sản xuất', readonly=True,
+    )
     design_task_title = fields.Char(
         string='Tên task thiết kế', compute='_compute_design_task_title', store=False,
     )
