@@ -44,3 +44,5 @@ from . import test_deposit_summary
 from . import test_deposit_sync
 from . import test_sale_back_permission
 from . import test_res_users_home_action
+
+from . import test_design_preview_workflow

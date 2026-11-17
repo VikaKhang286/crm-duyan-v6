@@ -4,6 +4,12 @@ from datetime import timedelta
 from odoo.exceptions import AccessError
 
 
+def _notification_task_label(name):
+    """Keep task names in notification titles within 20 characters, including ellipsis."""
+    name = name or ''
+    return name if len(name) <= 20 else name[:19] + '…'
+
+
 def _first_line(html_or_text):
     if not html_or_text:
         return ''
@@ -146,6 +152,20 @@ class SaleOrder(models.Model):
             'all_tasks': all_packed,
             'tasks_by_type': buckets,
         }
+
+    def _notify_design_dashboard_changed(self, extra_users=None):
+        """Invalidate design feeds for affected users after this transaction commits."""
+        orders = self.sudo()
+        if not orders and not extra_users:
+            return
+        users = orders.mapped('user_id_design') | orders.mapped('task_ids.assigned_user_id')
+        if extra_users:
+            users |= extra_users.sudo().exists()
+        manager_group = self.env.ref('dac_erp.group_dac_erp_manager', raise_if_not_found=False)
+        if manager_group:
+            users |= self.env['res.users'].sudo().search([('groups_id', 'in', [manager_group.id])])
+        for partner in users.mapped('partner_id'):
+            self.env['bus.bus']._sendone(partner, 'dac_design_dashboard_changed', {})
 
     @api.model
     def dac_get_dashboard_design(self):
@@ -332,7 +352,7 @@ class SaleOrder(models.Model):
                 task = order.task_ids.filtered(
                     lambda task: task.task_type == 'design' and task.state != 'cancelled'
                 )[:1]
-                task_name = task.name or order.design_task_title or order.order_display_title
+                task_name = _notification_task_label(task.name or order.design_task_title or order.order_display_title)
                 is_approval = body.startswith('Đã duyệt bản preview.')
                 design_notifications.append({
                     'key': f'message-{message.id}',
@@ -356,7 +376,7 @@ class SaleOrder(models.Model):
             order = task.order_id
             if not order:
                 continue
-            task_label = task.name or order.order_number or order.name
+            task_label = _notification_task_label(task.name or order.order_number or order.name)
             timestamp = fields.Datetime.to_string(task.write_date) if task.write_date else False
             if task.deadline and task.deadline < now and order.design_review_state not in ('pending', 'approved', 'done'):
                 deadline = fields.Datetime.context_timestamp(self, task.deadline).strftime('%d/%m/%Y %H:%M')
@@ -404,8 +424,24 @@ class SaleOrder(models.Model):
                 'ready': len(completed_design),
             },
             'design_notifications': design_notifications,
+            'design_read_notifications': user.sudo().dac_design_read_notification_keys or [],
             'user_name': user.name,
         }
+
+    @api.model
+    def dac_mark_design_notifications_read(self, keys):
+        """Mark only notifications visible to the current user, never another user."""
+        if not isinstance(keys, list) or any(not isinstance(key, str) for key in keys):
+            raise ValueError('Invalid notification keys')
+        visible = {item['key'] for item in self.dac_get_dashboard_design()['design_notifications']}
+        keys = set(keys) & visible
+        user = self.env.user.sudo()
+        self.env.cr.execute('SELECT id FROM res_users WHERE id = %s FOR UPDATE', [user.id])
+        user.invalidate_recordset(['dac_design_read_notification_keys'])
+        read = set(user.dac_design_read_notification_keys or []) | keys
+        user.dac_design_read_notification_keys = sorted(read)
+        self.env['bus.bus']._sendone(user.partner_id, 'dac_design_dashboard_changed', {})
+        return sorted(read)
 
     @api.model
     def dac_get_dashboard_production(self):

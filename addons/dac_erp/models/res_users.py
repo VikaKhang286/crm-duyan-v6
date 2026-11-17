@@ -48,6 +48,8 @@ _DAC_ROLE_PRIORITY = [
 class ResUsersDac(models.Model):
     _inherit = 'res.users'
 
+    dac_design_read_notification_keys = fields.Json(default=list, copy=False, groups='base.group_system')
+
     dac_job_id = fields.Many2one(
         related='employee_id.job_id',
         string='Vị trí công việc',

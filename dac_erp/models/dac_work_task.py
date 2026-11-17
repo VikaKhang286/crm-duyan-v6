@@ -300,7 +300,8 @@ class DacWorkTask(models.Model):
         type_labels = dict(self._fields['task_type'].selection)
         type_label = type_labels.get(task_type, task_type)
         order_ref = getattr(order, 'order_number', None) or order.name
-        task_name = f'{type_label}: {order_ref}'
+        task_name = (order._get_auto_design_task_name() if task_type == 'design'
+                     else f'{type_label}: {order_ref}')
 
         snap = self._build_snapshot_vals(order, task_type)
         vals = {
@@ -340,6 +341,7 @@ class DacWorkTask(models.Model):
         for task in tasks:
             if task.assigned_user_id:
                 task._send_task_assigned_notification()
+        tasks.filtered(lambda task: task.task_type == 'design').mapped('order_id')._notify_design_dashboard_changed()
         return tasks
 
     def write(self, vals):
@@ -371,6 +373,8 @@ class DacWorkTask(models.Model):
         old_state = {t.id: t.state for t in self} if track_state else {}
         old_deadline = {t.id: t.deadline for t in self} if track_deadline else {}
 
+        design_orders = self.filtered(lambda task: task.task_type == 'design').mapped('order_id')
+        previous_users = self.mapped('assigned_user_id') if track_assigned else self.env['res.users']
         result = super().write(vals)
 
         if track_assigned:
@@ -383,6 +387,16 @@ class DacWorkTask(models.Model):
             self._sync_to_sale_order(old_state, old_deadline,
                                      track_state=track_state,
                                      track_deadline=track_deadline)
+        if {'state', 'deadline', 'assigned_user_id', 'task_type', 'order_id', 'name'} & vals.keys():
+            design_orders |= self.filtered(lambda task: task.task_type == 'design').mapped('order_id')
+            design_orders._notify_design_dashboard_changed(extra_users=previous_users)
+        return result
+
+    def unlink(self):
+        orders = self.filtered(lambda task: task.task_type == 'design').mapped('order_id')
+        users = self.mapped('assigned_user_id')
+        result = super().unlink()
+        orders._notify_design_dashboard_changed(extra_users=users)
         return result
 
     def _sync_to_sale_order(self, old_state, old_deadline,

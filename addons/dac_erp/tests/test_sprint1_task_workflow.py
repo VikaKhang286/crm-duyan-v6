@@ -99,6 +99,7 @@ class TestSprint1SnapshotFields(TransactionCase):
         order = self._make_order()
         Task = self.env['dac.work.task']
         task1, created1 = Task._create_from_order(order, 'design')
+        self.assertEqual(task1.name, order._get_auto_design_task_name(task1.create_date))
         task2, created2 = Task._create_from_order(order, 'design')
         self.assertTrue(created1, 'First call should create')
         self.assertFalse(created2, 'Second call should return existing')
@@ -143,13 +144,18 @@ class TestSprint1SnapshotFields(TransactionCase):
         task, _ = Task._create_from_order(order, 'design')
         self.assertTrue(task.snap_order_number, 'snap_order_number should be set on factory-created task')
 
+    def test_design_task_creation_date_uses_vietnam_time(self):
+        order = self._make_order(date='2000-01-01 00:00:00')
+        name = order._get_auto_design_task_name('2026-10-31 17:30:00')
+        self.assertEqual(name, 'Thiết kế Sprint1 Partner 01/11')
+
     def test_assign_designer_creates_named_design_task(self):
         """Assigning a designer creates the task shown on their task block."""
         designer = self.env['res.users'].create({
             'name': 'Sprint1 Designer',
             'login': 'sprint1.designer@example.invalid',
         })
-        order = self._make_order(order_state_custom='deposit')
+        order = self._make_order(order_state_custom='deposit', date='2026-11-01 05:00:00')
 
         order.write({'user_id_design': designer.id})
 
@@ -160,7 +166,15 @@ class TestSprint1SnapshotFields(TransactionCase):
         ])
         self.assertEqual(len(task), 1)
         self.assertEqual(task.assigned_user_id, designer)
-        self.assertEqual(task.name, 'Thiết kế bản vẽ sản xuất')
+        self.assertEqual(task.name, order._get_auto_design_task_name(task.create_date))
+
+        customer = self.env['res.partner'].create({'name': 'Huyền'})
+        order.write({'partner_id': customer.id, 'date': '2026-11-02 05:00:00'})
+        self.assertEqual(task.name, order._get_auto_design_task_name(task.create_date))
+        self.assertTrue(task.name.startswith('Thiết kế Huyền '))
+        original_name = task.name
+        order.write({'date': '2000-01-01 00:00:00', 'design_deadline': '2030-01-02'})
+        self.assertEqual(task.name, original_name)
 
     def test_create_quotation_with_designer_creates_design_task(self):
         """A designer selected before the first save receives the task immediately."""
@@ -171,6 +185,7 @@ class TestSprint1SnapshotFields(TransactionCase):
 
         order = self._make_order(
             order_state_custom='quotation',
+            date='2026-11-01 05:00:00',
             user_id_design=designer.id,
         )
 
@@ -181,7 +196,7 @@ class TestSprint1SnapshotFields(TransactionCase):
         ])
         self.assertEqual(len(task), 1)
         self.assertEqual(task.assigned_user_id, designer)
-        self.assertEqual(task.name, 'Thiết kế bản vẽ sản xuất')
+        self.assertEqual(task.name, order._get_auto_design_task_name(task.create_date))
 
     # ── _refresh_snapshot ─────────────────────────────────────────────
 

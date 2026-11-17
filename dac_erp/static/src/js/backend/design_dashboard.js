@@ -10,27 +10,23 @@ import {
 } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
 import { registry } from "@web/core/registry";
+import { DESIGN_READ_CHANGED, readDesignNotifications, setDesignReadNotifications, markDesignNotificationsRead } from "./design_workspace_header";
 
 const _DESIGN_H = "dac_design_list_h";
-const _DESIGN_READ_NOTIFICATIONS = "dac_design_read_notifications";
-
-function loadReadNotifications() {
-  try {
-    const value = JSON.parse(localStorage.getItem(_DESIGN_READ_NOTIFICATIONS) || "[]");
-    return Array.isArray(value) ? value : [];
-  } catch {
-    return [];
-  }
-}
-
 class DesignDashboard extends Component {
   setup() {
     this.orm = useService("orm");
     this.action = useService("action");
     this.menu = useService("menu");
     this.notification = useService("notification");
-    this.state = useState({ loading: true, data: null, error: null, filter: "total", search: "", readNotifications: loadReadNotifications(), notificationTab: "all" });
+    this.state = useState({ loading: true, data: null, error: null, filter: "in_progress", search: "", readNotifications: readDesignNotifications(), notificationTab: "all" });
     this.designScrollRef = useRef("designScroll");
+    this._syncReadNotifications = () => {
+      this.state.readNotifications = readDesignNotifications();
+    };
+    this._syncDashboardData = (event) => { this.state.data = event.detail; };
+    window.addEventListener("dac-design-dashboard-data", this._syncDashboardData);
+    window.addEventListener(DESIGN_READ_CHANGED, this._syncReadNotifications);
 
     onWillStart(async () => {
       await this.reload();
@@ -66,6 +62,8 @@ class DesignDashboard extends Component {
     });
 
     onWillUnmount(() => {
+      window.removeEventListener("dac-design-dashboard-data", this._syncDashboardData);
+      window.removeEventListener(DESIGN_READ_CHANGED, this._syncReadNotifications);
       if (this._raf1) cancelAnimationFrame(this._raf1);
       if (this._raf2) cancelAnimationFrame(this._raf2);
       if (this._retryTimer) clearTimeout(this._retryTimer);
@@ -117,7 +115,7 @@ class DesignDashboard extends Component {
   async _silentReload() {
     try {
       const data = await this.orm.call("sale.order", "dac_get_dashboard_design", []);
-      if (data) this.state.data = data;
+      if (data) { this.state.data = data; setDesignReadNotifications(data.design_read_notifications); }
     } catch (e) {
       console.error("[design_dashboard] silent reload failed:", e);
     }
@@ -133,6 +131,7 @@ class DesignDashboard extends Component {
         []
       );
       this.state.data = data || { task_stats: {}, design_tasks: [] };
+      setDesignReadNotifications(this.state.data.design_read_notifications);
     } catch (e) {
       this.state.error = (e && e.message) || String(e);
       console.error(e);
@@ -147,8 +146,25 @@ class DesignDashboard extends Component {
   get designTasks() {
     return this.state.data?.design_tasks || [];
   }
+  countDesignOrders(tasks) {
+    return new Set(tasks.map((task) => task.order_id).filter(Boolean)).size;
+  }
   get designOrderCount() {
-    return this.designTasks.length;
+    return this.countDesignOrders(this.designTasks);
+  }
+  get todoOrderCount() {
+    return this.countDesignOrders(this.designTasks.filter((task) =>
+      ['in_progress', 'revision'].includes(task.design_review_state)
+    ));
+  }
+  get overdueOrderCount() {
+    return this.countDesignOrders(this.designTasks.filter((task) => task.is_overdue));
+  }
+  get waitingOrderCount() {
+    return this.countDesignOrders(this.designTasks.filter((task) => task.design_review_state === 'pending'));
+  }
+  get revisionOrderCount() {
+    return this.countDesignOrders(this.designTasks.filter((task) => task.design_review_state === 'revision'));
   }
   get todoCount() {
     return this.designTasks.filter((task) =>
@@ -172,7 +188,7 @@ class DesignDashboard extends Component {
     );
   }
   get completedDesignOrderCount() {
-    return new Set(this.completedDesignTasks.map((task) => task.order_id).filter(Boolean)).size;
+    return this.countDesignOrders(this.completedDesignTasks);
   }
   get designDistribution() {
     return this.state.data?.design_distribution || {};
@@ -246,6 +262,10 @@ class DesignDashboard extends Component {
     return this._applyFilter(this.designTasks);
   }
 
+  get filteredDesignOrderCount() {
+    return this.countDesignOrders(this.filteredDesignTasks);
+  }
+
   get filterLabel() {
     return { total: 'Tất cả', in_progress: 'Cần làm', draft: 'Chưa thực hiện', working: 'Đang làm', overdue: 'Quá hạn', waiting: 'Chờ Sale duyệt', done: 'Thiết kế xong', revision: 'Cần chỉnh sửa' }[this.state.filter] || 'Tất cả';
   }
@@ -296,20 +316,15 @@ class DesignDashboard extends Component {
     return this.state.readNotifications.includes(key);
   }
 
-  markNotificationRead(key) {
+  async markNotificationRead(key) {
     if (!this.isNotificationRead(key)) {
-      // Gán mảng mới để OWL render lại đồng thời badge và tab "Chưa đọc".
-      this.state.readNotifications = [...this.state.readNotifications, key];
-      localStorage.setItem(
-        _DESIGN_READ_NOTIFICATIONS,
-        JSON.stringify(this.state.readNotifications)
-      );
+      this.state.readNotifications = await markDesignNotificationsRead(this.orm, [key]);
     }
   }
 
   async openNotification(item) {
     if (!item) return;
-    this.markNotificationRead(item.key);
+    await this.markNotificationRead(item.key);
     if (item.order_id) {
       const action = await this.orm.call(
         "sale.order",
@@ -322,14 +337,8 @@ class DesignDashboard extends Component {
     await this.openTaskOrOrder(item.task);
   }
 
-  markAllNotificationsRead() {
-    this.state.readNotifications = [
-      ...new Set([...this.state.readNotifications, ...this.notificationItems.map((item) => item.key)]),
-    ];
-    localStorage.setItem(
-      _DESIGN_READ_NOTIFICATIONS,
-      JSON.stringify(this.state.readNotifications)
-    );
+  async markAllNotificationsRead() {
+    this.state.readNotifications = await markDesignNotificationsRead(this.orm, this.notificationItems.map((item) => item.key));
   }
 
   async openTaskOrOrder(task) {

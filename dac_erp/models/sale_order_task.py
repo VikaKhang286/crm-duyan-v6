@@ -16,6 +16,14 @@ class SaleOrderTask(models.Model):
             return 'high'
         return 'normal'
 
+    def _get_auto_design_task_name(self, created_at=None):
+        self.ensure_one()
+        customer = self.partner_id.name or ''
+        created_at = fields.Datetime.to_datetime(created_at or fields.Datetime.now())
+        local_date = fields.Datetime.context_timestamp(self.with_context(tz='Asia/Ho_Chi_Minh'), created_at)
+        date_label = local_date.strftime('%d/%m')
+        return ' '.join(part for part in ('Thiết kế', customer, date_label) if part)
+
     def _sync_design_task(self):
         """Tạo hoặc cập nhật task thiết kế khi sale phân công / cập nhật deadline."""
         if not self.user_id_design:
@@ -31,16 +39,17 @@ class SaleOrderTask(models.Model):
         dl = self.design_deadline
         deadline_dt = (str(dl) + ' 23:59:00') if dl else False
         task_priority = self._get_design_task_priority()
+        task_name = self._get_auto_design_task_name(existing.create_date if existing else None)
         if existing:
             existing.with_context(dac_skip_order_sync=True).write({
-                'name': 'Thiết kế bản vẽ sản xuất',
+                'name': task_name,
                 'assigned_user_id': self.user_id_design.id,
                 'deadline': deadline_dt,
                 'priority': task_priority,
             })
         else:
             Task.with_context(dac_skip_order_sync=True).create({
-                'name': 'Thiết kế bản vẽ sản xuất',
+                'name': task_name,
                 'task_type': 'design',
                 'order_id': self.id,
                 'assigned_user_id': self.user_id_design.id,

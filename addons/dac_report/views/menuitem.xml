@@ -1,6 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
   <data>
+    <!-- Bind optional reporting actions only after dac_report is installed. -->
+    <record id="dac_erp.dac_sale_order_menu_manager_admin" model="ir.ui.menu">
+      <field name="action" ref="dac_manager_dashboard_action"/>
+    </record>
+    <record id="dac_erp.dac_sale_order_menu_sale_admin" model="ir.ui.menu">
+      <field name="action" ref="dac_sale_dashboard_action"/>
+    </record>
+    <function model="res.users" name="_dac_sync_role_home_actions"/>
     <!-- ========================================================
          1. PHÂN HỆ BÁN HÀNG & CRM (dac_erp.dac_sale_crm_root)
          ======================================================== -->

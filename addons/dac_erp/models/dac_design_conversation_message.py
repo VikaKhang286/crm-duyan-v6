@@ -1,4 +1,4 @@
-from odoo import fields, models
+from odoo import api, fields, models
 
 
 class DacDesignConversationMessage(models.Model):
@@ -20,3 +20,21 @@ class DacDesignConversationMessage(models.Model):
         'ir.attachment', 'dac_design_conversation_message_attachment_rel',
         'message_id', 'attachment_id', string='Tệp đính kèm',
     )
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        messages = super().create(vals_list)
+        messages.mapped('order_id')._notify_design_dashboard_changed()
+        return messages
+
+    def write(self, vals):
+        orders = self.mapped('order_id')
+        result = super().write(vals)
+        (orders | self.mapped('order_id'))._notify_design_dashboard_changed()
+        return result
+
+    def unlink(self):
+        orders = self.mapped('order_id')
+        result = super().unlink()
+        orders._notify_design_dashboard_changed()
+        return result

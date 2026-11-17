@@ -2,18 +2,22 @@
 
 import { registry } from "@web/core/registry";
 
-const READ_KEY = "dac_design_read_notifications";
+export const DESIGN_READ_CHANGED = "dac-design-read-notifications-changed";
+let readNotifications = [];
 
-function readSet() {
-  try {
-    return new Set(JSON.parse(localStorage.getItem(READ_KEY) || "[]"));
-  } catch {
-    return new Set();
-  }
+export function readDesignNotifications() {
+  return readNotifications;
 }
 
-function saveSet(read) {
-  localStorage.setItem(READ_KEY, JSON.stringify([...read]));
+export function setDesignReadNotifications(keys) {
+  readNotifications = Array.isArray(keys) ? [...new Set(keys)] : [];
+  window.dispatchEvent(new Event(DESIGN_READ_CHANGED));
+}
+
+export async function markDesignNotificationsRead(orm, keys) {
+  const read = await orm.call("sale.order", "dac_mark_design_notifications_read", [keys]);
+  setDesignReadNotifications(read);
+  return read;
 }
 
 function relativeTime(value) {
@@ -27,8 +31,8 @@ function relativeTime(value) {
 }
 
 const designWorkspaceHeader = {
-  dependencies: ["orm", "action"],
-  start(env, { orm, action }) {
+  dependencies: ["orm", "action", "bus_service"],
+  start(env, { orm, action, bus_service }) {
     // Do not await boot here. A header failure must never delay Odoo startup.
     window.setTimeout(async () => {
       try {
@@ -38,7 +42,7 @@ const designWorkspaceHeader = {
         let panel;
         let data = {};
         let unreadOnly = false;
-        const read = readSet();
+        const read = new Set(readDesignNotifications());
 
         const getItems = () => (data.design_notifications || []).map((item, index) => ({
           ...item,
@@ -64,7 +68,7 @@ const designWorkspaceHeader = {
           done.type = "button";
           done.innerHTML = '<i class="fa fa-check"></i>';
           done.title = "Đánh dấu tất cả đã đọc";
-          done.onclick = () => { getItems().forEach((item) => read.add(item.key)); saveSet(read); render(); };
+          done.onclick = async () => { await markDesignNotificationsRead(orm, getItems().map((item) => item.key)); };
           const x = document.createElement("button");
           x.type = "button";
           x.innerHTML = '<i class="fa fa-times"></i>';
@@ -128,8 +132,7 @@ const designWorkspaceHeader = {
             dot.className = "dac-design-global-notification-dot";
             row.append(icon, copy, dot);
             row.onclick = async () => {
-              read.add(item.key);
-              saveSet(read);
+              await markDesignNotificationsRead(orm, [item.key]);
               close();
               if (item.order_id) {
                 const result = await orm.call("sale.order", "action_open_design_collaboration", [[item.order_id]]);
@@ -156,10 +159,7 @@ const designWorkspaceHeader = {
             bell.innerHTML = '<i class="fa fa-bell-o"></i>';
             bell.onclick = async () => {
               if (panel) return close();
-              // Match the fixed app rail: no background polling or remounting.
-              // Refresh only when the user explicitly asks to see notifications.
-              try { data = await orm.call("sale.order", "dac_get_dashboard_design", []); } catch { /* keep last successful data */ }
-              render();
+              await reload();
               panel = document.createElement("aside");
               panel.className = "dac-design-global-notification-popover";
               bell.classList.add("is-active");
@@ -179,11 +179,33 @@ const designWorkspaceHeader = {
           renderPanel();
         };
 
+        let requestVersion = 0;
         const reload = async () => {
-          try { data = await orm.call("sale.order", "dac_get_dashboard_design", []); } catch { data = {}; }
+          const version = ++requestVersion;
+          try {
+            const result = await orm.call("sale.order", "dac_get_dashboard_design", []);
+            if (version !== requestVersion) return;
+            data = result || {};
+            setDesignReadNotifications(data.design_read_notifications);
+            window.dispatchEvent(new CustomEvent("dac-design-dashboard-data", { detail: data }));
+            render();
+          } catch { /* Keep the last successful feed during a connection error. */ }
+        };
+        const syncRead = () => {
+          read.clear();
+          readDesignNotifications().forEach((key) => read.add(key));
           render();
         };
+        window.addEventListener(DESIGN_READ_CHANGED, syncRead);
         await reload();
+        let refreshTimer;
+        bus_service.subscribe("dac_design_dashboard_changed", () => {
+          clearTimeout(refreshTimer);
+          refreshTimer = setTimeout(() => void reload(), 100);
+        });
+        bus_service.start();
+        // Deadlines can pass without a database write, and reconnects may miss events.
+        setInterval(() => void reload(), 30_000);
         document.addEventListener("click", (event) => {
           if (panel && header && !header.contains(event.target)) close();
         }, true);

@@ -641,6 +641,8 @@ class SaleOrder(models.Model):
         image_key_present = 'production_image' in vals
         image_removed = image_key_present and not vals.get('production_image')   # None/False → xoá
 
+        old_design_users = self.mapped('user_id_design') if 'user_id_design' in vals else self.env['res.users']
+
         # 3) Gọi super() viết dữ liệu
         result = super().write(vals)
 
@@ -753,6 +755,7 @@ class SaleOrder(models.Model):
         # Bỏ qua khi sync ngược (task → order) đang chạy, tránh vòng lặp.
         _DESIGN_TRIGGER = frozenset([
             'user_id_design', 'design_deadline', 'is_priority', 'is_priority_today',
+            'partner_id',
         ])
         _PROD_TRIGGER = frozenset(['user_id_production', 'production_deadline'])
         if not self.env.context.get('dac_skip_task_sync'):
@@ -765,6 +768,8 @@ class SaleOrder(models.Model):
                 for rec in self:
                     rec._sync_production_task()
 
+        if {'design_review_state', 'order_state_custom', 'user_id_design'} & vals.keys():
+            self._notify_design_dashboard_changed(extra_users=old_design_users)
         return result
 
     @api.model

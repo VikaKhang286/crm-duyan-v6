@@ -22,12 +22,10 @@ class TestResUsersHomeAction(TransactionCase):
 
     def test_sync_repairs_existing_role_home_action(self):
         production_group = self.env.ref('dac_erp.group_dac_erp_production')
-        attendance_action = self.env.ref(
-            'dac_attendance.dac_attendance_manager_dashboard_action'
-        )
+        other_action = self.env.ref('dac_erp.dac_design_dashboard_action')
         self.user.write({
             'groups_id': [(4, production_group.id)],
-            'action_id': attendance_action.id,
+            'action_id': other_action.id,
         })
 
         self.env['res.users']._dac_sync_role_home_actions()
