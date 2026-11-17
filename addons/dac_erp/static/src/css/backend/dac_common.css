@@ -3829,7 +3829,7 @@ html body.o_web_client .dac-design-chat-attach .o_select_file_button {
   }
 
   .design-v6-kpis {
-    grid-template-columns: 1fr
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .design-v6-chart-wrap {
