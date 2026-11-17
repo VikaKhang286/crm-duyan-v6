@@ -1,0 +1,226 @@
+<odoo>
+    <record id="remind_config_form" model="ir.ui.view">
+        <field name="name">dac.pancake.remind.config.form</field><field name="model">dac.pancake.remind.config</field>
+        <field name="arch" type="xml"><form string="Nhắc khách Pancake" create="0" delete="0"><sheet>
+            <div class="oe_button_box" name="button_box">
+                <button class="oe_stat_button" type="object" name="action_open_waits" icon="fa-hourglass-half">
+                    <field name="wait_count" widget="statinfo" string="Khách đang chờ"/>
+                </button>
+                <button class="oe_stat_button" type="object" name="action_open_waits" icon="fa-bell">
+                    <field name="reminded_24h" widget="statinfo" string="Đã nhắc 24 giờ"/>
+                </button>
+                <button class="oe_stat_button" type="object" name="action_open_contacts" icon="fa-line-chart">
+                    <div class="o_stat_info"><span class="o_stat_text">Thống kê khách mới</span></div>
+                </button>
+            </div>
+            <div class="dac_ui_hero">
+                <div class="dac_ui_hero_icon is-brand"><i class="fa fa-comments" role="img" aria-label="Pancake"/></div>
+                <div class="dac_ui_hero_body">
+                    <div class="dac_ui_hero_title"><label for="name" class="d-none"/><h1><field name="name"/></h1></div>
+                    <div class="dac_ui_hero_meta">
+                        <span class="dac_ui_pill is-ok" invisible="not active"><i class="fa fa-check-circle"/> Đang bật</span>
+                        <span class="dac_ui_pill" invisible="active"><i class="fa fa-pause"/> Đang tắt</span>
+                        <span invisible="not activated_at"><i class="fa fa-clock-o"/> Bật lúc <field name="activated_at" readonly="1" nolabel="1"/></span>
+                    </div>
+                </div>
+                <div class="dac_ui_hero_side">
+                    <label for="active" string="Bật nhắc"/>
+                    <field name="active" widget="boolean_toggle" nolabel="1"/>
+                </div>
+            </div>
+            <div class="alert alert-info" role="alert">
+                Khách nhắn page Pancake mà quá hạn (giờ làm việc T2–T7, 8–12h, 13h30–17h30) chưa có nhân viên trả lời thì bot gửi ảnh chụp hội thoại
+                + tag tên + link vào các nhóm Zalo nhận loại tin <strong>Khách Pancake chưa được trả lời</strong>. Trước lần nhắc đầu, AI đọc đoạn chat:
+                khách chỉ "ok em", cảm ơn, gửi biểu tượng sau tin của sale, hoặc tin rác thì không nhắc.
+                <br/><strong>Khách mới</strong>: quá 15 phút thì nhắc, rồi cứ 10 phút nhắc lại (tag tên + trả lời vào ảnh đã gửi, không gửi lại ảnh) tới khi có người trả lời.
+                <br/><strong>Khách cũ</strong>: quá 30 phút thì nhắc đúng một lần.
+                <br/>Tin tổng 8:00 / 11:30 / 17:00 kèm thống kê khách liên hệ mới (form web + Pancake). Thả cảm xúc <strong>không</strong> làm dừng nhắc.
+                Không tính: nhóm/cộng đồng Zalo, khách nội bộ, thông báo sinh nhật, reaction.
+            </div>
+            <group>
+                <group string="Thời gian nhắc">
+                    <field name="wait_minutes"/>
+                    <field name="repeat_minutes"/>
+                    <field name="old_wait_minutes"/>
+                    <field name="ai_check"/>
+                </group>
+                <group string="Phạm vi">
+                    <field name="page_ids" widget="many2many_tags" options="{'no_create': True, 'no_open': True}"
+                           placeholder="Để trống = mọi page đã thêm"/>
+                    <field name="effective_page_ids" widget="many2many_tags" options="{'no_create': True, 'no_open': True}" readonly="1"/>
+                    <field name="only_new_customers"/>
+                    <field name="live_check"/>
+                </group>
+            </group>
+            <group string="Page Pancake (token theo từng page)">
+                <div colspan="2">
+                    Luồng Pancake mới tự lấy tin, không dùng đồng bộ cũ của CRM. Thêm page và dán <strong>Page Access Token</strong> của từng page
+                    (Pancake → Cài đặt page → Công cụ → Page Access Token), rồi bấm <strong>Kiểm tra token</strong>.
+                    <div class="mt-2">
+                        <button name="action_open_pages" type="object" string="Mở danh sách Page Pancake" class="btn-primary" icon="fa-list"/>
+                    </div>
+                </div>
+            </group>
+            <group string="Luồng Pancake cũ (đồng bộ của CRM)" groups="base.group_system">
+                <div colspan="2">
+                    <field name="legacy_disabled" invisible="1"/>
+                    <span invisible="legacy_disabled">Đang hiện menu/cron của luồng cũ. Tắt tạm để chỉ dùng luồng mới (không xóa dữ liệu, bật lại được).</span>
+                    <span invisible="not legacy_disabled" class="text-muted">Đã tắt tạm: ẩn menu đồng bộ và cron của luồng cũ. Dữ liệu cũ vẫn còn.</span>
+                    <div class="mt-2">
+                        <button name="action_disable_legacy" type="object" string="Tạm tắt luồng Pancake cũ" class="btn-secondary"
+                                invisible="legacy_disabled" confirm="Ẩn menu đồng bộ Pancake cũ và tắt các cron của nó? Không xóa dữ liệu, bật lại được."/>
+                        <button name="action_enable_legacy" type="object" string="Bật lại luồng Pancake cũ" class="btn-secondary"
+                                invisible="not legacy_disabled"/>
+                    </div>
+                </div>
+            </group>
+            <group string="Thống kê khách mới (lead website + Pancake)">
+                <label for="backfill_from" string="Tính lại từ ngày"/>
+                <div class="d-flex align-items-center gap-2">
+                    <field name="backfill_from" nolabel="1"/>
+                    <button name="action_backfill_contacts" type="object" string="Tính lại thống kê" class="btn-secondary"
+                            confirm="Lấy lại hội thoại Pancake (các page đã thêm) và lead website từ ngày đã chọn để lập bảng thống kê. Có thể mất vài phút. Tiếp tục?"/>
+                </div>
+            </group>
+        </sheet></form></field>
+    </record>
+    <record id="remind_config_action" model="ir.actions.act_window">
+        <field name="name">Nhắc khách Pancake</field><field name="res_model">dac.pancake.remind.config</field>
+        <field name="view_mode">form</field><field name="res_id" ref="config_default"/>
+    </record>
+
+    <record id="remind_wait_list" model="ir.ui.view">
+        <field name="name">dac.pancake.remind.wait.list</field><field name="model">dac.pancake.remind.wait</field>
+        <field name="arch" type="xml"><list string="Khách Pancake đang chờ trả lời" create="0"
+                decoration-success="state == 'answered'" decoration-muted="state in ('expired', 'done', 'ignored', 'not_needed')" decoration-warning="state == 'waiting'">
+            <field name="since"/>
+            <field name="customer_name"/>
+            <field name="page_name"/>
+            <field name="customer_kind" widget="badge" optional="show"/>
+            <field name="state" widget="badge"/>
+            <field name="ai_reason" optional="show"/>
+            <field name="remind_count"/>
+            <field name="last_reminded_at"/>
+            <field name="due_at" optional="hide"/>
+            <field name="is_test" optional="hide"/>
+            <field name="external_url" widget="url" optional="show"/>
+        </list></field>
+    </record>
+    <record id="remind_wait_form" model="ir.ui.view">
+        <field name="name">dac.pancake.remind.wait.form</field><field name="model">dac.pancake.remind.wait</field>
+        <field name="arch" type="xml"><form string="Khách chờ trả lời" create="0" edit="0"><sheet>
+            <group>
+                <group>
+                    <field name="conversation_id"/><field name="customer_name"/><field name="page_name"/>
+                    <field name="external_url" widget="url"/><field name="is_test"/>
+                </group>
+                <group>
+                    <field name="state"/><field name="since"/><field name="due_at"/><field name="remind_count"/>
+                    <field name="last_reminded_at"/><field name="answered_at"/>
+                </group>
+                <group string="Loại khách / AI">
+                    <field name="customer_kind"/><field name="ai_state"/><field name="ai_reason"/><field name="ai_source"/><field name="ai_checked_at"/>
+                </group>
+            </group>
+            <field name="zalo_message_ids"><list><field name="channel_id"/><field name="state"/><field name="sent_at"/><field name="text"/></list></field>
+        </sheet></form></field>
+    </record>
+    <record id="remind_wait_search" model="ir.ui.view">
+        <field name="name">dac.pancake.remind.wait.search</field><field name="model">dac.pancake.remind.wait</field>
+        <field name="arch" type="xml"><search>
+            <field name="customer_name"/><field name="page_name"/>
+            <filter name="waiting" string="Đang chờ trả lời" domain="[('state', '=', 'waiting')]"/>
+            <filter name="reminded" string="Đã nhắc" domain="[('remind_count', '>', 0)]"/>
+            <filter name="not_needed" string="AI: không cần trả lời" domain="[('state', '=', 'not_needed')]"/>
+            <separator/>
+            <filter name="kind_new" string="Khách mới" domain="[('customer_kind', '=', 'new')]"/>
+            <filter name="kind_old" string="Khách cũ" domain="[('customer_kind', '=', 'old')]"/>
+        </search></field>
+    </record>
+    <record id="remind_wait_action" model="ir.actions.act_window">
+        <field name="name">Khách Pancake chờ trả lời</field><field name="res_model">dac.pancake.remind.wait</field>
+        <field name="view_mode">list,form</field><field name="context">{'search_default_waiting': 1}</field>
+        <field name="help" type="html"><p class="o_view_nocontent_smiling_face">Không có khách nào đang chờ trả lời</p></field>
+    </record>
+
+    <!-- ═══ Thống kê khách mới liên hệ ═══════════════════════════════════════ -->
+    <record id="new_contact_list" model="ir.ui.view">
+        <field name="name">dac.new.contact.list</field><field name="model">dac.new.contact</field>
+        <field name="arch" type="xml"><list string="Khách mới liên hệ" create="0" edit="0" delete="0"
+                decoration-muted="not counts_as_new">
+            <field name="contact_at"/><field name="source" widget="badge"/><field name="name"/><field name="phone"/>
+            <field name="page_id" optional="show"/><field name="platform" optional="hide"/><field name="counts_as_new"/><field name="seen_note"/>
+            <field name="is_internal" optional="hide"/><field name="staff_first" optional="hide"/>
+            <field name="external_url" widget="url" optional="hide"/><field name="is_test" optional="hide"/>
+        </list></field>
+    </record>
+    <record id="new_contact_pivot" model="ir.ui.view">
+        <field name="name">dac.new.contact.pivot</field><field name="model">dac.new.contact</field>
+        <field name="arch" type="xml"><pivot string="Khách mới liên hệ">
+            <field name="contact_at" interval="day" type="row"/><field name="source" type="col"/><field name="value" type="measure"/>
+        </pivot></field>
+    </record>
+    <record id="new_contact_graph" model="ir.ui.view">
+        <field name="name">dac.new.contact.graph</field><field name="model">dac.new.contact</field>
+        <field name="arch" type="xml"><graph string="Khách mới liên hệ" type="bar" stacked="1">
+            <field name="contact_at" interval="day"/><field name="source"/><field name="value" type="measure"/>
+        </graph></field>
+    </record>
+    <record id="new_contact_search" model="ir.ui.view">
+        <field name="name">dac.new.contact.search</field><field name="model">dac.new.contact</field>
+        <field name="arch" type="xml"><search>
+            <field name="name"/><field name="phone"/>
+            <filter name="real_new" string="Khách mới thật sự" domain="[('counts_as_new', '=', True)]"/>
+            <filter name="seen" string="Đã liên hệ trước đó (trùng)" domain="[('seen_before', '=', True)]"/>
+            <filter name="internal" string="Nội bộ" domain="[('is_internal', '=', True)]"/>
+            <filter name="staff_first" string="Shop nhắn trước" domain="[('staff_first', '=', True)]"/>
+            <separator/>
+            <filter name="web_lead" string="Form website" domain="[('source', '=', 'web_lead')]"/>
+            <filter name="pancake" string="Pancake" domain="[('source', '=', 'pancake')]"/>
+            <separator/>
+            <filter name="days7" string="7 ngày qua" domain="[('contact_at', '&gt;=', (context_today() - relativedelta(days=7)).strftime('%Y-%m-%d'))]"/>
+            <filter name="month" string="Tháng này" domain="[('contact_at', '&gt;=', context_today().strftime('%Y-%m-01'))]"/>
+            <group expand="0" string="Nhóm theo">
+                <filter name="g_day" string="Ngày" context="{'group_by': 'contact_at:day'}"/>
+                <filter name="g_week" string="Tuần" context="{'group_by': 'contact_at:week'}"/>
+                <filter name="g_month" string="Tháng" context="{'group_by': 'contact_at:month'}"/>
+                <filter name="g_source" string="Nguồn" context="{'group_by': 'source'}"/>
+                <filter name="g_page" string="Page Pancake" context="{'group_by': 'page_id'}"/>
+            </group>
+        </search></field>
+    </record>
+    <record id="new_contact_action" model="ir.actions.act_window">
+        <field name="name">Thống kê khách mới liên hệ</field><field name="res_model">dac.new.contact</field>
+        <field name="view_mode">pivot,graph,list</field>
+        <field name="context">{'search_default_real_new': 1, 'search_default_days7': 1}</field>
+        <field name="help" type="html"><p class="o_view_nocontent_smiling_face">Chưa có lượt khách mới nào</p>
+            <p>Lead điền form website và khách mới nhắn page Pancake sẽ hiện ở đây. Dùng "Tính lại thống kê" ở màn hình cấu hình để lập từ dữ liệu cũ.</p></field>
+    </record>
+    <menuitem id="menu_section_stats" name="Thống kê" parent="dac_push.menu_push_root" sequence="5"/>
+    <menuitem id="menu_new_contacts" name="Khách mới liên hệ" parent="menu_section_stats" action="new_contact_action" sequence="10"/>
+    <record id="menu_section_stats" model="ir.ui.menu"><field name="web_icon">fa-line-chart</field></record>
+
+    <!-- Lead website: cảnh báo số này đã liên hệ trước đó -->
+    <record id="web_lead_form_pancake" model="ir.ui.view">
+        <field name="name">dac.web.lead.form.pancake</field><field name="model">dac.web.lead</field>
+        <field name="inherit_id" ref="dac_push.web_lead_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook" position="before">
+                <div class="alert alert-warning" role="alert" invisible="not pancake_match_note">
+                    <i class="fa fa-exclamation-triangle"/> Khách này đã liên hệ trước đó: <field name="pancake_match_note" readonly="1" nolabel="1" class="fw-bold"/>.
+                    <field name="pancake_conversation_ids" widget="many2many_tags" readonly="1" nolabel="1" invisible="not pancake_conversation_ids"/>
+                </div>
+            </xpath>
+        </field>
+    </record>
+
+    <menuitem id="menu_section_pancake" name="Pancake" parent="dac_zalo_assistant.menu_root" sequence="25"
+              groups="dac_erp.group_dac_erp_manager,base.group_system"/>
+    <menuitem id="menu_pancake_config" name="Nhắc khách chưa trả lời" parent="menu_section_pancake" action="remind_config_action"
+              groups="base.group_system" sequence="10"/>
+    <menuitem id="menu_pancake_waits" name="Khách đang chờ trả lời" parent="menu_section_pancake" action="remind_wait_action" sequence="20"/>
+    <menuitem id="menu_pancake_pages" name="Page Pancake" parent="menu_section_pancake" action="pancake_page_action"
+              groups="base.group_system" sequence="5"/>
+    <menuitem id="menu_pancake_conversations" name="Hội thoại Pancake" parent="menu_section_pancake" action="pancake_conversation_action" sequence="30"/>
+    <record id="menu_section_pancake" model="ir.ui.menu"><field name="web_icon">fa-comments</field></record>
+</odoo>

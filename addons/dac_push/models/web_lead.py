@@ -5,6 +5,7 @@ from datetime import timedelta
 from urllib.parse import urlsplit
 
 from odoo import api, fields, models
+from odoo.addons.dac_zalo_assistant.models.channels import MAX_MENTIONS
 
 from .contact_intent import THANKS_TEXT, ai_decision, fold, means_contacted
 from .push_event import clean
@@ -153,25 +154,60 @@ class WebLead(models.Model):
         params.set_param(SUMMARY_PARAM, fields.Datetime.to_string(slot))
 
     @api.model
+    def _summary_entries(self, slot):
+        """Móc cho addon khác: các khách (không phải lead website) còn chờ, đưa vào cùng tin nhắc tổng.
+
+        Trả danh sách dict {'channel': dac.zalo.channel, 'line': 'Tên: link', 'at': datetime (tin đầu tiên của khách),
+        'event_type': dac.zalo.event.type (để lấy người được nhắc tên)}; khách chờ lâu nhất xếp trên cùng.
+        """
+        return []
+
+    @api.model
+    def _summary_stats(self, slot):
+        """Móc cho addon khác: thống kê khách liên hệ gửi kèm tin tổng ở mốc này.
+
+        Trả None hoặc {'text': 'các dòng thống kê', 'channels': dac.zalo.channel nhận thống kê}."""
+        return None
+
+    @api.model
     def _send_summary(self, slot):
         leads = self.search([('contact_state', '=', 'new'), ('acked_at', '=', False), ('zalo_message_ids', '!=', False),
                              ('received_at', '<', slot), ('received_at', '>=', slot - SUMMARY_MAX_AGE)], order='received_at, id')
-        if not leads:
+        extras = self._summary_entries(slot)
+        stats = self._summary_stats(slot)
+        if not leads and not extras and not stats:
             return
         event_type = self.env.ref('dac_push.event_type_web_lead_created')
 
         def delivered_channels(lead):
             return lead.zalo_message_ids.filtered(lambda m: m.state in ('sent', 'queued')).channel_id.filtered('active')
 
+        channels = leads.mapped(delivered_channels)
+        for entry in extras:
+            channels |= entry['channel']
+        if stats:
+            channels |= stats['channels']
         queued = False
-        for channel in leads.mapped(delivered_channels):
+        for channel in channels:
             mine = leads.filtered(lambda lead: channel in delivered_channels(lead))
-            lines = ['Còn %d khách chưa liên hệ:' % len(mine)]
-            # Khách chờ lâu nhất ở trên cùng (leads đã sắp theo received_at tăng dần); mỗi dòng chỉ "số: link rút gọn"
-            lines.extend('%s: %s' % (lead.phone or 'chưa có SĐT', lead._short_link(compact=True)) for lead in mine[:SUMMARY_MAX_LEADS])
-            if len(mine) > SUMMARY_MAX_LEADS:
-                lines.append('… và %d khách nữa (xem trong Odoo → Lead website)' % (len(mine) - SUMMARY_MAX_LEADS))
-            text, mentions = channel._with_mentions('\n'.join(lines), channel._mention_members(event_type), leading=True)
+            extra = [entry for entry in extras if entry['channel'] == channel]
+            # Khách chờ lâu nhất ở trên cùng; mỗi dòng chỉ "số: link rút gọn" (lead) hoặc "Tên: link Pancake" (khách Pancake)
+            rows = sorted([(lead.received_at, lead.phone or 'chưa có SĐT', lead._short_link(compact=True)) for lead in mine]
+                          + [(entry['at'], entry['line'], None) for entry in extra], key=lambda row: row[0])
+            parts = [stats['text']] if stats and channel in stats['channels'] else []
+            if rows:
+                lines = ['Còn %d khách chưa liên hệ:' % len(rows)]
+                lines.extend('%s: %s' % (row[1], row[2]) if row[2] else row[1] for row in rows[:SUMMARY_MAX_LEADS])
+                if len(rows) > SUMMARY_MAX_LEADS:
+                    lines.append('… và %d khách nữa (xem trong Odoo → Lead website)' % (len(rows) - SUMMARY_MAX_LEADS))
+                parts.append('\n'.join(lines))
+            if not parts:
+                continue
+            members = channel._mention_members(event_type) if mine else self.env['dac.zalo.channel.member']
+            for entry in extra:
+                members |= channel._mention_members(entry['event_type'])
+            # Chỉ có thống kê (không còn ai chờ) thì không cần tag ai
+            text, mentions = channel._with_mentions('\n\n'.join(parts), members.sorted(lambda m: (m.name or '').lower())[:MAX_MENTIONS], leading=True)
             summary = channel._queue(text, 'lead-summary:%s:%s' % (fields.Datetime.to_string(slot), channel.id), event_type, mentions=mentions)
             mine.write({'summary_message_ids': [(4, summary.id)]})  # để trả lời tin tổng cũng chốt được các số trong đó
             queued = True

@@ -1,0 +1,15 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_pancake_remind_config_system,Pancake remind config admin,model_dac_pancake_remind_config,base.group_system,1,1,0,0
+access_pancake_remind_config_manager,Pancake remind config manager,model_dac_pancake_remind_config,dac_erp.group_dac_erp_manager,1,0,0,0
+access_pancake_remind_wait_system,Pancake wait admin,model_dac_pancake_remind_wait,base.group_system,1,1,1,1
+access_pancake_remind_wait_manager,Pancake wait manager,model_dac_pancake_remind_wait,dac_erp.group_dac_erp_manager,1,0,0,0
+access_new_contact_system,New contact admin,model_dac_new_contact,base.group_system,1,1,1,1
+access_new_contact_manager,New contact manager,model_dac_new_contact,dac_erp.group_dac_erp_manager,1,0,0,0
+access_pancake_phone_system,Pancake phone admin,model_dac_pancake_phone,base.group_system,1,1,1,1
+access_pancake_phone_manager,Pancake phone manager,model_dac_pancake_phone,dac_erp.group_dac_erp_manager,1,0,0,0
+access_pancake_page_system,Pancake page admin,model_dac_pancake_page,base.group_system,1,1,1,1
+access_pancake_page_manager,Pancake page manager,model_dac_pancake_page,dac_erp.group_dac_erp_manager,1,0,0,0
+access_pancake_conversation_system,Pancake conversation admin,model_dac_pancake_conversation,base.group_system,1,1,1,1
+access_pancake_conversation_manager,Pancake conversation manager,model_dac_pancake_conversation,dac_erp.group_dac_erp_manager,1,0,0,0
+access_pancake_message_system,Pancake message admin,model_dac_pancake_message,base.group_system,1,1,1,1
+access_pancake_message_manager,Pancake message manager,model_dac_pancake_message,dac_erp.group_dac_erp_manager,1,0,0,0

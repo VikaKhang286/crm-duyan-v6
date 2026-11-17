@@ -1,3 +1,5 @@
+import base64
+import io
 import logging
 import uuid
 from datetime import timedelta
@@ -106,25 +108,32 @@ class ZaloChannel(models.Model):
             channel.last_sent_at = max(sent.mapped('sent_at')) if sent else False
             channel.failed_count = len(channel.message_ids.filtered(lambda m: m.state in ('failed', 'uncertain')))
 
-    def _queue(self, text, key, event_type=False, styles=None, mentions=None, reply_to=None, quote_message_id=None):
+    def _queue(self, text, key, event_type=False, styles=None, mentions=None, reply_to=None, quote_message_id=None, image=None):
         """Đưa tin vào hàng đợi gửi của riêng kênh này. Idempotent theo key.
 
         `styles`: danh sách {'start', 'len', 'style': 'bold'} (vị trí tính theo ký tự của `text`).
         `mentions`: danh sách {'pos', 'len', 'uid'} nhắc tên thành viên nhóm (xem `_with_mentions`).
         `reply_to`: tin đã gửi trước đó trong cùng hội thoại; tin mới hiện dưới dạng "trả lời" tin đó trên Zalo.
         `quote_message_id`: mã Zalo của một tin bất kỳ (vd tin của nhân viên) mà bridge còn giữ dữ liệu, để trả lời đúng tin đó.
+        `image`: bytes của ảnh JPEG/PNG (≤ 4 MB) gửi kèm; `text` thành chú thích ảnh (có thể nhắc tên). Không dùng chung với
+        `styles` hoặc `quote_message_id`/`reply_to`.
         """
         self.ensure_one()
         messages = self.env['dac.zalo.channel.message']
         existing = messages.search([('event_key', '=', key)], limit=1)
         if existing:
             return existing
-        return messages.create({
+        vals = {
             'channel_id': self.id, 'event_key': key, 'text': text[:MAX_TEXT],
             'event_type_id': event_type.id if event_type else False, 'state': 'queued',
             'styles': styles or False, 'mentions': mentions or False, 'reply_to_id': reply_to.id if reply_to else False,
             'quote_message_id': quote_message_id or False,
-        })
+        }
+        if image:
+            if styles or reply_to or quote_message_id:
+                raise UserError(_('Tin kèm ảnh không dùng được chữ đậm hoặc trả lời tin khác.'))
+            vals.update(self.env['dac.zalo.channel.message']._image_vals(image))
+        return messages.create(vals)
 
     def _mention_members(self, event_type):
         """Thành viên cần nhắc tên cho loại thông báo này (chỉ nhóm; tối đa MAX_MENTIONS người)."""
@@ -160,12 +169,14 @@ class ZaloChannel(models.Model):
         return base + extra, mentions
 
     @api.model
-    def _notify(self, event_code, text, key, styles=None, test=None):
+    def _notify(self, event_code, text, key, styles=None, test=None, image=None, leading=False):
         """API cho addon khác: gửi `text` tới mọi hội thoại đang đăng ký `event_code`.
 
         `test`: True = chỉ các hội thoại thử nghiệm (`is_test`), False = chỉ hội thoại thật, None (mặc định) = tất cả.
 
         `styles` (tùy chọn): định dạng chữ, vd [{'start': 0, 'len': 20, 'style': 'bold'}] để in đậm tiêu đề.
+
+        `image` (tùy chọn): bytes ảnh JPEG/PNG gửi kèm, `text` thành chú thích. `leading=True`: nhắc tên ở đầu câu thay vì dòng cuối.
 
         `key` phải ổn định cho một sự kiện (vd 'web_lead:duyan.vn:123') để không gửi trùng khi gọi lại.
         Trả về recordset tin đã xếp hàng (rỗng nếu chưa có hội thoại nào đăng ký).
@@ -181,8 +192,8 @@ class ZaloChannel(models.Model):
         channels = self.sudo().search(domain)
         messages = self.env['dac.zalo.channel.message']
         for channel in channels:
-            channel_text, mentions = channel._with_mentions(text, channel._mention_members(event_type))
-            messages |= channel._queue(channel_text, '%s:%s' % (key, channel.id), event_type, styles, mentions)
+            channel_text, mentions = channel._with_mentions(text, channel._mention_members(event_type), leading=leading)
+            messages |= channel._queue(channel_text, '%s:%s' % (key, channel.id), event_type, styles, mentions, image=image)
         if messages:
             self._trigger_send()
         return messages
@@ -304,6 +315,10 @@ class ZaloChannelMessage(models.Model):
     sent_at = fields.Datetime(string='Gửi lúc', readonly=True)
     external_message_id = fields.Char(readonly=True)
     error_message = fields.Char(string='Lỗi', readonly=True)
+    image = fields.Binary(string='Ảnh đính kèm', attachment=True, readonly=True, copy=False,
+        help='Ảnh JPEG/PNG gửi kèm tin; nội dung tin thành chú thích của ảnh.')
+    image_width = fields.Integer(readonly=True)
+    image_height = fields.Integer(readonly=True)
     alerted = fields.Boolean(string='Đã cảnh báo', readonly=True, copy=False,
         help='Tin lỗi đã được đưa vào một cảnh báo hệ thống (loại thông báo "Cảnh báo hệ thống").')
     _sql_constraints = [('event_unique', 'unique(event_key)', 'Tin này đã được xếp hàng.')]
@@ -380,6 +395,23 @@ class ZaloChannelMessage(models.Model):
         text, mentions = channel._with_mentions(text, channel._mention_members(self.event_type_id), leading=True)
         return channel._queue(text, key, self.event_type_id, mentions=mentions, reply_to=self)
 
+    MAX_IMAGE_BYTES = 4 * 1024 * 1024
+
+    @api.model
+    def _image_vals(self, image):
+        """Kiểm tra ảnh (thật sự là JPEG/PNG, ≤ 4 MB) và trả giá trị các trường ảnh."""
+        from PIL import Image
+        if not isinstance(image, (bytes, bytearray)) or not image or len(image) > self.MAX_IMAGE_BYTES:
+            raise UserError(_('Ảnh phải có dung lượng từ 1 byte đến 4 MB.'))
+        try:
+            with Image.open(io.BytesIO(image)) as picture:
+                if picture.format not in ('JPEG', 'PNG'):
+                    raise UserError(_('Chỉ gửi được ảnh JPEG hoặc PNG.'))
+                width, height = picture.size
+        except OSError as error:
+            raise UserError(_('Không đọc được ảnh.')) from error
+        return {'image': base64.b64encode(bytes(image)), 'image_width': width, 'image_height': height}
+
     def _send(self, config):
         self.ensure_one()
         payload = {
@@ -389,6 +421,9 @@ class ZaloChannelMessage(models.Model):
             payload['styles'] = self.styles
         if self.mentions:
             payload['mentions'] = self.mentions
+        if self.image:
+            # Bridge nhận ảnh dạng base64 trong JSON; ảnh lưu ở attachment nên đọc lại đúng bytes đã kiểm tra khi xếp hàng
+            payload['image'] = {'data_base64': self.with_context(bin_size=False).image.decode(), 'width': self.image_width, 'height': self.image_height}
         quoted_id = self.quote_message_id or (self.reply_to_id.external_message_id if self.reply_to_id.state == 'sent' else False)
         if quoted_id:
             payload['quote_message_id'] = quoted_id

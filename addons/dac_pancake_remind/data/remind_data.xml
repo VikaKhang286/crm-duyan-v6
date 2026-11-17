@@ -1,0 +1,33 @@
+<odoo noupdate="1">
+    <record id="config_default" model="dac.pancake.remind.config">
+        <field name="name">Nhắc khách Pancake</field>
+        <field name="active" eval="False"/>
+    </record>
+    <record id="event_type_pancake_unanswered" model="dac.zalo.event.type">
+        <field name="name">Khách Pancake chưa được trả lời</field>
+        <field name="code">pancake.unanswered</field>
+        <field name="group_name">Pancake</field>
+        <field name="description">Khách nhắn tin vào page Pancake mà sau 15 phút làm việc vẫn chưa có nhân viên trả lời. Gửi kèm ảnh chụp hội thoại và link mở thẳng hội thoại.</field>
+        <field name="sequence">20</field>
+    </record>
+    <record id="cron_pancake_remind_scan" model="ir.cron">
+        <field name="name">Pancake: nhắc khách chưa được trả lời</field>
+        <field name="model_id" ref="model_dac_pancake_remind_wait"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_scan()</field>
+        <field name="interval_number">10</field>
+        <field name="interval_type">minutes</field>
+        <field name="user_id" ref="base.user_root"/>
+        <field name="active" eval="True"/>
+    </record>
+    <record id="cron_pancake_history" model="ir.cron">
+        <field name="name">Pancake: lấy toàn bộ tin cũ</field>
+        <field name="model_id" ref="model_dac_pancake_page"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_crawl_history()</field>
+        <field name="interval_number">5</field>
+        <field name="interval_type">minutes</field>
+        <field name="user_id" ref="base.user_root"/>
+        <field name="active" eval="True"/>
+    </record>
+</odoo>
