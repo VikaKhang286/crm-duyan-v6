@@ -65,7 +65,12 @@ class DacAttendanceDashboard(models.AbstractModel):
         today_hours = sum(a.worked_hours or 0 for a in today_atts)
         if open_att:
             from datetime import datetime
-            elapsed = (datetime.utcnow() - open_att.check_in).total_seconds() / 3600
+            effective_now = min(
+                datetime.utcnow(),
+                open_att._get_shift_work_cutoff(employee, open_att.check_in),
+            )
+            elapsed = max(
+                0, (effective_now - open_att.check_in).total_seconds() / 3600)
             today_hours += elapsed
 
         today_status = {
@@ -317,7 +322,12 @@ class DacAttendanceDashboard(models.AbstractModel):
             emp = att.employee_id
             worked_hours = sum(record.worked_hours or 0 for record in employee_atts)
             if not att.check_out and att.check_in:
-                worked_hours += max(0, (datetime.utcnow() - att.check_in).total_seconds() / 3600)
+                effective_now = min(
+                    datetime.utcnow(),
+                    att._get_shift_work_cutoff(emp, att.check_in),
+                )
+                worked_hours += max(
+                    0, (effective_now - att.check_in).total_seconds() / 3600)
 
             verification = []
             if att.gps_validated:

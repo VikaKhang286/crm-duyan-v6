@@ -4,6 +4,7 @@
 import base64
 import json
 from datetime import datetime
+from psycopg2 import OperationalError
 from odoo import http, fields
 from odoo.http import request
 from odoo.exceptions import ValidationError
@@ -56,6 +57,8 @@ class AttendanceKioskController(http.Controller):
                 config_data['today_hours'] = 0
 
             return {'success': True, 'data': config_data}
+        except OperationalError:
+            raise
         except Exception as e:
             _logger.error("Error getting attendance config: %s", e, exc_info=True)
             return {'success': False, 'message': str(e)}
@@ -145,6 +148,7 @@ class AttendanceKioskController(http.Controller):
                         vals['check_in_longitude'] = metadata['longitude']
 
             Attendance = request.env['hr.attendance'].sudo()
+            Attendance._lock_employee_attendance(employee.id)
             existing_today = Attendance._get_workday_attendance(employee, vals['check_in'])
             if existing_today:
                 vals.update({
@@ -171,6 +175,8 @@ class AttendanceKioskController(http.Controller):
                 'check_in_time': str(attendance.check_in),
             }
 
+        except OperationalError:
+            raise
         except ValidationError as e:
             return {'success': False, 'message': str(e.name or e)}
         except Exception as e:
@@ -186,12 +192,31 @@ class AttendanceKioskController(http.Controller):
             if not employee:
                 return {'success': False, 'message': 'Không tìm thấy nhân viên'}
 
-            attendance = request.env['hr.attendance'].search([
+            Attendance = request.env['hr.attendance'].sudo()
+            Attendance._lock_employee_attendance(employee.id)
+            attendance = Attendance.search([
                 ('employee_id', '=', employee.id),
                 ('check_out', '=', False),
             ], limit=1, order='check_in desc')
 
             if not attendance:
+                latest = Attendance.search([
+                    ('employee_id', '=', employee.id),
+                    ('check_in', '!=', False),
+                    ('check_out', '!=', False),
+                ], limit=1, order='check_in desc')
+                now_utc = fields.Datetime.now()
+                if latest:
+                    cutoff_utc = Attendance._get_auto_checkout_cutoff(
+                        employee, latest.check_in)
+                    if latest.check_out == cutoff_utc and now_utc >= cutoff_utc:
+                        return {
+                            'success': True,
+                            'message': 'Hệ thống đã tự check-out lúc 18:00.',
+                            'attendance_id': latest.id,
+                            'worked_hours': round(latest.worked_hours or 0, 2),
+                            'auto_checked_out': True,
+                        }
                 return {'success': False, 'message': 'Không tìm thấy bản ghi check-in'}
 
             Config = request.env['hr.employee.attendance.config']
@@ -236,6 +261,8 @@ class AttendanceKioskController(http.Controller):
                 'worked_hours': round(attendance.worked_hours or 0, 2),
             }
 
+        except OperationalError:
+            raise
         except Exception as e:
             _logger.error("Check-out error: %s", e, exc_info=True)
             return {'success': False, 'message': f'Lỗi: {str(e)}'}

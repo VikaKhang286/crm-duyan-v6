@@ -5,6 +5,7 @@ import logging
 import math
 from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
+from psycopg2 import OperationalError
 from odoo import models, fields, api
 from odoo.exceptions import ValidationError
 
@@ -203,6 +204,19 @@ class HrAttendanceWithGeolocation(models.Model):
         for record in self:
             record.worked_hours_display = round(record.worked_hours, 2)
 
+    @api.depends('check_in', 'check_out')
+    def _compute_worked_hours(self):
+        """Keep the real check-out time, but stop regular shift hours at 17:30."""
+        for attendance in self:
+            if attendance.check_out and attendance.check_in and attendance.employee_id:
+                shift_cutoff = attendance._get_shift_work_cutoff(
+                    attendance.employee_id, attendance.check_in)
+                effective_check_out = min(attendance.check_out, shift_cutoff)
+                attendance.worked_hours = attendance._get_worked_hours_in_range(
+                    attendance.check_in, effective_check_out)
+            else:
+                attendance.worked_hours = False
+
     def _get_employee_calendar(self, employee=None):
         # employee=None: called by Odoo base without arg (uses self.employee_id)
         emp = employee or self.employee_id
@@ -244,6 +258,11 @@ class HrAttendanceWithGeolocation(models.Model):
             domain.append(('id', 'not in', exclude_ids))
         return self.sudo().search(domain, limit=1)
 
+    def _lock_employee_attendance(self, employee_id):
+        """Serialize attendance state changes for one employee per transaction."""
+        self.env.cr.execute(
+            'SELECT pg_advisory_xact_lock(%s, %s)', [9182, employee_id])
+
     @api.model_create_multi
     def create(self, vals_list):
         """Create or update the single attendance record for each local day."""
@@ -253,7 +272,7 @@ class HrAttendanceWithGeolocation(models.Model):
         for employee_id in employee_ids:
             # A transaction-scoped PostgreSQL advisory lock also covers two
             # simultaneous browser/API requests for the same employee.
-            self.env.cr.execute('SELECT pg_advisory_xact_lock(%s, %s)', [9182, employee_id])
+            self._lock_employee_attendance(employee_id)
         attendances = self.browse()
         Employee = self.env['hr.employee'].sudo()
         for vals in vals_list:
@@ -343,16 +362,8 @@ class HrAttendanceWithGeolocation(models.Model):
         }
 
     @api.model
-    def _cron_auto_check_out_at_midnight(self):
-        """Close attendances left open when their next local day has begun.
-
-        The cron is scheduled at midnight (Asia/Ho_Chi_Minh).  Computing the
-        cutoff from each employee's calendar timezone keeps the persisted
-        checkout time at exactly 00:00 even if the scheduler starts a little
-        late.  It also makes a delayed cron safe: an attendance is closed at
-        the first midnight following its check-in, rather than at the time the
-        cron happened to run.
-        """
+    def _cron_auto_check_out_at_cutoff(self):
+        """Close forgotten open attendances at the employee-local 18:00 cutoff."""
         now_utc = fields.Datetime.now()
         closed_count = 0
 
@@ -362,8 +373,12 @@ class HrAttendanceWithGeolocation(models.Model):
         ])
         for attendance in open_attendances:
             try:
-                if attendance._auto_check_out_if_past_midnight(now_utc):
+                if attendance._auto_check_out_if_past_cutoff(now_utc):
                     closed_count += 1
+            except OperationalError:
+                # Let Odoo restart the whole transaction with a fresh snapshot
+                # when a user checks out at the same instant as this job.
+                raise
             except Exception:
                 _logger.exception(
                     'Unable to auto check-out attendance %s for employee %s',
@@ -373,8 +388,13 @@ class HrAttendanceWithGeolocation(models.Model):
         _logger.info('DAC Attendance: automatically checked out %s open attendance(s)', closed_count)
         return closed_count
 
-    def _auto_check_out_if_past_midnight(self, now_utc=None):
-        """Close this open attendance at its employee-local midnight if due.
+    @api.model
+    def _cron_auto_check_out_at_midnight(self):
+        """Compatibility alias for the former midnight scheduled action."""
+        return self._cron_auto_check_out_at_cutoff()
+
+    def _auto_check_out_if_past_cutoff(self, now_utc=None):
+        """Close this open attendance at the first local 18:00 after check-in.
 
         Besides the scheduled action, this is intentionally called while the
         systray refreshes the current employee's state.  It is a narrowly
@@ -382,30 +402,77 @@ class HrAttendanceWithGeolocation(models.Model):
         shown as checked in after their attendance day has ended.
         """
         self.ensure_one()
+        now_utc = now_utc or fields.Datetime.now()
+        employee = self.employee_id
+        self._lock_employee_attendance(employee.id)
+        # Another request may have checked out while this transaction waited
+        # for the employee lock. Refresh before deciding which request wins.
+        self.invalidate_recordset(['check_in', 'check_out'])
         if self.check_out or not self.check_in:
             return False
 
-        now_utc = now_utc or fields.Datetime.now()
-        employee = self.employee_id
-        employee_tz = ZoneInfo(self._get_employee_timezone(employee))
-        check_in_local = self.check_in.replace(
-            tzinfo=ZoneInfo('UTC')).astimezone(employee_tz)
-        next_midnight_local = datetime.combine(
-            check_in_local.date() + timedelta(days=1), time.min,
-            tzinfo=employee_tz,
-        )
-        cutoff_utc = next_midnight_local.astimezone(ZoneInfo('UTC')).replace(tzinfo=None)
+        cutoff_utc = self._get_auto_checkout_cutoff(employee, self.check_in)
         if now_utc < cutoff_utc:
             return False
 
-        # Evaluate early leave against the day being closed, not the new day.
-        checkout_status = self._build_check_out_status(
-            employee, cutoff_utc - timedelta(microseconds=1))
+        checkout_status = self._build_check_out_status(employee, cutoff_utc)
         self.write({
             'check_out': cutoff_utc,
             'is_early_leave': checkout_status['is_early_leave'],
         })
         return True
+
+    def _get_auto_checkout_cutoff(self, employee, check_in):
+        """Return the first employee-local 18:00 strictly after check-in."""
+        employee_tz = ZoneInfo(self._get_employee_timezone(employee))
+        check_in_local = check_in.replace(
+            tzinfo=ZoneInfo('UTC')).astimezone(employee_tz)
+        cutoff_local = datetime.combine(
+            check_in_local.date(), time(hour=18), tzinfo=employee_tz)
+        if check_in_local >= cutoff_local:
+            cutoff_local += timedelta(days=1)
+        return cutoff_local.astimezone(ZoneInfo('UTC')).replace(tzinfo=None)
+
+    def _get_shift_work_cutoff(self, employee, check_in):
+        """Return 17:30 on the employee-local check-in date in UTC."""
+        employee_tz = ZoneInfo(self._get_employee_timezone(employee))
+        check_in_local = check_in.replace(
+            tzinfo=ZoneInfo('UTC')).astimezone(employee_tz)
+        cutoff_local = datetime.combine(
+            check_in_local.date(), time(hour=17, minute=30), tzinfo=employee_tz)
+        return cutoff_local.astimezone(ZoneInfo('UTC')).replace(tzinfo=None)
+
+    def _is_after_shift_work_cutoff(self, employee, now_utc=None):
+        """Return whether the employee-local time has reached 17:30."""
+        now_utc = now_utc or fields.Datetime.now()
+        employee_tz = ZoneInfo(self._get_employee_timezone(employee))
+        now_local = now_utc.replace(
+            tzinfo=ZoneInfo('UTC')).astimezone(employee_tz)
+        return now_local.time().replace(tzinfo=None) >= time(hour=17, minute=30)
+
+    def _is_after_auto_checkout_cutoff(self, employee, now_utc=None):
+        """Compatibility alias for the former overtime-confirmation helper."""
+        return self._is_after_shift_work_cutoff(employee, now_utc)
+
+    def _auto_check_out_if_past_midnight(self, now_utc=None):
+        """Compatibility alias retained for callers from an older deployment."""
+        return self._auto_check_out_if_past_cutoff(now_utc)
+
+    @api.model
+    def dac_get_overtime_checkin_confirmation_info(self):
+        """Tell the systray whether check-in requires overtime confirmation."""
+        employee = self.env['hr.employee'].sudo().search(
+            [('user_id', '=', self.env.uid)], limit=1)
+        if not employee:
+            return {'needs_confirmation': False}
+        needs_confirmation = self._is_after_shift_work_cutoff(employee)
+        return {
+            'needs_confirmation': needs_confirmation,
+            'message': (
+                'Đã qua 17 giờ 30. Bạn muốn làm thêm giờ?'
+                if needs_confirmation else False
+            ),
+        }
 
     @api.model
     def _cron_normalize_overnight_attendances(self):
@@ -608,6 +675,7 @@ class HrAttendanceWithGeolocation(models.Model):
             # the current user. A repeated check-in overwrites that employee's
             # single record for the local workday.
             Attendance = self.sudo()
+            Attendance._lock_employee_attendance(employee.id)
 
             Config = self.env['hr.employee.attendance.config']
             config = Config.get_config_for_employee(employee.id)
@@ -702,6 +770,8 @@ class HrAttendanceWithGeolocation(models.Model):
                 'is_late': attendance.is_late,
                 'late_minutes': attendance.late_minutes,
             }
+        except OperationalError:
+            raise
         except Exception as e:
             return {'success': False, 'message': str(e)}
 
@@ -719,12 +789,32 @@ class HrAttendanceWithGeolocation(models.Model):
             # Odoo's standard "own attendance" group.  Use sudo only after
             # resolving the current user's employee and constrain the lookup
             # to that employee.
+            self._lock_employee_attendance(employee.id)
             attendance = self.sudo().search([
                 ('employee_id', '=', employee.id),
                 ('check_out', '=', False),
             ], limit=1, order='check_in desc')
 
             if not attendance:
+                latest = self.sudo().search([
+                    ('employee_id', '=', employee.id),
+                    ('check_in', '!=', False),
+                    ('check_out', '!=', False),
+                ], limit=1, order='check_in desc')
+                now_utc = fields.Datetime.now()
+                if latest:
+                    cutoff_utc = self._get_auto_checkout_cutoff(
+                        employee, latest.check_in)
+                    if latest.check_out == cutoff_utc and now_utc >= cutoff_utc:
+                        return {
+                            'success': True,
+                            'message': 'Hệ thống đã tự check-out lúc 18:00.',
+                            'attendance_id': latest.id,
+                            'worked_hours': round(latest.worked_hours or 0, 2),
+                            'is_early_leave': latest.is_early_leave,
+                            'early_minutes': 0,
+                            'auto_checked_out': True,
+                        }
                 return {'success': False, 'message': 'Không tìm thấy bản ghi check-in'}
 
             Config = self.env['hr.employee.attendance.config']
@@ -768,6 +858,8 @@ class HrAttendanceWithGeolocation(models.Model):
                 'is_early_leave': attendance.is_early_leave,
                 'early_minutes': checkout_status['early_minutes'],
             }
+        except OperationalError:
+            raise
         except Exception as e:
             return {'success': False, 'message': str(e)}
 

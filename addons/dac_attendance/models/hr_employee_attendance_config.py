@@ -2,6 +2,7 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 from odoo import models, fields, api
+from psycopg2 import OperationalError
 import logging
 
 _logger = logging.getLogger(__name__)
@@ -212,11 +213,10 @@ class HrEmployeeAttendanceConfig(models.Model):
                 ('check_out', '=', False),
             ], limit=1, order='check_in desc')
 
-            # The scheduled action is the primary reset mechanism.  The
+            # The scheduled action is the primary reset mechanism. The
             # systray polling path closes only this user's stale open record
-            # as a fallback, so a delayed cron cannot leave the UI stuck on
-            # "checked in" after the employee-local midnight.
-            if open_att and open_att._auto_check_out_if_past_midnight():
+            # as a fallback after the employee-local 18:00 checkout cutoff.
+            if open_att and open_att._auto_check_out_if_past_cutoff():
                 open_att = Attendance.browse()
             
             if open_att:
@@ -237,6 +237,8 @@ class HrEmployeeAttendanceConfig(models.Model):
 
             _logger.info("DAC_ATTENDANCE: returning result=%s", result)
             return result
+        except OperationalError:
+            raise
         except Exception as e:
             _logger.error("DAC_ATTENDANCE: Error in get_config_for_current_user: %s", e, exc_info=True)
             return {

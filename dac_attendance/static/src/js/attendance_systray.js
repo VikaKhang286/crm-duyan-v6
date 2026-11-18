@@ -12,7 +12,7 @@ export class DacAttendanceSystray extends Component {
         this.orm = useService("orm");
         this.notification = useService("notification");
         this.dialog = useService("dialog");
-        this.midnightRefreshTimer = null;
+        this.autoCheckoutRefreshTimer = null;
         this.statusRefreshInterval = null;
         this.visibilityChangeHandler = () => {
             if (document.visibilityState === "visible") {
@@ -43,17 +43,17 @@ export class DacAttendanceSystray extends Component {
     }
 
     _startStatusRefresh() {
-        this._scheduleMidnightRefresh();
+        this._scheduleAutoCheckoutRefresh();
         // This is a fallback if Odoo's scheduled job starts a little after
-        // midnight, or if a browser delays the midnight timeout in background.
+        // 18:00, or if a browser delays the timeout in the background.
         this.statusRefreshInterval = window.setInterval(() => this.loadConfig(), 60 * 1000);
         document.addEventListener("visibilitychange", this.visibilityChangeHandler);
     }
 
     _stopStatusRefresh() {
-        if (this.midnightRefreshTimer) {
-            window.clearTimeout(this.midnightRefreshTimer);
-            this.midnightRefreshTimer = null;
+        if (this.autoCheckoutRefreshTimer) {
+            window.clearTimeout(this.autoCheckoutRefreshTimer);
+            this.autoCheckoutRefreshTimer = null;
         }
         if (this.statusRefreshInterval) {
             window.clearInterval(this.statusRefreshInterval);
@@ -62,17 +62,20 @@ export class DacAttendanceSystray extends Component {
         document.removeEventListener("visibilitychange", this.visibilityChangeHandler);
     }
 
-    _scheduleMidnightRefresh() {
-        if (this.midnightRefreshTimer) {
-            window.clearTimeout(this.midnightRefreshTimer);
+    _scheduleAutoCheckoutRefresh() {
+        if (this.autoCheckoutRefreshTimer) {
+            window.clearTimeout(this.autoCheckoutRefreshTimer);
         }
         const now = new Date();
-        const nextMidnight = new Date(now);
-        nextMidnight.setHours(24, 0, 5, 0);
-        this.midnightRefreshTimer = window.setTimeout(async () => {
+        const nextCutoff = new Date(now);
+        nextCutoff.setHours(18, 0, 5, 0);
+        if (nextCutoff <= now) {
+            nextCutoff.setDate(nextCutoff.getDate() + 1);
+        }
+        this.autoCheckoutRefreshTimer = window.setTimeout(async () => {
             await this.loadConfig();
-            this._scheduleMidnightRefresh();
-        }, nextMidnight.getTime() - now.getTime());
+            this._scheduleAutoCheckoutRefresh();
+        }, nextCutoff.getTime() - now.getTime());
     }
 
     async loadConfig() {
@@ -241,6 +244,11 @@ export class DacAttendanceSystray extends Component {
             if (!shouldContinue) {
                 return;
             }
+        } else {
+            const shouldContinue = await this._confirmOvertimeCheckInIfNeeded();
+            if (!shouldContinue) {
+                return;
+            }
         }
 
         if (method === "photo") {
@@ -362,6 +370,38 @@ export class DacAttendanceSystray extends Component {
                 title: "Xác nhận check-out sớm",
                 body: result.message || "Bạn có muốn check-out sớm không?",
                 confirmLabel: "Check-out sớm",
+                cancelLabel: "Hủy",
+                confirm: () => resolve(true),
+                cancel: () => resolve(false),
+            });
+        });
+    }
+
+    async _confirmOvertimeCheckInIfNeeded() {
+        let result;
+        try {
+            result = await this.orm.call(
+                "hr.attendance",
+                "dac_get_overtime_checkin_confirmation_info",
+                []
+            );
+        } catch (error) {
+            console.warn("DAC Attendance: failed to check overtime window", error);
+            this.notification.add("Không thể kiểm tra khung giờ làm thêm. Vui lòng thử lại.", {
+                type: "danger",
+            });
+            return false;
+        }
+
+        if (!result?.needs_confirmation) {
+            return true;
+        }
+
+        return new Promise((resolve) => {
+            this.dialog.add(ConfirmationDialog, {
+                title: "Xác nhận làm thêm giờ",
+                body: result.message || "Đã qua 17 giờ 30. Bạn muốn làm thêm giờ?",
+                confirmLabel: "Làm thêm giờ",
                 cancelLabel: "Hủy",
                 confirm: () => resolve(true),
                 cancel: () => resolve(false),
