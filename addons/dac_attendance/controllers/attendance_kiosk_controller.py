@@ -151,19 +151,8 @@ class AttendanceKioskController(http.Controller):
             Attendance._lock_employee_attendance(employee.id)
             existing_today = Attendance._get_workday_attendance(employee, vals['check_in'])
             if existing_today:
-                vals.update({
-                    'check_out': False,
-                    'check_out_photo': False,
-                    'check_out_photo_timestamp': False,
-                    'check_out_photo_metadata': False,
-                    'check_out_latitude': 0.0,
-                    'check_out_longitude': 0.0,
-                    'check_out_gps_accuracy': 0.0,
-                    'is_early_leave': False,
-                })
-                existing_today.write(vals)
-                attendance = existing_today
-                message = 'Đã ghi đè giờ check-in hôm nay. Hãy check-out lại khi kết thúc làm việc.'
+                attendance, message = Attendance._upsert_daily_check_in(
+                    existing_today, vals)
             else:
                 attendance = Attendance.create(vals)
                 message = 'Check-in thành công!'
@@ -209,10 +198,12 @@ class AttendanceKioskController(http.Controller):
                 if latest:
                     cutoff_utc = Attendance._get_auto_checkout_cutoff(
                         employee, latest.check_in)
-                    if latest.check_out == cutoff_utc and now_utc >= cutoff_utc:
+                    if (cutoff_utc and latest.check_out == cutoff_utc
+                            and now_utc >= cutoff_utc):
                         return {
                             'success': True,
-                            'message': 'Hệ thống đã tự check-out lúc 18:00.',
+                            'message': Attendance._get_auto_checkout_message(
+                                employee, cutoff_utc),
                             'attendance_id': latest.id,
                             'worked_hours': round(latest.worked_hours or 0, 2),
                             'auto_checked_out': True,
@@ -226,6 +217,8 @@ class AttendanceKioskController(http.Controller):
             vals = {
                 'check_out': fields.Datetime.now(),
             }
+            if attendance.overtime_check_in and not attendance.overtime_check_out:
+                vals['overtime_check_out'] = vals['check_out']
 
             if method == 'photo':
                 photo_b64 = data.get('photo_base64')

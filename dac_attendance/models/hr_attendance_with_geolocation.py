@@ -44,12 +44,18 @@ class HrAttendanceWithGeolocation(models.Model):
         compute='_compute_check_in_date',
         store=True
     )
+    overtime_check_in = fields.Datetime(
+        string='Bắt đầu làm thêm', readonly=True, copy=False)
+    overtime_check_out = fields.Datetime(
+        string='Kết thúc làm thêm', readonly=True, copy=False)
 
-    @api.depends('check_in')
+    @api.depends('check_in', 'employee_id')
     def _compute_check_in_date(self):
         for record in self:
-            if record.check_in:
-                record.check_in_date = record.check_in.date()
+            if record.check_in and record.employee_id:
+                employee_tz = ZoneInfo(record._get_employee_timezone(record.employee_id))
+                record.check_in_date = record.check_in.replace(
+                    tzinfo=ZoneInfo('UTC')).astimezone(employee_tz).date()
             else:
                 record.check_in_date = False
 
@@ -217,6 +223,29 @@ class HrAttendanceWithGeolocation(models.Model):
             else:
                 attendance.worked_hours = False
 
+    def _get_worked_hours_as_of(self, as_of=None):
+        """Return calendar-aware hours for open and closed attendance records."""
+        self.ensure_one()
+        if not self.check_in:
+            return 0.0
+        as_of = as_of or fields.Datetime.now()
+        effective_end = min(
+            self.check_out or as_of,
+            as_of,
+            self._get_shift_work_cutoff(self.employee_id, self.check_in),
+        )
+        if effective_end <= self.check_in:
+            return 0.0
+        if self.check_out:
+            return self._get_worked_hours_in_range(self.check_in, effective_end)
+        virtual_attendance = self.new({
+            'employee_id': self.employee_id.id,
+            'check_in': self.check_in,
+            'check_out': effective_end,
+        })
+        return virtual_attendance._get_worked_hours_in_range(
+            self.check_in, effective_end)
+
     def _get_employee_calendar(self, employee=None):
         # employee=None: called by Odoo base without arg (uses self.employee_id)
         emp = employee or self.employee_id
@@ -263,6 +292,46 @@ class HrAttendanceWithGeolocation(models.Model):
         self.env.cr.execute(
             'SELECT pg_advisory_xact_lock(%s, %s)', [9182, employee_id])
 
+    def _upsert_daily_check_in(self, existing, vals):
+        """Reopen one daily record without destroying its regular-shift check-in."""
+        check_in = vals['check_in']
+        employee = existing.employee_id
+        is_overtime = not self._get_auto_checkout_cutoff(employee, check_in)
+        reset_vals = {
+            'check_out': False,
+            'check_out_photo': False,
+            'check_out_photo_timestamp': False,
+            'check_out_photo_metadata': False,
+            'check_out_latitude': 0.0,
+            'check_out_longitude': 0.0,
+            'check_out_gps_accuracy': 0.0,
+            'is_early_leave': False,
+        }
+        if is_overtime:
+            # A regular check-in already exists: retain it for attendance and
+            # payroll, and store the overtime session separately on the same
+            # one-record-per-day attendance.
+            has_regular_shift = bool(
+                self._get_auto_checkout_cutoff(employee, existing.check_in))
+            write_vals = reset_vals | {
+                'overtime_check_in': check_in,
+                'overtime_check_out': False,
+            }
+            if not has_regular_shift:
+                # The day contains only overtime, so the latest repeated
+                # check-in remains the visible check-in as required by the
+                # overwrite rule.
+                write_vals.update(vals)
+            existing.write(write_vals)
+            return existing, 'Đã bắt đầu làm thêm giờ. Hãy check-out khi kết thúc.'
+
+        vals.update(reset_vals | {
+            'overtime_check_in': False,
+            'overtime_check_out': False,
+        })
+        existing.write(vals)
+        return existing, 'Đã ghi đè giờ check-in hôm nay. Hãy check-out lại khi kết thúc làm việc.'
+
     @api.model_create_multi
     def create(self, vals_list):
         """Create or update the single attendance record for each local day."""
@@ -281,9 +350,12 @@ class HrAttendanceWithGeolocation(models.Model):
             if employee_id and check_in:
                 existing = self._get_workday_attendance(Employee.browse(employee_id), check_in)
                 if existing:
-                    existing.write(vals)
-                    attendances |= existing
+                    attendance, _message = self._upsert_daily_check_in(existing, vals)
+                    attendances |= attendance
                     continue
+                employee = Employee.browse(employee_id)
+                if not self._get_auto_checkout_cutoff(employee, check_in):
+                    vals['overtime_check_in'] = check_in
             attendances |= super(HrAttendanceWithGeolocation, self).create([vals])
         return attendances
 
@@ -407,11 +479,17 @@ class HrAttendanceWithGeolocation(models.Model):
         self._lock_employee_attendance(employee.id)
         # Another request may have checked out while this transaction waited
         # for the employee lock. Refresh before deciding which request wins.
-        self.invalidate_recordset(['check_in', 'check_out'])
+        self.invalidate_recordset([
+            'check_in', 'check_out', 'overtime_check_in', 'overtime_check_out',
+        ])
         if self.check_out or not self.check_in:
+            return False
+        if self.overtime_check_in and not self.overtime_check_out:
             return False
 
         cutoff_utc = self._get_auto_checkout_cutoff(employee, self.check_in)
+        if not cutoff_utc:
+            return False
         if now_utc < cutoff_utc:
             return False
 
@@ -423,15 +501,47 @@ class HrAttendanceWithGeolocation(models.Model):
         return True
 
     def _get_auto_checkout_cutoff(self, employee, check_in):
-        """Return the first employee-local 18:00 strictly after check-in."""
+        """Return 18:00 for a normal shift.
+
+        A check-in at/after 18:00 is deliberate overtime (the client asks for
+        confirmation), so it requires a manual check-out and has no automatic
+        cutoff.
+        """
         employee_tz = ZoneInfo(self._get_employee_timezone(employee))
         check_in_local = check_in.replace(
             tzinfo=ZoneInfo('UTC')).astimezone(employee_tz)
         cutoff_local = datetime.combine(
             check_in_local.date(), time(hour=18), tzinfo=employee_tz)
         if check_in_local >= cutoff_local:
-            cutoff_local += timedelta(days=1)
+            return False
         return cutoff_local.astimezone(ZoneInfo('UTC')).replace(tzinfo=None)
+
+    def _get_auto_checkout_message(self, employee, cutoff_utc):
+        """Build a truthful message for the regular or overtime cutoff."""
+        employee_tz = ZoneInfo(self._get_employee_timezone(employee))
+        cutoff_local = cutoff_utc.replace(
+            tzinfo=ZoneInfo('UTC')).astimezone(employee_tz)
+        return f"Hệ thống đã tự check-out lúc {cutoff_local.strftime('%H:%M')}."
+
+    @api.model
+    def _cron_recompute_attendance_cutoffs(self):
+        """One-time upgrade repair for stored dates and capped worked hours."""
+        attendances = self.sudo().search([('check_in', '!=', False)])
+        for attendance in attendances:
+            attendance._compute_check_in_date()
+            attendance._compute_worked_hours()
+            attendance._compute_worked_hours_display()
+        cron = self.env.ref(
+            'dac_attendance.cron_recompute_attendance_cutoffs',
+            raise_if_not_found=False,
+        )
+        if cron:
+            # ir.cron refuses ORM writes to the job currently holding its
+            # execution lock. This transaction already owns that row lock, so
+            # disable the one-shot job directly and commit it with the repair.
+            self.env.cr.execute(
+                'UPDATE ir_cron SET active = FALSE WHERE id = %s', [cron.id])
+        return len(attendances)
 
     def _get_shift_work_cutoff(self, employee, check_in):
         """Return 17:30 on the employee-local check-in date in UTC."""
@@ -747,19 +857,8 @@ class HrAttendanceWithGeolocation(models.Model):
 
             existing_today = Attendance._get_workday_attendance(employee, check_in_time)
             if existing_today:
-                vals.update({
-                    'check_out': False,
-                    'check_out_photo': False,
-                    'check_out_photo_timestamp': False,
-                    'check_out_photo_metadata': False,
-                    'check_out_latitude': 0.0,
-                    'check_out_longitude': 0.0,
-                    'check_out_gps_accuracy': 0.0,
-                    'is_early_leave': False,
-                })
-                existing_today.write(vals)
-                attendance = existing_today
-                success_message = 'Đã ghi đè giờ check-in hôm nay. Hãy check-out lại khi kết thúc làm việc.'
+                attendance, success_message = Attendance._upsert_daily_check_in(
+                    existing_today, vals)
             else:
                 attendance = Attendance.create(vals)
             return {
@@ -805,10 +904,12 @@ class HrAttendanceWithGeolocation(models.Model):
                 if latest:
                     cutoff_utc = self._get_auto_checkout_cutoff(
                         employee, latest.check_in)
-                    if latest.check_out == cutoff_utc and now_utc >= cutoff_utc:
+                    if (cutoff_utc and latest.check_out == cutoff_utc
+                            and now_utc >= cutoff_utc):
                         return {
                             'success': True,
-                            'message': 'Hệ thống đã tự check-out lúc 18:00.',
+                            'message': self._get_auto_checkout_message(
+                                employee, cutoff_utc),
                             'attendance_id': latest.id,
                             'worked_hours': round(latest.worked_hours or 0, 2),
                             'is_early_leave': latest.is_early_leave,
@@ -830,6 +931,8 @@ class HrAttendanceWithGeolocation(models.Model):
                 'check_out': check_out_time,
                 'is_early_leave': checkout_status['is_early_leave'],
             }
+            if attendance.overtime_check_in and not attendance.overtime_check_out:
+                vals['overtime_check_out'] = check_out_time
 
             if method == 'photo':
                 photo_b64 = data.get('photo_base64')

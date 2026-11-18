@@ -32,6 +32,7 @@ export class DacAttendanceSystray extends Component {
             earlyMinutes: 0,
             isLate: false,
             lateMinutes: 0,
+            isOvertime: false,
         });
 
         onWillStart(async () => {
@@ -97,12 +98,17 @@ export class DacAttendanceSystray extends Component {
                     this.state.todayHours = result.today_hours !== undefined ? result.today_hours : 0.0;
                     this.state.isLate = Boolean(result.is_late);
                     this.state.lateMinutes = result.late_minutes || 0;
+                    this.state.isOvertime = Boolean(result.is_overtime);
                     await this._loadCheckoutState();
                 } else {
+                    this.state.checkedIn = false;
+                    this.state.checkInTime = false;
+                    this.state.todayHours = 0.0;
                     this.state.checkoutNeedsConfirmation = false;
                     this.state.earlyMinutes = 0;
                     this.state.isLate = false;
                     this.state.lateMinutes = 0;
+                    this.state.isOvertime = false;
                 }
             }
         } catch (e) {
@@ -143,6 +149,7 @@ export class DacAttendanceSystray extends Component {
     get statusLabel() {
         if (!this.state.hasEmployee) return "CHẤM CÔNG";
         if (this.state.loading) return "Đang xử lý...";
+        if (this.state.checkedIn && this.state.isOvertime) return "ĐANG LÀM THÊM";
         return this.state.checkedIn ? "ĐANG LÀM VIỆC" : "SẴN SÀNG CHẤM CÔNG";
     }
 
@@ -204,6 +211,9 @@ export class DacAttendanceSystray extends Component {
             return "Đang xử lý dữ liệu chấm công";
         }
         if (this.state.checkedIn) {
+            if (this.state.isOvertime) {
+                return "Đang trong phiên làm thêm giờ";
+            }
             if (this.state.isLate) {
                 return `Hôm nay vào trễ ${this.state.lateMinutes} phút`;
             }
@@ -340,6 +350,9 @@ export class DacAttendanceSystray extends Component {
     }
 
     _buildSuccessMessage(result, isCheckOut) {
+        if (result.message) {
+            return result.message;
+        }
         if (isCheckOut) {
             let msg = `Check-out thành công! Số giờ làm: ${result.worked_hours}h`;
             if (result.is_early_leave) {

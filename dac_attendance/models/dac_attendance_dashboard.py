@@ -48,7 +48,7 @@ class DacAttendanceDashboard(models.AbstractModel):
         if not employee:
             return {'error': 'Không tìm thấy nhân viên cho tài khoản này'}
 
-        today = date.today()
+        today = fields.Date.context_today(self)
         month_start = today.replace(day=1)
         last_day = calendar.monthrange(today.year, today.month)[1]
         month_end = today.replace(day=last_day)
@@ -65,13 +65,7 @@ class DacAttendanceDashboard(models.AbstractModel):
         today_hours = sum(a.worked_hours or 0 for a in today_atts)
         if open_att:
             from datetime import datetime
-            effective_now = min(
-                datetime.utcnow(),
-                open_att._get_shift_work_cutoff(employee, open_att.check_in),
-            )
-            elapsed = max(
-                0, (effective_now - open_att.check_in).total_seconds() / 3600)
-            today_hours += elapsed
+            today_hours += open_att._get_worked_hours_as_of(datetime.utcnow())
 
         today_status = {
             'checked_in': bool(open_att),
@@ -278,16 +272,13 @@ class DacAttendanceDashboard(models.AbstractModel):
         if not self.env.user.has_group('hr_attendance.group_hr_attendance_manager'):
             raise AccessError('Chỉ quản lý chấm công mới có thể xem trang này.')
 
-        today = date.today()
+        today = fields.Date.context_today(self)
         from datetime import datetime
-        today_start = datetime.combine(today, datetime.min.time())
-        today_end = datetime.combine(today, datetime.max.time())
 
         all_employees = self.env['hr.employee'].search([('active', '=', True)])
 
         today_atts = self.env['hr.attendance'].search([
-            ('check_in', '>=', today_start),
-            ('check_in', '<=', today_end),
+            ('check_in_date', '=', today),
         ])
 
         checked_in_ids = {a.employee_id.id for a in today_atts}
@@ -322,12 +313,7 @@ class DacAttendanceDashboard(models.AbstractModel):
             emp = att.employee_id
             worked_hours = sum(record.worked_hours or 0 for record in employee_atts)
             if not att.check_out and att.check_in:
-                effective_now = min(
-                    datetime.utcnow(),
-                    att._get_shift_work_cutoff(emp, att.check_in),
-                )
-                worked_hours += max(
-                    0, (effective_now - att.check_in).total_seconds() / 3600)
+                worked_hours += att._get_worked_hours_as_of(datetime.utcnow())
 
             verification = []
             if att.gps_validated:

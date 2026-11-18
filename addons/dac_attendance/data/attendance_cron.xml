@@ -16,6 +16,22 @@
         </record>
     </data>
 
+    <data noupdate="1">
+        <!-- Runs once after upgrade to recalculate stored local dates and
+             worked hours using the 17:30 cap, then disables itself. -->
+        <record id="cron_recompute_attendance_cutoffs" model="ir.cron">
+            <field name="name">Chấm công: tính lại dữ liệu theo mốc 17:30</field>
+            <field name="model_id" ref="hr_attendance.model_hr_attendance"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_recompute_attendance_cutoffs()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">minutes</field>
+            <field name="nextcall" eval="datetime.now().strftime('%Y-%m-%d %H:%M:%S')"/>
+            <field name="active" eval="True"/>
+            <field name="user_id" ref="base.user_root"/>
+        </record>
+    </data>
+
     <!-- Existing databases may have created this cron while it was noupdate.
          Unlock it first so an upgrade restores the active state and schedule. -->
     <function model="ir.model.data" name="write">
@@ -23,15 +39,16 @@
         <value eval="{'noupdate': False}"/>
     </function>
 
-    <!-- 11:00 UTC is 18:00 in Asia/Ho_Chi_Minh (UTC+7). -->
+    <!-- Runs every minute so employee-local 18:00 is enforced without
+         depending on the server timezone. -->
     <record id="cron_auto_check_out_at_midnight" model="ir.cron">
         <field name="name">Chấm công: tự check-out lúc 18:00</field>
         <field name="model_id" ref="hr_attendance.model_hr_attendance"/>
         <field name="state">code</field>
         <field name="code">model._cron_auto_check_out_at_cutoff()</field>
         <field name="interval_number">1</field>
-        <field name="interval_type">days</field>
-        <field name="nextcall" eval="(datetime.now().replace(hour=11, minute=0, second=0, microsecond=0) + timedelta(days=1 if (datetime.now().hour, datetime.now().minute) >= (11, 0) else 0)).strftime('%Y-%m-%d %H:%M:%S')"/>
+        <field name="interval_type">minutes</field>
+        <field name="nextcall" eval="datetime.now().strftime('%Y-%m-%d %H:%M:%S')"/>
         <field name="active" eval="True"/>
         <field name="user_id" ref="base.user_root"/>
     </record>

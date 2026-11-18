@@ -3,6 +3,7 @@
 
 from odoo import models, fields, api
 from psycopg2 import OperationalError
+from zoneinfo import ZoneInfo
 import logging
 
 _logger = logging.getLogger(__name__)
@@ -191,6 +192,9 @@ class HrEmployeeAttendanceConfig(models.Model):
                 'check_in_time': None,
                 'check_in_time_display': None,
                 'today_hours': 0.0,
+                'is_overtime': False,
+                'is_late': False,
+                'late_minutes': 0,
             }
 
             if config:
@@ -221,18 +225,31 @@ class HrEmployeeAttendanceConfig(models.Model):
             
             if open_att:
                 result['checked_in'] = True
-                result['check_in_time'] = open_att.check_in.isoformat() if open_att.check_in else None
-                if open_att.check_in:
-                    localized_check_in = fields.Datetime.context_timestamp(employee, open_att.check_in)
+                active_check_in = open_att.overtime_check_in or open_att.check_in
+                result['is_overtime'] = bool(open_att.overtime_check_in)
+                result['is_late'] = bool(open_att.is_late)
+                result['late_minutes'] = open_att.late_minutes or 0
+                result['check_in_time'] = active_check_in.isoformat() if active_check_in else None
+                if active_check_in:
+                    employee_tz = ZoneInfo(
+                        Attendance._get_employee_timezone(employee))
+                    localized_check_in = active_check_in.replace(
+                        tzinfo=ZoneInfo('UTC')).astimezone(employee_tz)
                     result['check_in_time_display'] = localized_check_in.strftime('%H:%M')
             
             # Calculate today's total worked hours
-            today_start = fields.Datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            now_utc = fields.Datetime.now()
+            today_start, today_end = Attendance._get_attendance_day_bounds(
+                employee, now_utc)
             today_attendances = Attendance.search([
                 ('employee_id', '=', employee.id),
                 ('check_in', '>=', today_start),
+                ('check_in', '<', today_end),
             ])
-            today_hours = sum(att.worked_hours or 0.0 for att in today_attendances)
+            today_hours = sum(
+                att._get_worked_hours_as_of(now_utc)
+                for att in today_attendances
+            )
             result['today_hours'] = round(today_hours, 2)
 
             _logger.info("DAC_ATTENDANCE: returning result=%s", result)
