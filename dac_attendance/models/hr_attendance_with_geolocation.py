@@ -3,6 +3,9 @@
 
 import logging
 import math
+import json
+import time as time_module
+import requests
 from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 from psycopg2 import OperationalError
@@ -38,6 +41,99 @@ class HrAttendanceWithGeolocation(models.Model):
     """
     _inherit = 'hr.attendance'
     _table = 'hr_attendance'
+
+    @api.model
+    def dac_reverse_geocode(self, latitude, longitude):
+        """Resolve an address server-side with a shared, area-based cache."""
+        try:
+            latitude = float(latitude)
+            longitude = float(longitude)
+        except (TypeError, ValueError):
+            return {'success': False, 'error': 'Tọa độ GPS không hợp lệ'}
+        if not (-90 <= latitude <= 90 and -180 <= longitude <= 180):
+            return {'success': False, 'error': 'Tọa độ GPS nằm ngoài phạm vi'}
+
+        # Four decimals groups positions within roughly 11 metres. This keeps
+        # the cache useful without replacing the precise GPS stored on photos.
+        cache_location = f'{latitude:.4f},{longitude:.4f}'
+        cache_key = f'dac_attendance.reverse_geocode.{cache_location}'
+        cache_ttl = timedelta(days=30)
+        params = self.env['ir.config_parameter'].sudo()
+
+        def _cached_address():
+            raw_value = params.get_param(cache_key)
+            if not raw_value:
+                return False
+            try:
+                cached = json.loads(raw_value)
+                cached_at = fields.Datetime.from_string(cached.get('cached_at'))
+                if (cached.get('address') and cached_at
+                        and fields.Datetime.now() - cached_at <= cache_ttl):
+                    return cached['address']
+            except (TypeError, ValueError, json.JSONDecodeError):
+                return False
+            return False
+
+        address = _cached_address()
+        if address:
+            return {'success': True, 'address': address, 'cached': True}
+
+        # Serialize cache misses across all workers. Nominatim's public API is
+        # not a bulk endpoint, so different employee locations must not create
+        # a burst of parallel requests.
+        self.env.cr.execute('SELECT pg_advisory_xact_lock(%s, %s)', [9183, 1])
+        address = _cached_address()
+        if address:
+            return {'success': True, 'address': address, 'cached': True}
+
+        query = {
+            'lat': latitude,
+            'lon': longitude,
+            'format': 'jsonv2',
+            'addressdetails': 1,
+            'zoom': 18,
+            'accept-language': 'vi',
+        }
+        headers = {
+            'Accept': 'application/json',
+            'User-Agent': 'DAC-Attendance/1.0 (https://crm.duyan.vn)',
+        }
+        last_error = False
+        for attempt in range(2):
+            try:
+                last_request_key = 'dac_attendance.reverse_geocode.last_request'
+                last_request = float(params.get_param(last_request_key, '0') or 0)
+                wait_seconds = 1.0 - (time_module.time() - last_request)
+                if wait_seconds > 0:
+                    time_module.sleep(wait_seconds)
+                params.set_param(last_request_key, str(time_module.time()))
+                response = requests.get(
+                    'https://nominatim.openstreetmap.org/reverse',
+                    params=query,
+                    headers=headers,
+                    timeout=(3, 5),
+                )
+                if response.status_code == 429:
+                    last_error = 'Dịch vụ địa chỉ đang giới hạn truy cập'
+                elif response.status_code >= 500:
+                    last_error = f'Dịch vụ địa chỉ lỗi HTTP {response.status_code}'
+                else:
+                    response.raise_for_status()
+                    address = response.json().get('display_name')
+                    if address:
+                        params.set_param(cache_key, json.dumps({
+                            'address': address,
+                            'cached_at': fields.Datetime.to_string(fields.Datetime.now()),
+                        }, ensure_ascii=False))
+                        return {'success': True, 'address': address, 'cached': False}
+                    last_error = 'Không tìm thấy địa chỉ cho vị trí này'
+            except (requests.RequestException, ValueError) as error:
+                last_error = str(error)
+        _logger.warning(
+            'DAC Attendance reverse geocoding failed for %s: %s',
+            cache_location, last_error,
+        )
+        return {'success': False, 'error': last_error or 'Không xác định được địa chỉ'}
 
     check_in_date = fields.Date(
         string='Ngày check-in',

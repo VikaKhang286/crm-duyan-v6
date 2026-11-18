@@ -22,10 +22,27 @@
                             <span>Đang mở camera...</span>
                         </div>
                     </div>
-                    <video t-ref="cameraVideo"
-                           autoplay="true" playsinline="true" muted="true"
-                           t-att-style="state.cameraReady ? 'width:100%;max-height:400px;border-radius:8px;' : 'display:none;'"
-                           />
+                    <div class="o_dac_camera_frame"
+                         t-att-style="state.cameraReady ? '' : 'display:none;'">
+                        <video t-ref="cameraVideo"
+                               autoplay="true" playsinline="true" muted="true"/>
+                        <div class="o_dac_camera_map" aria-label="Vị trí GPS trên Google Maps">
+                            <iframe t-if="googleMapsEmbedUrl"
+                                    t-att-src="googleMapsEmbedUrl"
+                                    title="Vị trí GPS trên Google Maps"
+                                    loading="lazy"
+                                    referrerpolicy="no-referrer-when-downgrade"/>
+                            <div t-elif="state.gpsStatus === 'loading'"
+                                 class="o_dac_camera_map_status">
+                                <i class="fa fa-spinner fa-spin"/>
+                                <span>Đang lấy GPS</span>
+                            </div>
+                            <div t-else="" class="o_dac_camera_map_status o_dac_camera_map_status--warning">
+                                <i class="fa fa-map-marker"/>
+                                <span>Chưa có GPS</span>
+                            </div>
+                        </div>
+                    </div>
                     <canvas t-ref="cameraCanvas" style="display:none;"/>
 
                     <!-- GPS status -->
@@ -34,7 +51,9 @@
                             <i class="fa fa-spinner fa-spin me-1"/>Đang lấy vị trí GPS...
                         </span>
                         <span t-elif="state.gpsStatus === 'ready'" class="text-success">
-                            <i class="fa fa-map-marker me-1"/>GPS: <t t-esc="state.gpsLat?.toFixed(4)"/>, <t t-esc="state.gpsLng?.toFixed(4)"/>
+                            <i t-if="state.addressStatus === 'loading'" class="fa fa-spinner fa-spin me-1"/>
+                            <i t-else="" class="fa fa-map-marker me-1"/>
+                            <t t-esc="capturedLocationText"/>
                         </span>
                         <span t-elif="state.gpsStatus === 'error'" class="text-warning">
                             <i class="fa fa-warning me-1"/>Không lấy được GPS
@@ -47,16 +66,44 @@
                     <!-- Capture button -->
                     <button t-if="state.cameraReady"
                             class="btn btn-primary btn-lg mt-3 w-100"
+                            t-att-disabled="state.addressStatus === 'loading' or state.capturing"
                             t-on-click="capturePhoto">
-                        <i class="fa fa-camera me-2"/>Chụp ảnh
+                        <t t-if="state.capturing">
+                            <i class="fa fa-spinner fa-spin me-2"/>Đang tạo ảnh...
+                        </t>
+                        <t t-elif="state.addressStatus === 'loading'">
+                            <i class="fa fa-spinner fa-spin me-2"/>Đang xác định địa chỉ...
+                        </t>
+                        <t t-else="">
+                            <i class="fa fa-camera me-2"/>Chụp ảnh
+                        </t>
                     </button>
                 </div>
 
                 <!-- Photo preview (after photo taken) -->
                 <div t-if="state.photoTaken" class="o_dac_photo_preview text-center">
-                    <img t-att-src="state.photoDataUrl"
-                         style="width:100%;max-height:400px;border-radius:8px;object-fit:contain;"
-                         alt="Ảnh chấm công"/>
+                    <div class="o_dac_captured_frame">
+                        <img t-att-src="state.photoDataUrl" alt="Ảnh chấm công"/>
+                        <div t-if="googleMapsEmbedUrl" class="o_dac_captured_map">
+                            <iframe t-att-src="googleMapsEmbedUrl"
+                                    title="Vị trí GPS trên Google Maps"
+                                    loading="lazy"
+                                    referrerpolicy="no-referrer-when-downgrade"/>
+                        </div>
+                        <div class="o_dac_captured_stamp">
+                            <div class="o_dac_captured_time-row">
+                                <span t-attf-class="o_dac_captured_action {{ props.isCheckOut ? 'o_dac_captured_action--out' : '' }}">
+                                    <t t-esc="props.isCheckOut ? 'Ra ca' : 'Vào ca'"/>
+                                </span>
+                                <span class="o_dac_captured_time"><t t-esc="capturedTimeText"/></span>
+                            </div>
+                            <div t-attf-class="o_dac_captured_details {{ props.isCheckOut ? 'o_dac_captured_details--out' : '' }}">
+                                <strong><t t-esc="capturedDateText"/></strong>
+                                <span><i class="fa fa-map-marker me-1"/><t t-esc="capturedLocationText"/></span>
+                                <small class="o_dac_map_attribution">@OpenStreetMap contributors</small>
+                            </div>
+                        </div>
+                    </div>
 
                     <div class="d-flex gap-2 mt-3">
                         <button class="btn btn-secondary flex-fill"

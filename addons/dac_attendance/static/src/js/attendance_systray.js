@@ -4,6 +4,7 @@ import { Component, useState, onWillStart, onWillUnmount } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
 import { useService } from "@web/core/utils/hooks";
+import { DacAttendanceCameraDialog } from "@dac_attendance/js/attendance_camera_dialog";
 
 export class DacAttendanceSystray extends Component {
     static template = "dac_attendance.AttendanceSystray";
@@ -340,12 +341,8 @@ export class DacAttendanceSystray extends Component {
     }
 
     async _handlePhotoMethod(isCheckOut) {
-        const { DacAttendanceCameraDialog } = await import(
-            "@dac_attendance/js/attendance_camera_dialog"
-        );
         this.dialog.add(DacAttendanceCameraDialog, {
             isCheckOut,
-            employeeName: this.state.employeeName,
             onPhotoTaken: async (photoBase64, metadata) => {
                 await this._submitPhoto(photoBase64, metadata, isCheckOut);
             },

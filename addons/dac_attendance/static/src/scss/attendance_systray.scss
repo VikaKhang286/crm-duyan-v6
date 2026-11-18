@@ -308,18 +308,182 @@
 /* ===== Camera Dialog ===== */
 .o_dac_camera_dialog {
     .o_dac_camera_preview {
+        .o_dac_camera_frame {
+            position: relative;
+            overflow: hidden;
+            border-radius: 8px;
+            background: #1a1a2e;
+        }
+
         video {
+            display: block;
+            width: 100%;
+            max-height: 400px;
             background: #1a1a2e;
             border-radius: 8px;
             transform: scaleX(-1);
             /* Mirror for selfie */
         }
+
+        .o_dac_camera_map {
+            position: absolute;
+            z-index: 2;
+            top: 3px;
+            left: 3px;
+            width: 200px;
+            height: 130px;
+            overflow: hidden;
+            border: 2px solid rgba(255, 255, 255, 0.9);
+            border-radius: 8px;
+            background: rgba(15, 23, 42, 0.88);
+            box-shadow: 0 3px 12px rgba(0, 0, 0, 0.35);
+
+            iframe {
+                width: 100%;
+                height: 100%;
+                border: 0;
+            }
+        }
+
+        .o_dac_camera_map_status {
+            display: flex;
+            height: 100%;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            color: #fff;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .o_dac_camera_map_status--warning {
+            color: #fde68a;
+        }
+
+        @media (max-width: 576px) {
+            .o_dac_camera_map {
+                top: 8px;
+                left: 8px;
+                width: 135px;
+                height: 84px;
+            }
+        }
     }
 
     .o_dac_photo_preview {
-        img {
+        .o_dac_captured_frame {
+            position: relative;
+            overflow: hidden;
+            border-radius: 8px;
+            background: #111827;
             border: 2px solid #e5e7eb;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        img {
+            display: block;
+            width: 100%;
+            max-height: 520px;
+            object-fit: contain;
+        }
+
+        .o_dac_captured_map {
+            position: absolute;
+            z-index: 2;
+            top: 12px;
+            left: 12px;
+            width: 180px;
+            height: 110px;
+            overflow: hidden;
+            border: 3px solid #fff;
+            border-radius: 9px;
+            background: #e5e7eb;
+            box-shadow: 0 3px 12px rgba(0, 0, 0, 0.4);
+
+            iframe {
+                width: 100%;
+                height: 100%;
+                border: 0;
+            }
+        }
+
+        .o_dac_captured_stamp {
+            position: absolute;
+            z-index: 2;
+            right: 0;
+            bottom: 0;
+            left: 0;
+            padding: 58px 18px 16px;
+            color: #fff;
+            text-align: left;
+            background: linear-gradient(transparent, rgba(0, 0, 0, 0.88));
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.75);
+            pointer-events: none;
+        }
+
+        .o_dac_captured_time-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .o_dac_captured_action {
+            padding: 5px 10px;
+            border-radius: 7px;
+            background: #16a34a;
+            font-size: 18px;
+            font-weight: 800;
+            text-shadow: none;
+        }
+
+        .o_dac_captured_action--out {
+            background: #dc2626;
+        }
+
+        .o_dac_captured_time {
+            font-size: 32px;
+            font-weight: 800;
+            line-height: 1;
+        }
+
+        .o_dac_captured_details {
+            display: flex;
+            width: 75%;
+            flex-direction: column;
+            gap: 3px;
+            padding-left: 10px;
+            border-left: 4px solid #22c55e;
+            font-size: 14px;
+        }
+
+        .o_dac_captured_details--out {
+            border-left-color: #ef4444;
+        }
+
+        @media (max-width: 576px) {
+            .o_dac_captured_map {
+                top: 8px;
+                left: 8px;
+                width: 135px;
+                height: 84px;
+            }
+
+            .o_dac_captured_stamp {
+                padding: 44px 12px 10px;
+            }
+
+            .o_dac_captured_action {
+                font-size: 14px;
+            }
+
+            .o_dac_captured_time {
+                font-size: 25px;
+            }
+
+            .o_dac_captured_details {
+                font-size: 12px;
+            }
         }
     }
 
