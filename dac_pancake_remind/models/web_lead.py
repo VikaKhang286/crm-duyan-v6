@@ -110,7 +110,8 @@ class WebLeadPancake(models.Model):
             lines.append('Đang có %d khách Pancake chờ trả lời' % waiting)
         Channel = self.env['dac.zalo.channel'].sudo()
         types = self.env.ref('dac_push.event_type_web_lead_created') | self.env.ref('dac_pancake_remind.event_type_pancake_unanswered')
-        channels = Channel.search([('active', '=', True), ('is_test', '=', False), ('event_type_ids', 'in', types.ids)])
+        # Chưa được duyệt gửi nhóm thật thì chỉ gửi vào hội thoại thử nghiệm
+        channels = Channel.search([('active', '=', True), ('is_test', '=', not config.stats_real_channels), ('event_type_ids', 'in', types.ids)])
         if not channels:
             return stats
         text = '\n'.join(lines)

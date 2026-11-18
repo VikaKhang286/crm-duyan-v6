@@ -1,5 +1,5 @@
 import logging
-from datetime import timezone
+from datetime import timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from odoo import api, fields, models
@@ -211,3 +211,88 @@ class NewContact(models.Model):
         for conversation in conversations:
             self._record_conversation(conversation, bots, start)
         return self.sudo().search_count([]) - before
+
+    # ── Bảng số liệu (dashboard) ─────────────────────────────────────────────────
+
+    @api.model
+    def _period_range(self, period, now):
+        """(bắt đầu, kết thúc, kỳ trước bắt đầu, kiểu cột 'day'|'month', nhãn) theo giờ Việt Nam; trả naive UTC."""
+        local_now = now.replace(tzinfo=timezone.utc).astimezone(TZ)
+        today = local_now.replace(hour=0, minute=0, second=0, microsecond=0)
+        if period == '7d':
+            start, bucket, label = today - timedelta(days=6), 'day', '7 ngày qua'
+        elif period == 'month':
+            start, bucket, label = today.replace(day=1), 'day', 'Tháng %s' % today.strftime('%m/%Y')
+        elif period == '12m':
+            year, month = today.year, today.month - 11  # 12 tháng tính cả tháng này
+            if month <= 0:
+                year, month = year - 1, month + 12
+            start, bucket, label = today.replace(year=year, month=month, day=1), 'month', '12 tháng qua'
+        else:
+            start, bucket, label = today - timedelta(days=29), 'day', '30 ngày qua'
+        end = local_now
+        length = end - start
+        to_utc = lambda moment: moment.astimezone(timezone.utc).replace(tzinfo=None)
+        return to_utc(start), to_utc(end), to_utc(start - length), bucket, label
+
+    @api.model
+    def _channel_of(self, contact):
+        if contact.source == 'web_lead':
+            return 'web'
+        platform = (contact.platform or '').lower()
+        return {'zalo': 'zalo', 'facebook': 'messenger', 'messenger': 'messenger'}.get(platform, 'other')
+
+    @api.model
+    def dashboard_data(self, period='30d'):
+        """Số liệu cho bảng "Khách liên hệ": khách mới thật sự (không test, không nội bộ, không trùng số) theo nguồn."""
+        now = fields.Datetime.now()
+        start, end, prev_start, bucket, label = self._period_range(period, now)
+        real = [('counts_as_new', '=', True)]
+        contacts = self.search(real + [('contact_at', '>=', start), ('contact_at', '<=', end)], order='contact_at')
+        previous = self.search_count(real + [('contact_at', '>=', prev_start), ('contact_at', '<', start)])
+        channels = {'web': 0, 'zalo': 0, 'messenger': 0, 'other': 0}
+        local = lambda moment: moment.replace(tzinfo=timezone.utc).astimezone(TZ)
+        # Cột biểu đồ: đủ mọi ngày/tháng trong kỳ, kể cả ngày không có khách
+        keys, cursor = [], local(start)
+        while cursor <= local(end):
+            key = cursor.strftime('%Y-%m' if bucket == 'month' else '%Y-%m-%d')
+            if key not in keys:
+                keys.append(key)
+            cursor += timedelta(days=1)
+        series = {key: dict(channels) for key in keys}
+        hours = [0] * 24
+        pages = {}
+        for contact in contacts:
+            channel = self._channel_of(contact)
+            channels[channel] += 1
+            moment = local(contact.contact_at)
+            key = moment.strftime('%Y-%m' if bucket == 'month' else '%Y-%m-%d')
+            if key in series:
+                series[key][channel] += 1
+            hours[moment.hour] += 1
+            page = 'Form website' if contact.source == 'web_lead' else (contact.page_id.name or 'Pancake')
+            pages[page] = pages.get(page, 0) + 1
+        today_start = local(now).replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc).replace(tzinfo=None)
+        Wait = self.env['dac.pancake.remind.wait']
+        recent = self.search(real, order='contact_at desc, id desc', limit=12)
+        return {
+            'period': period, 'label': label,
+            'range': '%s – %s' % (local(start).strftime('%d/%m/%Y'), local(end).strftime('%d/%m/%Y')),
+            'total': len(contacts), 'previous': previous,
+            'today': self.search_count(real + [('contact_at', '>=', today_start)]),
+            'channels': channels,
+            'repeat': self.search_count([('contact_at', '>=', start), ('contact_at', '<=', end), ('seen_before', '=', True), ('is_test', '=', False)]),
+            'internal': self.search_count([('contact_at', '>=', start), ('contact_at', '<=', end), ('is_internal', '=', True)]),
+            'waiting': Wait.search_count([('state', '=', 'waiting'), ('is_test', '=', False)]),
+            'series': [dict(series[key], key=key, label=(key[5:7] + '/' + key[2:4]) if bucket == 'month' else (key[8:10] + '/' + key[5:7]))
+                       for key in keys],
+            'hours': hours,
+            'pages': sorted(({'name': name, 'count': count} for name, count in pages.items()), key=lambda row: -row['count']),
+            'recent': [{
+                'id': contact.id, 'at': local(contact.contact_at).strftime('%H:%M %d/%m'), 'name': contact.name or 'Khách',
+                'phone': contact.phone or '', 'channel': self._channel_of(contact),
+                'page': 'Form website' if contact.source == 'web_lead' else (contact.page_id.name or ''),
+                'url': contact.external_url or (contact.lead_id and '/lead/%s' % contact.lead_id.id) or '',
+            } for contact in recent],
+            'start': fields.Datetime.to_string(start), 'end': fields.Datetime.to_string(end),
+        }

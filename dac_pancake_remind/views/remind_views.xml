@@ -34,7 +34,7 @@
                 khách chỉ "ok em", cảm ơn, gửi biểu tượng sau tin của sale, hoặc tin rác thì không nhắc.
                 <br/><strong>Khách mới</strong>: quá 15 phút thì nhắc, rồi cứ 10 phút nhắc lại (tag tên + trả lời vào ảnh đã gửi, không gửi lại ảnh) tới khi có người trả lời.
                 <br/><strong>Khách cũ</strong>: quá 30 phút thì nhắc đúng một lần.
-                <br/>Tin tổng 8:00 / 11:30 / 17:00 kèm thống kê khách liên hệ mới (form web + Pancake). Thả cảm xúc <strong>không</strong> làm dừng nhắc.
+                <br/>Tin tổng 8:00 / 11:30 / 17:00 kèm thống kê khách liên hệ mới (form web + Pancake) — chỉ gửi vào hội thoại thử nghiệm, trừ khi bật "Gửi thống kê vào nhóm thật". Thả cảm xúc <strong>không</strong> làm dừng nhắc.
                 Không tính: nhóm/cộng đồng Zalo, khách nội bộ, thông báo sinh nhật, reaction.
             </div>
             <group>
@@ -43,6 +43,7 @@
                     <field name="repeat_minutes"/>
                     <field name="old_wait_minutes"/>
                     <field name="ai_check"/>
+                    <field name="stats_real_channels"/>
                 </group>
                 <group string="Phạm vi">
                     <field name="page_ids" widget="many2many_tags" options="{'no_create': True, 'no_open': True}"
@@ -197,6 +198,11 @@
             <p>Lead điền form website và khách mới nhắn page Pancake sẽ hiện ở đây. Dùng "Tính lại thống kê" ở màn hình cấu hình để lập từ dữ liệu cũ.</p></field>
     </record>
     <menuitem id="menu_section_stats" name="Thống kê" parent="dac_push.menu_push_root" sequence="5"/>
+    <record id="contact_dashboard_action" model="ir.actions.client">
+        <field name="name">Bảng số liệu khách liên hệ</field>
+        <field name="tag">dac_contact_dashboard</field>
+    </record>
+    <menuitem id="menu_contact_dashboard" name="Bảng số liệu" parent="menu_section_stats" action="contact_dashboard_action" sequence="5"/>
     <menuitem id="menu_new_contacts" name="Khách mới liên hệ" parent="menu_section_stats" action="new_contact_action" sequence="10"/>
     <record id="menu_section_stats" model="ir.ui.menu"><field name="web_icon">fa-line-chart</field></record>
 

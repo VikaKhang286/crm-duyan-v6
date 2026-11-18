@@ -1,0 +1,58 @@
+.dac_cd {
+    --cd-border: var(--border-color, #dee2e6);
+    --cd-muted: var(--bs-secondary-color, #6c757d);
+    --cd-card: var(--bs-body-bg, #fff);
+    --cd-track: var(--bs-secondary-bg, #eef1f5);
+    overflow: auto;
+    padding: 20px 24px 32px;
+    background: var(--bs-tertiary-bg, #f6f7f9);
+    h1 { font-size: 1.5rem; margin: 0; }
+    h2 { font-size: 1rem; margin: 0; font-weight: 600; }
+    .dac_cd_sub { color: var(--cd-muted); font-size: .85rem; }
+    .dac_cd_head { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: flex-end; margin-bottom: 16px; }
+    .dac_cd_tools { display: flex; gap: 8px; align-items: center; }
+    .dac_cd_loading { padding: 48px; text-align: center; color: var(--cd-muted); }
+    .dac_cd_kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 16px; }
+    .dac_cd_kpi {
+        display: flex; flex-direction: column; gap: 4px; text-align: left; padding: 14px 16px;
+        background: var(--cd-card); border: 1px solid var(--cd-border); border-radius: 10px; color: inherit;
+        &:hover { border-color: var(--bs-primary, #714b67); }
+        &.is-main .dac_cd_kpi_value { font-size: 2.2rem; }
+        .dac_cd_bar { flex: 0 0 6px; width: 100%; margin: 4px 0 2px; }
+    }
+    .dac_cd_kpi_label { font-size: .85rem; color: var(--cd-muted); }
+    .dac_cd_kpi_value { font-size: 1.8rem; font-weight: 700; line-height: 1.1; }
+    .dac_cd_kpi_note { font-size: .78rem; color: var(--cd-muted); &.is-up { color: #16a34a; } &.is-down { color: #dc2626; } }
+    .dac_cd_bar { display: block; height: 6px; border-radius: 3px; background: var(--cd-track); overflow: hidden; flex: 1;
+        > span { display: block; height: 100%; border-radius: 3px; background: var(--bs-primary, #714b67); } }
+    .dac_cd_card { background: var(--cd-card); border: 1px solid var(--cd-border); border-radius: 10px; padding: 14px 16px; margin-bottom: 16px; }
+    .dac_cd_card_head { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .dac_cd_legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: .8rem; color: var(--cd-muted);
+        i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; } }
+    .dac_cd_chart { display: flex; gap: 6px; height: 240px; }
+    .dac_cd_axis { display: flex; flex-direction: column; justify-content: space-between; font-size: .7rem; color: var(--cd-muted); padding-bottom: 18px; text-align: right; min-width: 22px; }
+    .dac_cd_cols { flex: 1; display: flex; align-items: stretch; gap: 3px; border-left: 1px solid var(--cd-border); padding-left: 4px; overflow-x: auto; }
+    .dac_cd_col { flex: 1 0 14px; display: flex; flex-direction: column; align-items: center; min-width: 14px; }
+    .dac_cd_col_total { font-size: .65rem; color: var(--cd-muted); height: 14px; }
+    .dac_cd_stack { flex: 1; width: 100%; max-width: 34px; display: flex; flex-direction: column-reverse; border-radius: 3px 3px 0 0; overflow: hidden; }
+    .dac_cd_seg { width: 100%; }
+    .dac_cd_col_label { font-size: .65rem; color: var(--cd-muted); height: 18px; line-height: 18px; white-space: nowrap; }
+    .dac_cd_grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; > .dac_cd_card { margin-bottom: 0; } margin-bottom: 16px; }
+    .dac_cd_hours { display: flex; gap: 2px; height: 150px; }
+    .dac_cd_hour { flex: 1; display: flex; flex-direction: column; align-items: center;
+        span { font-size: .65rem; color: var(--cd-muted); height: 16px; } }
+    .dac_cd_hour_bar { flex: 1; width: 100%; display: flex; align-items: flex-end;
+        > div { width: 100%; background: #0068ff; opacity: .75; border-radius: 2px 2px 0 0; } }
+    .dac_cd_pages { display: flex; flex-direction: column; gap: 10px; }
+    .dac_cd_page { display: flex; align-items: center; gap: 10px; font-size: .9rem; }
+    .dac_cd_page_name { width: 42%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dac_cd_foot { margin-top: 14px; font-size: .8rem; color: var(--cd-muted); }
+    .dac_cd_empty { color: var(--cd-muted); font-size: .9rem; }
+    .dac_cd_dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+    .dac_cd_table tr.is-link { cursor: pointer; }
+    @media (max-width: 576px) {
+        padding: 12px 16px 24px;
+        .dac_cd_chart { height: 200px; }
+        .dac_cd_page_name { width: 50%; }
+    }
+}

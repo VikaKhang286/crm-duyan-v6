@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="dac_pancake_remind.ContactDashboard">
+        <div class="o_action dac_cd">
+            <div class="dac_cd_head">
+                <div>
+                    <h1>Khách liên hệ mới</h1>
+                    <div class="dac_cd_sub" t-if="state.data">
+                        <t t-esc="state.data.label"/> · <t t-esc="state.data.range"/> · không tính khách test, nội bộ, số đã liên hệ trước
+                    </div>
+                </div>
+                <div class="dac_cd_tools">
+                    <div class="btn-group" role="group" aria-label="Chọn kỳ">
+                        <t t-foreach="periods" t-as="p" t-key="p.key">
+                            <button type="button" class="btn btn-sm" t-att-class="state.period === p.key ? 'btn-primary' : 'btn-outline-secondary'"
+                                    t-on-click="() => this.load(p.key)" t-esc="p.label"/>
+                        </t>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" title="Tải lại" aria-label="Tải lại" t-on-click="() => this.load()">
+                        <i class="fa fa-refresh" t-att-class="state.loading ? 'fa-spin' : ''"/>
+                    </button>
+                </div>
+            </div>
+
+            <div t-if="state.error" class="alert alert-warning" role="alert">Không tải được số liệu. Bấm tải lại để thử lần nữa.</div>
+            <div t-elif="!state.data" class="dac_cd_loading"><i class="fa fa-circle-o-notch fa-spin"/> Đang tải…</div>
+            <t t-else="">
+                <t t-set="d" t-value="state.data"/>
+                <div class="dac_cd_kpis">
+                    <button type="button" class="dac_cd_kpi is-main" t-on-click="() => this.openContacts()">
+                        <span class="dac_cd_kpi_label">Tổng khách mới</span>
+                        <span class="dac_cd_kpi_value" t-esc="d.total"/>
+                        <span t-if="delta" class="dac_cd_kpi_note" t-att-class="delta.up ? 'is-up' : 'is-down'">
+                            <i class="fa" t-att-class="delta.up ? 'fa-arrow-up' : 'fa-arrow-down'"/> <t t-esc="delta.text"/>
+                        </span>
+                        <span class="dac_cd_kpi_note">Hôm nay: <b t-esc="d.today"/></span>
+                    </button>
+                    <t t-foreach="visibleChannels" t-as="c" t-key="c.key">
+                        <button type="button" class="dac_cd_kpi" t-on-click="() => this.openContacts(c.key)">
+                            <span class="dac_cd_kpi_label"><i class="fa me-1" t-att-class="c.icon" t-att-style="'color:' + c.color"/><t t-esc="c.label"/></span>
+                            <span class="dac_cd_kpi_value" t-esc="d.channels[c.key]"/>
+                            <span class="dac_cd_bar"><span t-att-style="'width:' + share(c.key) + '%;background:' + c.color"/></span>
+                            <span class="dac_cd_kpi_note"><t t-esc="share(c.key)"/>% tổng số</span>
+                        </button>
+                    </t>
+                    <button type="button" class="dac_cd_kpi" t-on-click="openWaits">
+                        <span class="dac_cd_kpi_label"><i class="fa fa-hourglass-half me-1"/>Đang chờ trả lời</span>
+                        <span class="dac_cd_kpi_value" t-att-class="d.waiting ? 'text-warning' : ''" t-esc="d.waiting"/>
+                        <span class="dac_cd_kpi_note">Khách Pancake chưa ai trả lời</span>
+                    </button>
+                </div>
+
+                <div class="dac_cd_card">
+                    <div class="dac_cd_card_head">
+                        <h2>Khách mới theo <t t-esc="state.period === '12m' ? 'tháng' : 'ngày'"/></h2>
+                        <div class="dac_cd_legend">
+                            <t t-foreach="visibleChannels" t-as="c" t-key="c.key">
+                                <span><i t-att-style="'background:' + c.color"/><t t-esc="c.label"/></span>
+                            </t>
+                        </div>
+                    </div>
+                    <div class="dac_cd_chart">
+                        <div class="dac_cd_axis"><span t-esc="maxColumn"/><span t-esc="halfMax"/><span>0</span></div>
+                        <div class="dac_cd_cols">
+                            <t t-foreach="d.series" t-as="row" t-key="row.key">
+                                <div class="dac_cd_col" t-att-title="columnTitle(row)">
+                                    <span class="dac_cd_col_total" t-if="columnTotal(row) and d.series.length &lt;= 31" t-esc="columnTotal(row)"/>
+                                    <div class="dac_cd_stack">
+                                        <t t-foreach="channels" t-as="c" t-key="c.key">
+                                            <div t-if="row[c.key]" class="dac_cd_seg" t-att-style="segmentStyle(row, c)"/>
+                                        </t>
+                                    </div>
+                                    <span class="dac_cd_col_label" t-esc="showLabel(row_index) ? row.label : ''"/>
+                                </div>
+                            </t>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dac_cd_grid">
+                    <div class="dac_cd_card">
+                        <div class="dac_cd_card_head"><h2>Khách liên hệ theo giờ</h2><span class="dac_cd_sub">giờ Việt Nam</span></div>
+                        <div class="dac_cd_hours">
+                            <t t-foreach="d.hours" t-as="h" t-key="h_index">
+                                <div class="dac_cd_hour" t-att-title="h_index + 'h: ' + h + ' khách'">
+                                    <div class="dac_cd_hour_bar"><div t-att-style="hourStyle(h)"/></div>
+                                    <span t-esc="h_index % 3 === 0 ? h_index + 'h' : ''"/>
+                                </div>
+                            </t>
+                        </div>
+                    </div>
+                    <div class="dac_cd_card">
+                        <div class="dac_cd_card_head"><h2>Theo page / nguồn</h2></div>
+                        <div t-if="!d.pages.length" class="dac_cd_empty">Chưa có khách trong kỳ này</div>
+                        <div class="dac_cd_pages">
+                            <t t-foreach="d.pages" t-as="p" t-key="p.name">
+                                <div class="dac_cd_page">
+                                    <span class="dac_cd_page_name" t-esc="p.name"/>
+                                    <span class="dac_cd_bar"><span t-att-style="'width:' + (p.count / maxPage * 100) + '%'"/></span>
+                                    <b t-esc="p.count"/>
+                                </div>
+                            </t>
+                        </div>
+                        <div class="dac_cd_foot">
+                            Trong kỳ còn <b t-esc="d.repeat"/> lượt là số đã liên hệ trước (không tính) và <b t-esc="d.internal"/> lượt nội bộ.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dac_cd_card">
+                    <div class="dac_cd_card_head">
+                        <h2>Khách mới gần nhất</h2>
+                        <button type="button" class="btn btn-link btn-sm" t-on-click="() => this.openContacts()">Xem tất cả</button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover mb-0 dac_cd_table">
+                            <thead><tr><th>Lúc</th><th>Khách</th><th>SĐT</th><th>Nguồn</th><th>Page</th></tr></thead>
+                            <tbody>
+                                <tr t-foreach="d.recent" t-as="r" t-key="r.id" t-on-click="() => this.openRow(r)" t-att-class="r.url ? 'is-link' : ''">
+                                    <td class="text-nowrap" t-esc="r.at"/>
+                                    <td t-esc="r.name"/>
+                                    <td class="text-nowrap" t-esc="r.phone"/>
+                                    <td class="text-nowrap"><i class="dac_cd_dot" t-att-style="'background:' + channelOf(r.channel).color"/><t t-esc="channelOf(r.channel).label"/></td>
+                                    <td t-esc="r.page"/>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </t>
+        </div>
+    </t>
+</templates>

@@ -449,12 +449,23 @@ class TestPancakeRemind(TransactionCase):
             {'contact_at': T0 + timedelta(hours=3), 'source': 'pancake', 'name': 'Nội bộ', 'conversation_id': internal.id},
             {'contact_at': T0 + timedelta(hours=1), 'source': 'web_lead', 'name': 'Trước 11:30'},
         ])
+        test_channel = self.env['dac.zalo.channel'].create({'name': 'Nhóm thử', 'thread_id': 'G-test', 'thread_type': 'group',
+                                                            'is_test': True, 'event_type_ids': [(6, 0, lead_type.ids)]})
         slot = T0 + timedelta(hours=7)
         with patch.object(fields.Datetime, 'now', return_value=slot + timedelta(minutes=1)):
             self.env['dac.web.lead']._send_summary(slot)
-        message = self.channel.message_ids.filtered(lambda m: m.event_key.startswith('lead-summary'))
+        summary = lambda channel: channel.message_ids.filtered(lambda m: m.event_key.startswith('lead-summary'))
+        self.assertFalse(summary(self.channel), 'chưa duyệt: KHÔNG gửi thống kê vào nhóm thật')
+        message = summary(test_channel)
         self.assertEqual(message.text.splitlines(), ['📊 Khách liên hệ mới 11:30 10/11 → 17:00 10/11: 2', 'Form web: 1 · Zalo: 1'])
         self.assertFalse(message.mentions, 'chỉ có thống kê thì không tag ai')
+        # Đã duyệt gửi nhóm thật: chỉ nhóm thật nhận
+        self.config.stats_real_channels = True
+        slot2 = slot + timedelta(days=1)
+        with patch.object(fields.Datetime, 'now', return_value=slot2 + timedelta(minutes=1)):
+            self.env['dac.web.lead']._send_summary(slot2)
+        self.assertEqual(len(summary(self.channel)), 1)
+        self.assertEqual(len(summary(test_channel)), 1)
 
     # ── Thống kê khách mới + trùng số với Pancake ────────────────────────────────
 
@@ -532,3 +543,30 @@ class TestPancakeRemind(TransactionCase):
         with patch('odoo.addons.dac_pancake_remind.models.web_lead.WebLeadPancake._check_pancake', side_effect=RuntimeError('boom')):
             lead = self.lead()
         self.assertTrue(lead.exists())
+
+    def test_dashboard_data_counts_real_new_contacts_by_channel_day_and_hour(self):
+        Contact = self.env['dac.new.contact'].sudo()
+        Contact.search([]).unlink()
+        zalo = self.conversation(fm_id='d-z')
+        zalo.platform = 'zalo'
+        fb = self.conversation(fm_id='d-f')
+        fb.platform = 'facebook'
+        now = datetime(2026, 11, 17, 9, 0)  # 16:00 giờ VN
+        Contact.create([
+            {'contact_at': now - timedelta(hours=1), 'source': 'web_lead', 'name': 'Form hôm nay'},
+            {'contact_at': now - timedelta(days=2), 'source': 'pancake', 'name': 'Zalo', 'conversation_id': zalo.id, 'page_id': self.page.id},
+            {'contact_at': now - timedelta(days=2, hours=1), 'source': 'pancake', 'name': 'FB', 'conversation_id': fb.id},
+            {'contact_at': now - timedelta(days=3), 'source': 'web_lead', 'name': 'Test', 'is_test': True},
+            {'contact_at': now - timedelta(days=10), 'source': 'web_lead', 'name': 'Kỳ trước'},
+        ])
+        with patch.object(fields.Datetime, 'now', return_value=now):
+            data = Contact.dashboard_data('7d')
+        self.assertEqual((data['total'], data['previous'], data['today']), (3, 1, 1))
+        self.assertEqual(data['channels'], {'web': 1, 'zalo': 1, 'messenger': 1, 'other': 0})
+        self.assertEqual(len(data['series']), 7, 'đủ 7 ngày kể cả ngày không có khách')
+        self.assertEqual(data['series'][-1]['web'], 1)
+        self.assertEqual((data['hours'][15], data['hours'][16]), (2, 1), 'giờ Việt Nam')
+        self.assertEqual([r['name'] for r in data['recent']], ['Form hôm nay', 'Zalo', 'FB', 'Kỳ trước'])
+        with patch.object(fields.Datetime, 'now', return_value=now):
+            year = Contact.dashboard_data('12m')
+        self.assertEqual((len(year['series']), year['series'][0]['label'], year['series'][-1]['label']), (12, '12/25', '11/26'))

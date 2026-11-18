@@ -32,6 +32,9 @@ class PancakeRemindConfig(models.Model):
     ai_check = fields.Boolean(string='AI đọc tin trước khi nhắc', default=True,
         help='Trước lần nhắc đầu, Gemini (Trợ lý Zalo → Gemini) đọc đoạn chat để bỏ qua khách không cần trả lời nữa: khách chỉ "ok em", '
              'cảm ơn, gửi biểu tượng sau tin của sale, tin rác/hệ thống. Gemini chưa bật hoặc lỗi thì dùng luật từ khóa.')
+    stats_real_channels = fields.Boolean(string='Gửi thống kê vào nhóm thật', default=False,
+        help='Tắt (mặc định): thống kê khách liên hệ lúc 8:00 / 11:30 / 17:00 chỉ gửi vào hội thoại Zalo đánh dấu "Thử nghiệm". '
+             'Chỉ bật khi đã duyệt để gửi vào nhóm kinh doanh thật.')
     only_new_customers = fields.Boolean(string='Chỉ nhắc khách mới', default=False,
         help='Bật: bỏ qua khách cũ. Khách mới = hội thoại chưa từng có nhân viên trả lời và khách chưa có đơn hàng nào trong Odoo.')
     backfill_from = fields.Date(string='Tính thống kê từ ngày',
