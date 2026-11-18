@@ -11,6 +11,7 @@
     'auto_install': False,
     'application': False,
     'data': [
+        'security/attendance_management_groups.xml',
         'security/ir.model.access.csv',
         'security/record_rules.xml',
         'views/employee_attendance_config_views.xml',

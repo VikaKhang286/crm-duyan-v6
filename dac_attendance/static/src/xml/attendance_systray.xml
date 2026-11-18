@@ -24,6 +24,7 @@
                     </div>
                 </div>
                 <button t-attf-class="{{ actionButtonClass }}"
+                        t-att-disabled="state.loadError ? true : undefined"
                         t-att-title="statusTitle"
                         t-on-click="state.checkedIn ? onClickCheckOut : onClickCheckIn"
                         type="button">

@@ -160,19 +160,29 @@ class HrEmployeeAttendanceConfig(models.Model):
     @api.model
     def get_config_for_current_user(self):
         """Get attendance config for the current logged-in user's employee."""
+        uid = self.env.uid
+        employee = self.env['hr.employee'].sudo().with_context(
+            active_test=False).search([('user_id', '=', uid)], limit=1)
+        is_attendance_manager = self.env.user.has_group(
+            'hr_attendance.group_hr_attendance_manager')
         try:
-            uid = self.env.uid
             _logger.info("DAC_ATTENDANCE: get_config called for uid=%s", uid)
-            
-            employee = self.env['hr.employee'].sudo().search(
-                [('user_id', '=', uid)], limit=1
-            )
             _logger.info("DAC_ATTENDANCE: employee=%s", employee)
-            
+
             if not employee:
                 return {
                     'has_employee': False,
                     'has_config': False,
+                    'is_attendance_manager': is_attendance_manager,
+                    'employee_archived': False,
+                }
+            if not employee.active:
+                return {
+                    'has_employee': False,
+                    'has_config': False,
+                    'is_attendance_manager': is_attendance_manager,
+                    'employee_archived': True,
+                    'employee_name': employee.name or '',
                 }
 
             # Search config with sudo to avoid access issues
@@ -184,6 +194,8 @@ class HrEmployeeAttendanceConfig(models.Model):
 
             result = {
                 'has_employee': True,
+                'is_attendance_manager': is_attendance_manager,
+                'employee_archived': False,
                 'employee_id': employee.id,
                 'employee_name': employee.name or '',
                 'has_config': bool(config),
@@ -259,7 +271,11 @@ class HrEmployeeAttendanceConfig(models.Model):
         except Exception as e:
             _logger.error("DAC_ATTENDANCE: Error in get_config_for_current_user: %s", e, exc_info=True)
             return {
-                'has_employee': False,
+                'has_employee': bool(employee and employee.active),
+                'employee_id': employee.id if employee and employee.active else False,
+                'employee_name': employee.name if employee else '',
                 'has_config': False,
+                'is_attendance_manager': is_attendance_manager,
+                'employee_archived': bool(employee and not employee.active),
                 'error': str(e),
             }

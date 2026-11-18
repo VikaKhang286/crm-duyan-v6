@@ -33,6 +33,9 @@ export class DacAttendanceSystray extends Component {
             isLate: false,
             lateMinutes: 0,
             isOvertime: false,
+            isAttendanceManager: false,
+            employeeArchived: false,
+            loadError: false,
         });
 
         onWillStart(async () => {
@@ -87,7 +90,10 @@ export class DacAttendanceSystray extends Component {
                 []
             );
             if (result) {
+                this.state.loadError = result.error || false;
                 this.state.hasEmployee = result.has_employee;
+                this.state.isAttendanceManager = Boolean(result.is_attendance_manager);
+                this.state.employeeArchived = Boolean(result.employee_archived);
                 this.state.hasConfig = result.has_config;
                 this.state.checkInMethod = result.check_in_method || "location";
                 this.state.employeeName = result.employee_name || "";
@@ -113,6 +119,7 @@ export class DacAttendanceSystray extends Component {
             }
         } catch (e) {
             console.error("DAC Attendance: failed to load config", e);
+            this.state.loadError = e.message || "Không thể tải dữ liệu chấm công";
         }
     }
 
@@ -147,6 +154,8 @@ export class DacAttendanceSystray extends Component {
     }
 
     get statusLabel() {
+        if (this.state.loadError) return "LỖI CHẤM CÔNG";
+        if (!this.state.hasEmployee && this.state.isAttendanceManager) return "QUẢN LÝ CHẤM CÔNG";
         if (!this.state.hasEmployee) return "CHẤM CÔNG";
         if (this.state.loading) return "Đang xử lý...";
         if (this.state.checkedIn && this.state.isOvertime) return "ĐANG LÀM THÊM";
@@ -172,6 +181,11 @@ export class DacAttendanceSystray extends Component {
     }
 
     get statusTitle() {
+        if (this.state.loadError) return "Không tải được dữ liệu chấm công";
+        if (this.state.employeeArchived) return "Hồ sơ nhân viên đã bị lưu trữ";
+        if (!this.state.hasEmployee && this.state.isAttendanceManager) {
+            return "Tài khoản quản trị chưa liên kết hồ sơ nhân viên";
+        }
         if (!this.state.hasEmployee) return "Không có hồ sơ nhân viên";
         return this.state.checkedIn
             ? "Đang làm việc - Có thể check-out"
@@ -204,6 +218,15 @@ export class DacAttendanceSystray extends Component {
     }
 
     get statusMetaText() {
+        if (this.state.loadError) {
+            return "Không tải được dữ liệu chấm công. Vui lòng thử lại";
+        }
+        if (this.state.employeeArchived) {
+            return "Hồ sơ nhân viên đã bị lưu trữ";
+        }
+        if (!this.state.hasEmployee && this.state.isAttendanceManager) {
+            return "Tài khoản quản trị chưa liên kết hồ sơ nhân viên";
+        }
         if (!this.state.hasEmployee) {
             return "Bạn chưa có hồ sơ nhân viên";
         }
@@ -240,6 +263,12 @@ export class DacAttendanceSystray extends Component {
 
     async onClickAttendance(isCheckOut = this.state.checkedIn) {
         if (this.state.loading) return;
+        if (this.state.loadError) {
+            this.notification.add("Không tải được dữ liệu chấm công. Vui lòng tải lại trang.", {
+                type: "danger",
+            });
+            return;
+        }
         if (!this.state.hasEmployee) {
             this.notification.add("Bạn chưa có hồ sơ nhân viên trong hệ thống.", {
                 type: "warning",
@@ -452,4 +481,3 @@ for (const key of Object.keys(systrayRegistry.content || {})) {
 registry.category("systray").add("dac_attendance.AttendanceSystray", {
     Component: DacAttendanceSystray,
 }, { sequence: 25 });
-

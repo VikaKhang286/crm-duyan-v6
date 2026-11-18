@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- DAC Manager and Odoo Administrator inherit the complete standard
+             Attendance Manager permission. This keeps menus, record rules,
+             dashboard RPCs and approval actions on one source of truth. -->
+        <record id="dac_erp.group_dac_erp_manager" model="res.groups">
+            <field name="implied_ids" eval="[(4, ref('hr_attendance.group_hr_attendance_manager'))]"/>
+        </record>
+        <record id="base.group_system" model="res.groups">
+            <field name="implied_ids" eval="[(4, ref('hr_attendance.group_hr_attendance_manager'))]"/>
+        </record>
+    </data>
+</odoo>

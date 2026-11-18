@@ -149,8 +149,18 @@ class ResUsersDac(models.Model):
         # khiến combo group thêm vào nhưng các group con không kèm theo.
         dac = self._dac_groups()
         all_ids = {g.id for g in dac.values()}
+        attendance_manager = self.env.ref(
+            'hr_attendance.group_hr_attendance_manager',
+            raise_if_not_found=False,
+        )
+        role_managed_ids = all_ids | (
+            {attendance_manager.id} if attendance_manager else set())
         for user in self:
-            non_dac = [gid for gid in user.groups_id.ids if gid not in all_ids]
+            # Attendance Manager is implied by DAC Manager/Admin and must not
+            # become a sticky standalone permission after changing DAC role.
+            non_dac = [
+                gid for gid in user.groups_id.ids if gid not in role_managed_ids
+            ]
             target_ids = set(non_dac)
             action = user._dac_home_action(user.dac_role)
             if user.dac_role:

@@ -218,10 +218,29 @@ class HrAttendanceWithGeolocation(models.Model):
                 shift_cutoff = attendance._get_shift_work_cutoff(
                     attendance.employee_id, attendance.check_in)
                 effective_check_out = min(attendance.check_out, shift_cutoff)
-                attendance.worked_hours = attendance._get_worked_hours_in_range(
+                attendance.worked_hours = attendance._calculate_worked_hours(
                     attendance.check_in, effective_check_out)
             else:
                 attendance.worked_hours = False
+
+    def _calculate_worked_hours(self, start_dt, end_dt):
+        """Calculate hours through Odoo's native compute on every Odoo 18 build.
+
+        Newer Odoo 18 releases expose ``_get_worked_hours_in_range`` while
+        older production builds keep the calculation inline in
+        ``_compute_worked_hours``. A virtual record plus ``super`` preserves
+        each build's calendar/lunch logic without relying on the newer API.
+        """
+        self.ensure_one()
+        if not start_dt or not end_dt or end_dt <= start_dt:
+            return 0.0
+        virtual_attendance = self.new({
+            'employee_id': self.employee_id.id,
+            'check_in': start_dt,
+            'check_out': end_dt,
+        })
+        super(HrAttendanceWithGeolocation, virtual_attendance)._compute_worked_hours()
+        return virtual_attendance.worked_hours or 0.0
 
     def _get_worked_hours_as_of(self, as_of=None):
         """Return calendar-aware hours for open and closed attendance records."""
@@ -236,15 +255,7 @@ class HrAttendanceWithGeolocation(models.Model):
         )
         if effective_end <= self.check_in:
             return 0.0
-        if self.check_out:
-            return self._get_worked_hours_in_range(self.check_in, effective_end)
-        virtual_attendance = self.new({
-            'employee_id': self.employee_id.id,
-            'check_in': self.check_in,
-            'check_out': effective_end,
-        })
-        return virtual_attendance._get_worked_hours_in_range(
-            self.check_in, effective_end)
+        return self._calculate_worked_hours(self.check_in, effective_end)
 
     def _get_employee_calendar(self, employee=None):
         # employee=None: called by Odoo base without arg (uses self.employee_id)
