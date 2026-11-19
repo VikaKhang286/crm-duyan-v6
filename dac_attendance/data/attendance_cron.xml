@@ -32,6 +32,12 @@
         </record>
     </data>
 
+    <!-- Apply the lower priority on upgrades as well, including when a repair is already inactive. -->
+    <function model="ir.cron" name="write" eval="([
+        ref('dac_attendance.cron_normalize_overnight_attendances'),
+        ref('dac_attendance.cron_recompute_attendance_cutoffs'),
+    ], {'priority': 10})"/>
+
     <!-- Existing databases may have created this cron while it was noupdate.
          Unlock it first so an upgrade restores the active state and schedule. -->
     <function model="ir.model.data" name="write">

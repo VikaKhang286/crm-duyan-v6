@@ -14,6 +14,7 @@ from odoo.exceptions import ValidationError
 
 
 _logger = logging.getLogger(__name__)
+_ATTENDANCE_BACKFILL_BATCH_SIZE = 50
 
 
 def haversine_distance(lat1, lon1, lat2, lon2):
@@ -631,22 +632,17 @@ class HrAttendanceWithGeolocation(models.Model):
     @api.model
     def _cron_recompute_attendance_cutoffs(self):
         """One-time upgrade repair for stored dates and capped worked hours."""
-        attendances = self.sudo().search([('check_in', '!=', False)])
-        for attendance in attendances:
-            attendance._compute_check_in_date()
-            attendance._compute_worked_hours()
-            attendance._compute_worked_hours_display()
-        cron = self.env.ref(
+        return self._run_attendance_backfill(
             'dac_attendance.cron_recompute_attendance_cutoffs',
-            raise_if_not_found=False,
+            [('check_in', '!=', False)],
+            type(self)._recompute_attendance_cutoff_batch,
         )
-        if cron:
-            # ir.cron refuses ORM writes to the job currently holding its
-            # execution lock. This transaction already owns that row lock, so
-            # disable the one-shot job directly and commit it with the repair.
-            self.env.cr.execute(
-                'UPDATE ir_cron SET active = FALSE WHERE id = %s', [cron.id])
-        return len(attendances)
+
+    def _recompute_attendance_cutoff_batch(self):
+        self._compute_check_in_date()
+        self._compute_worked_hours()
+        self._compute_worked_hours_display()
+        return len(self)
 
     def _get_shift_work_cutoff(self, employee, check_in):
         """Return 17:30 on the employee-local check-in date in UTC."""
@@ -691,58 +687,68 @@ class HrAttendanceWithGeolocation(models.Model):
 
     @api.model
     def _cron_normalize_overnight_attendances(self):
-        """One-time repair for historical attendances spanning a local day.
-
-        Before the midnight auto-checkout rule existed, an employee who forgot
-        to check out could leave a closed attendance spanning several days.
-        Historical records are capped at 23:59:59 on their local check-in day.
-        The scheduled action disables itself once complete.
-        """
-        repaired_count = 0
-        failed_count = 0
-        attendances = self.sudo().search([
-            ('check_in', '!=', False),
-            ('check_out', '!=', False),
-        ])
-
-        for attendance in attendances:
-            employee = attendance.employee_id
-            try:
-                cutoff_utc = self._get_auto_checkout_cutoff(
-                    employee, attendance.check_in)
-
-                if attendance.check_out > cutoff_utc:
-                    checkout_status = self._build_check_out_status(
-                        employee, cutoff_utc - timedelta(microseconds=1))
-                    attendance.write({
-                        'check_out': cutoff_utc,
-                        'is_early_leave': checkout_status['is_early_leave'],
-                    })
-                    repaired_count += 1
-            except Exception:
-                failed_count += 1
-                _logger.exception(
-                    'Unable to normalize overnight attendance %s for employee %s',
-                    attendance.id, employee.id,
-                )
-
-        cron = self.env.ref(
+        """Cap historical check-outs at 23:59:59 on the local check-in day."""
+        return self._run_attendance_backfill(
             'dac_attendance.cron_normalize_overnight_attendances',
-            raise_if_not_found=False,
+            [('check_in', '!=', False), ('check_out', '!=', False)],
+            type(self)._normalize_overnight_attendance_batch,
         )
-        if cron and not failed_count:
-            # ir.cron locks its own row while executing, so ORM write() is
-            # rejected here. Updating within the current transaction safely
-            # marks this one-shot repair job inactive.
-            self.env.cr.execute(
-                'UPDATE ir_cron SET active = FALSE WHERE id = %s',
-                [cron.id],
-            )
-        _logger.info(
-            'DAC Attendance: normalized %s historical overnight attendance(s); %s failed',
-            repaired_count, failed_count,
-        )
+
+    def _normalize_overnight_attendance_batch(self):
+        repaired_count = 0
+        for attendance in self:
+            employee = attendance.employee_id
+            cutoff_utc = self._get_auto_checkout_cutoff(employee, attendance.check_in)
+            if attendance.check_out > cutoff_utc:
+                checkout_status = self._build_check_out_status(
+                    employee, cutoff_utc - timedelta(microseconds=1))
+                attendance.write({
+                    'check_out': cutoff_utc,
+                    'is_early_leave': checkout_status['is_early_leave'],
+                })
+                repaired_count += 1
         return repaired_count
+
+    @api.model
+    def _run_attendance_backfill(self, cron_xmlid, domain, process_batch):
+        """Process one batch per scheduled execution and checkpoint it atomically."""
+        # If a live request holds a needed row, retry the batch on the next run.
+        self.env.cr.execute("SET LOCAL lock_timeout = '1s'")
+        params = self.env['ir.config_parameter'].sudo()
+        progress_key = f'{cron_xmlid}.progress'
+        progress = params.get_param(progress_key)
+        # This maintenance job must include historical records from every employee.
+        attendances = self.sudo()
+        if progress:
+            last_id, end_id = json.loads(progress)
+        else:
+            last_id = 0
+            latest = attendances.search(domain, order='id desc', limit=1)
+            end_id = latest.id or 0
+
+        if progress and last_id == end_id:
+            self.env['ir.cron']._notify_progress(done=0, remaining=0, deactivate=True)
+            return 0
+
+        candidates = attendances.search(
+            domain + [('id', '>', last_id), ('id', '<=', end_id)],
+            order='id', limit=_ATTENDANCE_BACKFILL_BATCH_SIZE + 1,
+        )
+        batch = candidates[:_ATTENDANCE_BACKFILL_BATCH_SIZE]
+        processed_count = process_batch(batch)
+        self.env.flush_all()
+        finished = len(candidates) <= _ATTENDANCE_BACKFILL_BATCH_SIZE
+        next_id = end_id if finished else batch[-1].id
+        params.set_param(progress_key, json.dumps([next_id, end_id]))
+
+        if finished:
+            # The scheduler owns the ir.cron row lock on a different cursor.
+            self.env['ir.cron']._notify_progress(done=len(batch), remaining=0, deactivate=True)
+        # Intermediate calls use the regular interval, giving other jobs a turn.
+        _logger.info('DAC Attendance backfill %s: processed %s records in IDs (%s, %s]%s',
+                     cron_xmlid, len(batch), last_id, next_id,
+                     ' (complete)' if finished else '')
+        return processed_count
 
     def _validate_gps_location(self, employee_id, latitude, longitude, accuracy=None):
         """
