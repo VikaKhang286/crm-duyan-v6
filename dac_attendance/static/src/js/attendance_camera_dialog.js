@@ -221,9 +221,6 @@ export class DacAttendanceCameraDialog extends Component {
         addressLines.forEach((line, index) => {
             ctx.fillText(line, detailX, firstAddressY + index * lineHeight);
         });
-        ctx.fillStyle = "rgba(255, 255, 255, 0.72)";
-        ctx.font = `${Math.round(11 * scale)}px Arial, sans-serif`;
-        ctx.fillText("@OpenStreetMap contributors", detailX, badgeY + Math.round(139 * scale));
 
         // Get base64 after all persistent overlays have been drawn.
         const dataUrl = canvas.toDataURL("image/jpeg", 0.88);

@@ -100,7 +100,6 @@
                             <div t-attf-class="o_dac_captured_details {{ props.isCheckOut ? 'o_dac_captured_details--out' : '' }}">
                                 <strong><t t-esc="capturedDateText"/></strong>
                                 <span><i class="fa fa-map-marker me-1"/><t t-esc="capturedLocationText"/></span>
-                                <small class="o_dac_map_attribution">@OpenStreetMap contributors</small>
                             </div>
                         </div>
                     </div>

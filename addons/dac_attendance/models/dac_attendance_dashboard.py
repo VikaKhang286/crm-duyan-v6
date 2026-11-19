@@ -107,7 +107,7 @@ class DacAttendanceDashboard(models.AbstractModel):
         while d <= month_end:
             if d > today:
                 status = 'future'
-            elif d.weekday() >= 5:
+            elif d.weekday() >= 6:
                 status = 'weekend'
             elif d in leave_dates:
                 status = 'leave'
@@ -394,7 +394,7 @@ class DacAttendanceDashboard(models.AbstractModel):
         # check_in_date (the local business date stored by the attendance
         # extension) so the dashboard is stable around the UTC midnight edge.
         week_start = today - timedelta(days=today.weekday())
-        workday_names = ('Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6')
+        workday_names = ('Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7')
         total_employees = len(all_employees)
         weekly_attendance = []
         for offset, day_name in enumerate(workday_names):
