@@ -403,7 +403,7 @@ class HrAttendanceWithGeolocation(models.Model):
         """Reopen one daily record without destroying its regular-shift check-in."""
         check_in = vals['check_in']
         employee = existing.employee_id
-        is_overtime = not self._get_auto_checkout_cutoff(employee, check_in)
+        is_overtime = self._is_after_shift_work_cutoff(employee, check_in)
         reset_vals = {
             'check_out': False,
             'check_out_photo': False,
@@ -418,8 +418,8 @@ class HrAttendanceWithGeolocation(models.Model):
             # A regular check-in already exists: retain it for attendance and
             # payroll, and store the overtime session separately on the same
             # one-record-per-day attendance.
-            has_regular_shift = bool(
-                self._get_auto_checkout_cutoff(employee, existing.check_in))
+            has_regular_shift = not self._is_after_shift_work_cutoff(
+                employee, existing.check_in)
             write_vals = reset_vals | {
                 'overtime_check_in': check_in,
                 'overtime_check_out': False,
@@ -461,7 +461,7 @@ class HrAttendanceWithGeolocation(models.Model):
                     attendances |= attendance
                     continue
                 employee = Employee.browse(employee_id)
-                if not self._get_auto_checkout_cutoff(employee, check_in):
+                if self._is_after_shift_work_cutoff(employee, check_in):
                     vals['overtime_check_in'] = check_in
             attendances |= super(HrAttendanceWithGeolocation, self).create([vals])
         return attendances
@@ -542,7 +542,7 @@ class HrAttendanceWithGeolocation(models.Model):
 
     @api.model
     def _cron_auto_check_out_at_cutoff(self):
-        """Close forgotten open attendances at the employee-local 18:00 cutoff."""
+        """Close forgotten open attendances at 23:59:59 employee-local time."""
         now_utc = fields.Datetime.now()
         closed_count = 0
 
@@ -573,7 +573,7 @@ class HrAttendanceWithGeolocation(models.Model):
         return self._cron_auto_check_out_at_cutoff()
 
     def _auto_check_out_if_past_cutoff(self, now_utc=None):
-        """Close this open attendance at the first local 18:00 after check-in.
+        """Close this open attendance at 23:59:59 on its local check-in day.
 
         Besides the scheduled action, this is intentionally called while the
         systray refreshes the current employee's state.  It is a narrowly
@@ -591,9 +591,6 @@ class HrAttendanceWithGeolocation(models.Model):
         ])
         if self.check_out or not self.check_in:
             return False
-        if self.overtime_check_in and not self.overtime_check_out:
-            return False
-
         cutoff_utc = self._get_auto_checkout_cutoff(employee, self.check_in)
         if not cutoff_utc:
             return False
@@ -601,26 +598,27 @@ class HrAttendanceWithGeolocation(models.Model):
             return False
 
         checkout_status = self._build_check_out_status(employee, cutoff_utc)
-        self.write({
+        values = {
             'check_out': cutoff_utc,
             'is_early_leave': checkout_status['is_early_leave'],
-        })
+        }
+        if self.overtime_check_in and not self.overtime_check_out:
+            values['overtime_check_out'] = cutoff_utc
+        self.write(values)
         return True
 
     def _get_auto_checkout_cutoff(self, employee, check_in):
-        """Return 18:00 for a normal shift.
+        """Return 23:59:59 on ``check_in``'s employee-local day.
 
-        A check-in at/after 18:00 is deliberate overtime (the client asks for
-        confirmation), so it requires a manual check-out and has no automatic
-        cutoff.
+        This cutoff closes every open daily record, including overtime. The
+        separate 17:30 work-hours cap is intentionally unchanged.
         """
         employee_tz = ZoneInfo(self._get_employee_timezone(employee))
         check_in_local = check_in.replace(
             tzinfo=ZoneInfo('UTC')).astimezone(employee_tz)
         cutoff_local = datetime.combine(
-            check_in_local.date(), time(hour=18), tzinfo=employee_tz)
-        if check_in_local >= cutoff_local:
-            return False
+            check_in_local.date(), time(hour=23, minute=59, second=59),
+            tzinfo=employee_tz)
         return cutoff_local.astimezone(ZoneInfo('UTC')).replace(tzinfo=None)
 
     def _get_auto_checkout_message(self, employee, cutoff_utc):
@@ -693,15 +691,13 @@ class HrAttendanceWithGeolocation(models.Model):
 
     @api.model
     def _cron_normalize_overnight_attendances(self):
-        """One-time repair for historical attendances spanning midnight.
+        """One-time repair for historical attendances spanning a local day.
 
         Before the midnight auto-checkout rule existed, an employee who forgot
         to check out could leave a closed attendance spanning several days.
-        The agreed business rule is that every attendance ends at the first
-        local midnight after its check-in, so historical records follow that
-        same rule.  The scheduled action disables itself once complete.
+        Historical records are capped at 23:59:59 on their local check-in day.
+        The scheduled action disables itself once complete.
         """
-        utc_tz = ZoneInfo('UTC')
         repaired_count = 0
         failed_count = 0
         attendances = self.sudo().search([
@@ -712,14 +708,8 @@ class HrAttendanceWithGeolocation(models.Model):
         for attendance in attendances:
             employee = attendance.employee_id
             try:
-                employee_tz = ZoneInfo(self._get_employee_timezone(employee))
-                check_in_local = attendance.check_in.replace(
-                    tzinfo=utc_tz).astimezone(employee_tz)
-                next_midnight_local = datetime.combine(
-                    check_in_local.date() + timedelta(days=1), time.min,
-                    tzinfo=employee_tz,
-                )
-                cutoff_utc = next_midnight_local.astimezone(utc_tz).replace(tzinfo=None)
+                cutoff_utc = self._get_auto_checkout_cutoff(
+                    employee, attendance.check_in)
 
                 if attendance.check_out > cutoff_utc:
                     checkout_status = self._build_check_out_status(

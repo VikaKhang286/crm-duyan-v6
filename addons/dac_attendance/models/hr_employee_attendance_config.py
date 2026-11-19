@@ -231,7 +231,7 @@ class HrEmployeeAttendanceConfig(models.Model):
 
             # The scheduled action is the primary reset mechanism. The
             # systray polling path closes only this user's stale open record
-            # as a fallback after the employee-local 18:00 checkout cutoff.
+            # as a fallback after the employee-local 23:59:59 checkout cutoff.
             if open_att and open_att._auto_check_out_if_past_cutoff():
                 open_att = Attendance.browse()
             

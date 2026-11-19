@@ -50,7 +50,7 @@ export class DacAttendanceSystray extends Component {
     _startStatusRefresh() {
         this._scheduleAutoCheckoutRefresh();
         // This is a fallback if Odoo's scheduled job starts a little after
-        // 18:00, or if a browser delays the timeout in the background.
+        // 23:59:59, or if a browser delays the timeout in the background.
         this.statusRefreshInterval = window.setInterval(() => this.loadConfig(), 60 * 1000);
         document.addEventListener("visibilitychange", this.visibilityChangeHandler);
     }
@@ -73,7 +73,7 @@ export class DacAttendanceSystray extends Component {
         }
         const now = new Date();
         const nextCutoff = new Date(now);
-        nextCutoff.setHours(18, 0, 5, 0);
+        nextCutoff.setHours(23, 59, 59, 0);
         if (nextCutoff <= now) {
             nextCutoff.setDate(nextCutoff.getDate() + 1);
         }

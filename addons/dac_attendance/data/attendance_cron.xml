@@ -2,7 +2,7 @@
 <odoo>
     <data noupdate="1">
         <!-- Runs once after this version is installed/upgraded, then disables
-             itself. It repairs records created before the midnight rule. -->
+             itself. It repairs records created before the 23:59:59 rule. -->
         <record id="cron_normalize_overnight_attendances" model="ir.cron">
             <field name="name">Chấm công: chuẩn hóa lịch sử qua ngày</field>
             <field name="model_id" ref="hr_attendance.model_hr_attendance"/>
@@ -39,10 +39,10 @@
         <value eval="{'noupdate': False}"/>
     </function>
 
-    <!-- Runs every minute so employee-local 18:00 is enforced without
+    <!-- Runs every minute so employee-local 23:59:59 is enforced without
          depending on the server timezone. -->
     <record id="cron_auto_check_out_at_midnight" model="ir.cron">
-        <field name="name">Chấm công: tự check-out lúc 18:00</field>
+        <field name="name">Chấm công: tự check-out lúc 23:59:59</field>
         <field name="model_id" ref="hr_attendance.model_hr_attendance"/>
         <field name="state">code</field>
         <field name="code">model._cron_auto_check_out_at_cutoff()</field>
