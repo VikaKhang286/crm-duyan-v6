@@ -9,6 +9,15 @@
                 <button class="oe_stat_button" type="object" name="action_open_waits" icon="fa-bell">
                     <field name="reminded_24h" widget="statinfo" string="Đã nhắc 24 giờ"/>
                 </button>
+                <button class="oe_stat_button" type="object" name="action_open_scenarios" icon="fa-sliders">
+                    <div class="o_stat_info"><span class="o_stat_text">Kịch bản nhắc</span></div>
+                </button>
+                <button class="oe_stat_button" type="object" name="action_open_appointments" icon="fa-calendar-check-o">
+                    <div class="o_stat_info"><span class="o_stat_text">Lịch hẹn với khách</span></div>
+                </button>
+                <button class="oe_stat_button" type="object" name="action_open_staff" icon="fa-users">
+                    <div class="o_stat_info"><span class="o_stat_text">Nhân viên ↔ Zalo</span></div>
+                </button>
                 <button class="oe_stat_button" type="object" name="action_open_contacts" icon="fa-line-chart">
                     <div class="o_stat_info"><span class="o_stat_text">Thống kê khách mới</span></div>
                 </button>
@@ -28,28 +37,46 @@
                     <field name="active" widget="boolean_toggle" nolabel="1"/>
                 </div>
             </div>
+            <div class="alert alert-warning" role="alert" invisible="remind_real_channels">
+                <i class="fa fa-flask"/> <strong>Đang chạy thử:</strong> mọi tin nhắc (kể cả của khách thật) chỉ gửi vào hội thoại Zalo đánh dấu
+                "Thử nghiệm". Bật "Gửi nhắc vào nhóm thật" khi đã duyệt.
+            </div>
             <div class="alert alert-info" role="alert">
-                Khách nhắn page Pancake mà quá hạn (giờ làm việc T2–T7, 8–12h, 13h30–17h30) chưa có nhân viên trả lời thì bot gửi ảnh chụp hội thoại
-                + tag tên + link vào các nhóm Zalo nhận loại tin <strong>Khách Pancake chưa được trả lời</strong>. Trước lần nhắc đầu, AI đọc đoạn chat:
-                khách chỉ "ok em", cảm ơn, gửi biểu tượng sau tin của sale, hoặc tin rác thì không nhắc.
-                <br/><strong>Khách mới</strong>: quá 15 phút thì nhắc, rồi cứ 10 phút nhắc lại (tag tên + trả lời vào ảnh đã gửi, không gửi lại ảnh) tới khi có người trả lời.
-                <br/><strong>Khách cũ</strong>: quá 30 phút thì nhắc đúng một lần.
-                <br/>Tin tổng 8:00 / 11:30 / 17:00 kèm thống kê khách liên hệ mới (form web + Pancake) — chỉ gửi vào hội thoại thử nghiệm, trừ khi bật "Gửi thống kê vào nhóm thật". Thả cảm xúc <strong>không</strong> làm dừng nhắc.
-                Không tính: nhóm/cộng đồng Zalo, khách nội bộ, thông báo sinh nhật, reaction.
+                Mỗi lần đến hạn, hệ thống tải lại tin Pancake xem đã có nhân viên trả lời chưa; AI đọc đoạn chat để bỏ qua khách không cần trả lời,
+                đánh giá mức gấp (🚨 Khẩn · ⚠️ Chú ý · 🔔 Thường; tự nâng khi khách chờ quá 1 giờ / 2 giờ làm việc) và tóm tắt khách cần gì.
+                Giờ làm việc T2–T7, 8–12h, 13h30–17h30; khách nhắn ngoài giờ có trong tin tổng 8:00, nhắc riêng từ 8:30.
+                <br/><strong>Khách mới</strong>: quá hạn thì nhắc riêng bằng ảnh hội thoại, rồi nhắc lại bằng cách trả lời vào ảnh đó (không gửi lại ảnh), tối đa 4 lần.
+                <br/><strong>Đang trao đổi</strong> (nhân viên đã trả lời trong ngày, khách nhắn tiếp) và <strong>khách cũ</strong>: quá hạn thì gom vào một tin
+                mỗi 30 phút, mỗi dòng "Tên: AI tóm tắt — link", tag nhân viên đã chat với khách; AI đánh giá Khẩn thì nhắc riêng có ảnh.
+                <br/>Chưa xác định được nhân viên (chưa ghép ở "Nhân viên ↔ Zalo" hoặc trả lời từ app Zalo) thì tag những người được cài sẵn.
+                Thả cảm xúc <strong>không</strong> làm dừng nhắc. Không tính: nhóm/cộng đồng Zalo, khách nội bộ, thông báo sinh nhật, reaction.
             </div>
             <group>
-                <group string="Thời gian nhắc">
-                    <field name="wait_minutes"/>
-                    <field name="repeat_minutes"/>
-                    <field name="old_wait_minutes"/>
+                <group string="Kịch bản nhắc">
+                    <div colspan="2">
+                        Thời gian, số lần, mẫu tin và bật/tắt từng loại nhắc (khách mới, nhắc lại, đang trao đổi, khách cũ, khẩn, tin gom,
+                        lịch hẹn, nhắc việc 8:00, thống kê) nằm ở <strong>Kịch bản nhắc</strong>. Mỗi tin đã gửi có trong <strong>Nhật ký nhắc</strong>.
+                        <div class="mt-2 d-flex gap-2">
+                            <button name="action_open_scenarios" type="object" string="Kịch bản nhắc" class="btn-primary" icon="fa-sliders"/>
+                            <button name="action_open_events" type="object" string="Nhật ký nhắc" class="btn-secondary" icon="fa-history"/>
+                        </div>
+                    </div>
                     <field name="ai_check"/>
+                </group>
+                <group string="Gửi vào đâu">
+                    <field name="remind_real_channels"/>
                     <field name="stats_real_channels"/>
+                    <field name="last_digest_at" invisible="not last_digest_at"/>
+                </group>
+                <group string="Đọc lại hôm qua">
+                    <field name="review_date" invisible="not review_date"/>
+                    <field name="review_done" invisible="not review_date"/>
+                    <field name="morning_sent_date" invisible="not morning_sent_date"/>
                 </group>
                 <group string="Phạm vi">
                     <field name="page_ids" widget="many2many_tags" options="{'no_create': True, 'no_open': True}"
                            placeholder="Để trống = mọi page đã thêm"/>
                     <field name="effective_page_ids" widget="many2many_tags" options="{'no_create': True, 'no_open': True}" readonly="1"/>
-                    <field name="only_new_customers"/>
                     <field name="live_check"/>
                 </group>
             </group>
@@ -98,8 +125,11 @@
             <field name="customer_name"/>
             <field name="page_name"/>
             <field name="customer_kind" widget="badge" optional="show"/>
+            <field name="level" widget="badge" optional="show" decoration-danger="level == 'urgent'" decoration-warning="level == 'high'"/>
             <field name="state" widget="badge"/>
-            <field name="ai_reason" optional="show"/>
+            <field name="summary" optional="show"/>
+            <field name="staff_id" optional="show"/>
+            <field name="ai_reason" optional="hide"/>
             <field name="remind_count"/>
             <field name="last_reminded_at"/>
             <field name="due_at" optional="hide"/>
@@ -120,7 +150,8 @@
                     <field name="last_reminded_at"/><field name="answered_at"/>
                 </group>
                 <group string="Loại khách / AI">
-                    <field name="customer_kind"/><field name="ai_state"/><field name="ai_reason"/><field name="ai_source"/><field name="ai_checked_at"/>
+                    <field name="customer_kind"/><field name="level"/><field name="summary"/><field name="staff_id"/><field name="digest_pending"/>
+                    <field name="ai_state"/><field name="ai_reason"/><field name="ai_source"/><field name="ai_checked_at"/>
                 </group>
             </group>
             <field name="zalo_message_ids"><list><field name="channel_id"/><field name="state"/><field name="sent_at"/><field name="text"/></list></field>
@@ -135,7 +166,15 @@
             <filter name="not_needed" string="AI: không cần trả lời" domain="[('state', '=', 'not_needed')]"/>
             <separator/>
             <filter name="kind_new" string="Khách mới" domain="[('customer_kind', '=', 'new')]"/>
+            <filter name="kind_ongoing" string="Đang trao đổi" domain="[('customer_kind', '=', 'ongoing')]"/>
             <filter name="kind_old" string="Khách cũ" domain="[('customer_kind', '=', 'old')]"/>
+            <separator/>
+            <filter name="urgent" string="🚨 Khẩn" domain="[('level', '=', 'urgent')]"/>
+            <filter name="high" string="⚠️ Chú ý" domain="[('level', '=', 'high')]"/>
+            <group expand="0" string="Nhóm theo">
+                <filter name="g_staff" string="Nhân viên" context="{'group_by': 'staff_id'}"/>
+                <filter name="g_level" string="Mức độ gấp" context="{'group_by': 'level'}"/>
+            </group>
         </search></field>
     </record>
     <record id="remind_wait_action" model="ir.actions.act_window">
@@ -227,6 +266,10 @@
     <menuitem id="menu_pancake_waits" name="Khách đang chờ trả lời" parent="menu_section_pancake" action="remind_wait_action" sequence="20"/>
     <menuitem id="menu_pancake_pages" name="Page Pancake" parent="menu_section_pancake" action="pancake_page_action"
               groups="base.group_system" sequence="5"/>
+    <menuitem id="menu_pancake_scenarios" name="Kịch bản nhắc" parent="menu_section_pancake" action="scenario_action" sequence="12"/>
+    <menuitem id="menu_pancake_events" name="Nhật ký nhắc" parent="menu_section_pancake" action="event_action" sequence="24"/>
+    <menuitem id="menu_pancake_appointments" name="Lịch hẹn với khách" parent="menu_section_pancake" action="appointment_action" sequence="22"/>
+    <menuitem id="menu_pancake_staff" name="Nhân viên Pancake ↔ Zalo" parent="menu_section_pancake" action="pancake_staff_action" sequence="40"/>
     <menuitem id="menu_pancake_conversations" name="Hội thoại Pancake" parent="menu_section_pancake" action="pancake_conversation_action" sequence="30"/>
     <record id="menu_section_pancake" model="ir.ui.menu"><field name="web_icon">fa-comments</field></record>
 </odoo>

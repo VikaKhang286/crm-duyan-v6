@@ -48,9 +48,6 @@ class ZaloConfig(models.Model):
     ai_enabled = fields.Boolean(string='Bật AI', default=False)
     ai_auto_reply = fields.Boolean(string='AI trả lời tin nhắn thông thường', default=False,
         help='Khi tắt, nhân viên dùng /ai để yêu cầu AI. Lệnh /congviec không cần AI.')
-    ai_base_url = fields.Char(string='AI Base URL', default='https://api.openai.com/v1', groups='base.group_system')
-    ai_api_key = fields.Char(string='AI API key', copy=False, groups='base.group_system')
-    ai_model = fields.Char(string='Model', groups='base.group_system')
     ai_include_tasks = fields.Boolean(string='Cho AI xem công việc của người hỏi', default=True,
         help='Chỉ gửi tối đa 10 công việc được giao cho chính nhân viên, theo quyền Odoo của họ.')
     ai_instructions = fields.Text(string='Hướng dẫn bổ sung cho AI', groups='base.group_system')
@@ -63,16 +60,12 @@ class ZaloConfig(models.Model):
         if not self.env.user.has_group('base.group_system'):
             raise AccessError(_('Chỉ quản trị hệ thống được thay đổi kết nối và AI.'))
 
-    @api.constrains('bridge_url', 'ai_base_url', 'ai_enabled', 'ai_model', 'ai_api_key', 'bridge_token', 'active')
+    @api.constrains('bridge_url', 'bridge_token', 'active')
     def _validate_config(self):
         for config in self:
             check_url(config.bridge_url)
-            if config.ai_base_url:
-                check_url(config.ai_base_url)
             if config.active and len(config.bridge_token or '') < 32:
                 raise ValidationError(_('Khóa kết nối bridge cần ít nhất 32 ký tự.'))
-            if config.ai_enabled and not (config.ai_model and config.ai_api_key and config.ai_base_url):
-                raise ValidationError(_('Nhập Base URL, API key và model trước khi bật AI.'))
 
     def _bridge_request(self, path, payload=None):
         self.ensure_one()
@@ -217,25 +210,13 @@ class ZaloConfig(models.Model):
         else:
             activities.unlink()
 
-    def _ask_ai(self, messages):
+    def _ask_ai(self, messages, user=None):
         self.ensure_one()
         if not self.ai_enabled:
             raise UserError(_('AI chưa được bật.'))
-        try:
-            response = requests.post(
-                self.ai_base_url.rstrip('/') + '/chat/completions',
-                headers={'Authorization': 'Bearer ' + self.ai_api_key},
-                json={'model': self.ai_model, 'messages': messages, 'max_tokens': 1000},
-                timeout=(10, 30), allow_redirects=False,
-            )
-            if response.status_code >= 300:
-                raise UserError(_('Dịch vụ AI trả HTTP %s.') % response.status_code)
-            content = response.json()['choices'][0]['message']['content']
-            if not isinstance(content, str) or not content.strip():
-                raise ValueError('Empty AI answer')
-            return content.strip()[:MAX_TEXT]
-        except (requests.exceptions.RequestException, ValueError, KeyError, IndexError, TypeError):
-            raise UserError(_('Dịch vụ AI chưa phản hồi hợp lệ.')) from None
+        # Gọi qua Kết nối AI dùng chung (dac_ai_core): tự chuyển kết nối dự phòng khi lỗi
+        answer, _kind = self.env['dac.ai.connection']._chat(messages, max_tokens=1000, user=user)
+        return answer[:MAX_TEXT]
 
     def action_test_ai(self):
         self._require_admin()
@@ -257,6 +238,8 @@ class ZaloBinding(models.Model):
     pairing_hash = fields.Char(copy=False, groups='base.group_system', index=True)
     pairing_expires_at = fields.Datetime(copy=False, groups='base.group_system')
     last_code_at = fields.Datetime(copy=False, groups='base.group_system')
+    ai_model_id = fields.Many2one(related='user_id.dac_ai_model_id', readonly=False, groups='base.group_system', string='Model AI riêng',
+        help='Admin chọn model AI cho trợ lý của nhân viên này; để trống = theo thứ tự ở Kết nối AI dùng chung.')
     _sql_constraints = [
         ('user_unique', 'unique(user_id)', 'Mỗi nhân viên chỉ có một liên kết Zalo.'),
         ('zalo_unique', 'unique(zalo_uid)', 'Tài khoản Zalo này đã liên kết với nhân viên khác.'),
@@ -474,7 +457,7 @@ class ZaloMessage(models.Model):
             ('state', 'in', ['received', 'sent', 'ai_pending'])], order='id desc', limit=12)
         prompt.extend({'role': 'user' if item.direction == 'in' else 'assistant', 'content': item.text[:4000]} for item in reversed(history))
         try:
-            answer = config._ask_ai(prompt)
+            answer = config._ask_ai(prompt, user=self.user_id)
         except UserError as error:
             self.write({'state': 'failed', 'error_message': str(error)[:200], 'ai_processed': True})
             self.conversation_id._queue('AI hiện chưa xử lý được. Bạn có thể thử lại hoặc dùng /congviec.', 'reply:%s' % self.id)

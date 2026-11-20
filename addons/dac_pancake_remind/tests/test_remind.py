@@ -12,7 +12,7 @@ from odoo.exceptions import UserError
 from odoo.tests import tagged
 from odoo.tests.common import TransactionCase
 
-from odoo.addons.dac_pancake_remind.models.remind_wait import REMIND_TEXT, classify
+from odoo.addons.dac_pancake_remind.models.remind_wait import classify
 
 PAGE_ID = 'pzl_1571138013671979826'
 CUSTOMER_ID = 'pzl_u_1571138013671979826_4856871187136939928'
@@ -27,6 +27,16 @@ def jpeg():
     return out.getvalue()
 
 
+def reset_scenarios(env):
+    """Kịch bản về mặc định (DB thử có thể đã chỉnh tay)."""
+    values = {'new_first': {'wait_minutes': 10}, 'new_repeat': {'repeat_minutes': 10, 'max_count': 4}, 'ongoing': {'wait_minutes': 15},
+              'old': {'wait_minutes': 30}, 'digest': {'repeat_minutes': 30}, 'appt_pre': {'wait_minutes': 30},
+              'appt_post': {'wait_minutes': 30, 'repeat_minutes': 60, 'max_count': 3}}
+    for scenario in env['dac.pancake.remind.scenario'].search([]):
+        scenario.write(dict(values.get(scenario.code, {}), enabled=True, template=scenario.default_template,
+                            line_template=scenario.default_line_template))
+
+
 unittest_skip_without_wkhtmltoimage = unittest.skipUnless(shutil.which('wkhtmltoimage'), 'cần wkhtmltoimage')
 
 
@@ -36,9 +46,11 @@ class TestPancakeRemind(TransactionCase):
     def setUpClass(cls):
         super().setUpClass()
         cls.env = cls.env(context=dict(cls.env.context, tracking_disable=True))
+        cls.env['dac.ai.connection'].search([]).write({'active': False})  # test không gọi AI thật (dùng luật hoặc giả lập)
         cls.page = cls.env['dac.pancake.page'].create({'name': 'Page thử', 'page_fm_id': PAGE_ID})
         cls.config = cls.env['dac.pancake.remind.config']._get()
-        cls.config.write({'active': True})
+        cls.config.write({'active': True, 'remind_real_channels': True})
+        reset_scenarios(cls.env)
         cls.config.activated_at = T0 - timedelta(hours=1)
         cls.event_type = cls.env.ref('dac_pancake_remind.event_type_pancake_unanswered')
         cls.channel = cls.env['dac.zalo.channel'].create({
@@ -47,6 +59,10 @@ class TestPancakeRemind(TransactionCase):
             {'channel_id': cls.channel.id, 'uid': '111', 'name': 'An'}, {'channel_id': cls.channel.id, 'uid': '222', 'name': 'Bình'}])
         cls.env['dac.zalo.channel.mention'].create({'channel_id': cls.channel.id, 'event_type_id': cls.event_type.id, 'member_ids': [(6, 0, members.ids)]})
         cls.Wait = cls.env['dac.pancake.remind.wait']
+
+    def short(self, fm_id):
+        """Link rút gọn của hội thoại (một link gốc luôn cho cùng một mã)."""
+        return self.env['dac.short.link']._shorten('https://pancake.vn/%s?c_id=%s' % (PAGE_ID, fm_id), kind='p')
 
     def conversation(self, name='Nguyễn Minh Anh', fm_id='c1'):
         return self.env['dac.pancake.conversation'].create({
@@ -93,8 +109,11 @@ class TestPancakeRemind(TransactionCase):
 
     def test_defaults(self):
         config = self.env['dac.pancake.remind.config'].new({})
-        self.assertEqual((config.wait_minutes, config.repeat_minutes, config.old_wait_minutes, config.only_new_customers, config.ai_check),
-                         (15, 10, 30, False, True))
+        self.assertEqual((config.ai_check, config.remind_real_channels), (True, False))
+        defaults = {s.code: (s.wait_minutes, s.repeat_minutes, s.max_count) for s in self.env['dac.pancake.remind.scenario'].search([])}
+        self.assertEqual(sorted(defaults), sorted(['new_first', 'new_repeat', 'ongoing', 'old', 'urgent', 'digest', 'appt_pre', 'appt_post', 'morning', 'stats']))
+        self.assertEqual((defaults['new_first'][0], defaults['new_repeat'][1:], defaults['ongoing'][0], defaults['old'][0], defaults['digest'][1]),
+                         (10, (10, 4), 15, 30, 30))
 
     # ── Phát hiện khách chờ ──────────────────────────────────────────────────────
 
@@ -103,7 +122,7 @@ class TestPancakeRemind(TransactionCase):
         self.message(conv, T0)
         self.scan(T0 + timedelta(minutes=2))
         wait = self.Wait.search([('conversation_id', '=', conv.id)])
-        self.assertEqual((wait.state, wait.since, wait.due_at, wait.is_test), ('waiting', T0, T0 + timedelta(minutes=15), False))
+        self.assertEqual((wait.state, wait.since, wait.due_at, wait.is_test), ('waiting', T0, T0 + timedelta(minutes=10), False))
         self.scan(T0 + timedelta(minutes=4))
         self.assertEqual(self.Wait.search_count([('conversation_id', '=', conv.id)]), 1, 'quét lại không tạo trùng')
 
@@ -112,7 +131,7 @@ class TestPancakeRemind(TransactionCase):
         at = datetime(2026, 11, 10, 4, 55, 0)  # 11:55 giờ VN
         self.message(conv, at)
         self.scan(at + timedelta(minutes=1))
-        self.assertEqual(self.Wait.search([('conversation_id', '=', conv.id)]).due_at, datetime(2026, 11, 10, 6, 40, 0))  # 13:40 VN
+        self.assertEqual(self.Wait.search([('conversation_id', '=', conv.id)]).due_at, datetime(2026, 11, 10, 6, 35, 0))  # 13:35 VN
 
     def test_messages_before_activation_are_ignored(self):
         conv = self.conversation()
@@ -150,7 +169,7 @@ class TestPancakeRemind(TransactionCase):
         self.message(conv, T0 + timedelta(minutes=2), 'bot', text='Chào bạn, shop sẽ phản hồi sớm')
         self.scan(T0 + timedelta(minutes=3))
         self.assertEqual(self.Wait.search([('conversation_id', '=', conv.id)]).state, 'waiting')
-        self.scan(T0 + timedelta(minutes=16))
+        self.scan(T0 + timedelta(minutes=11))
         self.assertEqual(len(self.channel.message_ids), 1)
 
     # ── Nhắc ─────────────────────────────────────────────────────────────────────
@@ -159,54 +178,70 @@ class TestPancakeRemind(TransactionCase):
         conv = self.conversation()
         self.message(conv, T0)
         self.scan(T0 + timedelta(minutes=2))
-        self.scan(T0 + timedelta(minutes=14))
+        self.scan(T0 + timedelta(minutes=9))
         self.assertFalse(self.channel.message_ids, 'chưa đến hạn')
-        self.scan(T0 + timedelta(minutes=16))
+        self.scan(T0 + timedelta(minutes=11))
         message = self.channel.message_ids
         self.assertEqual(len(message), 1)
-        self.assertEqual(message.text, '@An @Bình %s\nhttps://pancake.vn/%s?c_id=c1' % (REMIND_TEXT, PAGE_ID))
+        self.assertEqual(message.text, '@An @Bình ⚠️ CHÚ Ý · Khách mới chờ 11 phút\nCho mình hỏi giá\n' + self.short('c1'))
         self.assertEqual([m['uid'] for m in message.mentions], ['111', '222'])
         self.assertTrue(message.image)
         self.assertEqual((message.image_width, message.image_height), (40, 60))
         wait = self.Wait.search([('conversation_id', '=', conv.id)])
-        self.assertEqual((wait.state, wait.remind_count, wait.due_at), ('waiting', 1, T0 + timedelta(minutes=16 + 10)))
+        self.assertEqual((wait.state, wait.remind_count, wait.due_at), ('waiting', 1, T0 + timedelta(minutes=11 + 10)))
         self.assertEqual(wait.zalo_message_ids, message)
-        self.assertEqual((wait.customer_kind, wait.ai_state, wait.ai_source), ('new', 'needed', 'rules'))
+        self.assertEqual((wait.customer_kind, wait.ai_state, wait.ai_source, wait.level, wait.summary), ('new', 'needed', 'rules', 'high', 'Cho mình hỏi giá'))
 
     def test_new_customer_is_reminded_every_10_minutes_by_replying_to_the_first_image_until_answered(self):
         conv = self.conversation()
         self.message(conv, T0)
         self.scan(T0 + timedelta(minutes=2))
-        self.scan(T0 + timedelta(minutes=16))
+        self.scan(T0 + timedelta(minutes=11))
         first = self.channel.message_ids
         first.write({'state': 'sent', 'external_message_id': 'z1'})
         reaction = self.env['dac.zalo.channel.reaction'].create({'message_id': first.id, 'uid': '111', 'icon': '/-heart'})
         first._on_reaction(reaction)  # người được tag thả cảm xúc: KHÔNG dừng nhắc
         wait = self.Wait.search([('conversation_id', '=', conv.id)])
-        self.scan(T0 + timedelta(minutes=20))
+        self.scan(T0 + timedelta(minutes=15))
         self.assertEqual(wait.remind_count, 1, 'chưa đủ 10 phút')
-        self.scan(T0 + timedelta(minutes=27))
-        self.scan(T0 + timedelta(minutes=38))
+        self.scan(T0 + timedelta(minutes=22))
+        self.scan(T0 + timedelta(minutes=33))
         self.assertEqual((wait.remind_count, wait.state), (3, 'waiting'))
         replies = self.channel.message_ids - first
         self.assertEqual(len(replies), 2)
         for reply in replies:
             self.assertEqual(reply.reply_to_id, first, 'trả lời vào ảnh nhắc lần đầu')
             self.assertFalse(reply.image, 'không gửi lại ảnh')
-            self.assertEqual(reply.text, '@An @Bình %s' % REMIND_TEXT)
             self.assertEqual([m['uid'] for m in reply.mentions], ['111', '222'])
-        self.message(conv, T0 + timedelta(minutes=40), 'staff')
-        self.scan(T0 + timedelta(minutes=50))
+        self.assertEqual(sorted(replies.mapped('text')), ['@An @Bình ⚠️ Nhắc lần 2/4 · khách chờ 22 phút', '@An @Bình ⚠️ Nhắc lần 3/4 · khách chờ 33 phút'])
+        self.message(conv, T0 + timedelta(minutes=35), 'staff')
+        self.scan(T0 + timedelta(minutes=45))
         self.assertEqual(wait.state, 'answered')
         self.scan(T0 + timedelta(hours=3))
         self.assertEqual(len(self.channel.message_ids), 3, 'có người trả lời thì thôi nhắc')
+
+    def test_new_customer_gets_at_most_4_reminders_and_escalates_with_waiting_time(self):
+        conv = self.conversation()
+        self.message(conv, T0, text='Shop ơi')
+        self.scan(T0 + timedelta(minutes=2))
+        self.scan(T0 + timedelta(minutes=11))
+        first = self.channel.message_ids
+        first.write({'state': 'sent', 'external_message_id': 'z1'})
+        self.env.ref('dac_pancake_remind.scenario_new_repeat').repeat_minutes = 30
+        for minutes in (42, 73, 124, 200):  # 124 phút sau 10:00 = 12:04, đúng 2 giờ làm việc
+            self.scan(T0 + timedelta(minutes=minutes))
+        wait = self.Wait.search([('conversation_id', '=', conv.id)])
+        self.assertEqual((wait.remind_count, wait.state), (4, 'done'))
+        texts = (self.channel.message_ids - first).sorted('id').mapped('text')
+        self.assertEqual(texts, ['@An @Bình ⚠️ Nhắc lần 2/4 · khách chờ 42 phút', '@An @Bình ⚠️ Nhắc lần 3/4 · khách chờ 1 giờ 13 phút',
+                                 '@An @Bình 🚨 Nhắc lần 4/4 · khách chờ 2 giờ'], 'chờ quá 1 giờ: Chú ý; quá 2 giờ: Khẩn')
 
     def test_repeat_waits_while_the_first_image_is_not_sent_yet(self):
         conv = self.conversation()
         self.message(conv, T0)
         self.scan(T0 + timedelta(minutes=2))
-        self.scan(T0 + timedelta(minutes=16))
-        self.scan(T0 + timedelta(minutes=27))
+        self.scan(T0 + timedelta(minutes=11))
+        self.scan(T0 + timedelta(minutes=22))
         self.assertEqual(len(self.channel.message_ids), 1, 'ảnh đầu còn trong hàng đợi: chưa có gì để trả lời, không gửi thêm ảnh')
 
     def test_live_check_finds_a_reply_that_was_not_synced_yet(self):
@@ -217,7 +252,7 @@ class TestPancakeRemind(TransactionCase):
         def late_sync(records):
             self.message(conv, T0 + timedelta(minutes=10), 'staff')
             return True
-        with patch.object(fields.Datetime, 'now', return_value=T0 + timedelta(minutes=16)), \
+        with patch.object(fields.Datetime, 'now', return_value=T0 + timedelta(minutes=11)), \
              patch(FETCH, late_sync), \
              patch('odoo.addons.dac_pancake_remind.models.remind_wait.PancakeRemindWait._render_image', return_value=jpeg()):
             self.Wait._cron_scan()
@@ -243,11 +278,22 @@ class TestPancakeRemind(TransactionCase):
         self.message(real, T0)
         self.message(fake, T0)
         self.scan(T0 + timedelta(minutes=2))
-        self.scan(T0 + timedelta(minutes=16))
+        self.scan(T0 + timedelta(minutes=11))
         self.assertEqual(len(self.channel.message_ids), 1)
         self.assertEqual(len(test_channel.message_ids), 1)
-        self.assertIn('c-real', self.channel.message_ids.text)
-        self.assertIn('c-test', test_channel.message_ids.text)
+        self.assertIn(self.short('c-real'), self.channel.message_ids.text)
+        self.assertIn(self.short('c-test'), test_channel.message_ids.text)
+
+    def test_trial_mode_sends_real_customers_only_to_test_channels(self):
+        self.config.remind_real_channels = False
+        test_channel = self.env['dac.zalo.channel'].create({
+            'name': 'Beework Test', 'thread_id': 'G-test', 'thread_type': 'group', 'is_test': True, 'event_type_ids': [(6, 0, self.event_type.ids)]})
+        real = self.conversation(fm_id='c-real')
+        self.message(real, T0)
+        self.scan(T0 + timedelta(minutes=2))
+        self.scan(T0 + timedelta(minutes=11))
+        self.assertFalse(self.channel.message_ids, 'chưa duyệt: KHÔNG gửi vào nhóm thật')
+        self.assertIn(self.short('c-real'), test_channel.message_ids.text)
 
     def test_old_wait_expires_instead_of_reminding_late(self):
         self.channel.event_type_ids = False
@@ -330,24 +376,33 @@ class TestPancakeRemind(TransactionCase):
         self.message(fresh, T0)
         return returning, has_orders, fresh
 
-    def test_old_customers_wait_30_minutes_and_are_reminded_once(self):
+    def test_old_customers_wait_30_minutes_and_are_grouped_into_one_digest(self):
         self.old_and_new_customers()
         self.scan(T0 + timedelta(minutes=2))
         waits = {w.conversation_id.conversation_fm_id: (w.customer_kind, w.state, w.due_at) for w in self.Wait.search([])}
         self.assertEqual(waits, {'c-returning': ('old', 'waiting', T0 + timedelta(minutes=30)), 'c-buyer': ('old', 'waiting', T0 + timedelta(minutes=30)),
-                                 'c-fresh': ('new', 'waiting', T0 + timedelta(minutes=15))})
-        self.scan(T0 + timedelta(minutes=16))
+                                 'c-fresh': ('new', 'waiting', T0 + timedelta(minutes=10))})
+        self.scan(T0 + timedelta(minutes=11))
         self.assertEqual(len(self.channel.message_ids), 1)
-        self.assertIn('c-fresh', self.channel.message_ids.text)
+        self.assertIn(self.short('c-fresh'), self.channel.message_ids.text)
         self.scan(T0 + timedelta(minutes=31))
         old = self.Wait.search([('customer_kind', '=', 'old')])
         self.assertEqual(old.mapped('state'), ['done', 'done'])
-        self.assertEqual(len(self.channel.message_ids.filtered('image')), 3)
+        digest = self.channel.message_ids.filtered(lambda m: m.event_key.startswith('pancake-digest'))
+        self.assertEqual(len(digest), 1, 'khách cũ gom chung một tin')
+        self.assertFalse(digest.image)
+        lines = digest.text.splitlines()
+        self.assertEqual(lines[0], '🗂 2 khách đang chờ trả lời')
+        self.assertEqual(lines[1], '@An @Bình', 'chưa rõ nhân viên phụ trách: tag người được cài')
+        self.assertEqual(sorted(lines[2:]), sorted([
+            '⚠️ Nguyễn Minh Anh: Anh lấy 200 cái thì giá sao em? · chờ 31 phút — ' + self.short('c-returning'),
+            '⚠️ Nguyễn Minh Anh: Cho mình hỏi giá · chờ 31 phút — ' + self.short('c-buyer')]))
+        self.assertEqual(len(self.channel.message_ids.filtered('image')), 1)
         self.scan(T0 + timedelta(hours=6))
         self.assertEqual(old.mapped('remind_count'), [1, 1], 'khách cũ chỉ nhắc một lần')
 
-    def test_only_new_customers_switch_skips_old_customers(self):
-        self.config.only_new_customers = True
+    def test_turning_off_old_and_ongoing_scenarios_skips_old_customers(self):
+        (self.env.ref('dac_pancake_remind.scenario_old') | self.env.ref('dac_pancake_remind.scenario_ongoing')).write({'enabled': False})
         self.old_and_new_customers()
         self.scan(T0 + timedelta(minutes=2))
         states = {w.conversation_id.conversation_fm_id: w.state for w in self.Wait.search([])}
@@ -362,15 +417,16 @@ class TestPancakeRemind(TransactionCase):
         self.message(conv, T0, text='ok em')
         self.scan(T0 + timedelta(minutes=2))
         wait = self.Wait.search([('conversation_id', '=', conv.id)])
-        self.assertEqual(wait.customer_kind, 'old')
-        self.scan(T0 + timedelta(minutes=31))
+        self.assertEqual((wait.customer_kind, wait.due_at), ('ongoing', T0 + timedelta(minutes=15)), 'nhân viên vừa trả lời hôm nay: hạn 15 phút')
+        self.scan(T0 + timedelta(minutes=16))
         self.assertEqual((wait.state, wait.ai_state, wait.ai_source), ('not_needed', 'not_needed', 'rules'))
         self.assertFalse(self.channel.message_ids)
         self.message(conv, T0 + timedelta(minutes=40), text='À cho anh hỏi thêm in 500 tờ bao nhiêu?')
         self.scan(T0 + timedelta(minutes=41))
-        self.assertEqual((wait.state, wait.ai_state, wait.due_at), ('waiting', 'none', T0 + timedelta(minutes=70)))
-        self.scan(T0 + timedelta(minutes=71))
-        self.assertEqual((wait.state, wait.remind_count), ('done', 1))
+        self.assertEqual((wait.state, wait.ai_state, wait.due_at), ('waiting', 'none', T0 + timedelta(minutes=55)))
+        self.scan(T0 + timedelta(minutes=56))
+        self.assertEqual((wait.state, wait.remind_count, wait.level), ('done', 1, 'high'))
+        self.assertIn('À cho anh hỏi thêm in 500 tờ bao nhiêu?', self.channel.message_ids.text)
 
     def test_reply_rules_and_gemini_decision(self):
         from odoo.addons.dac_pancake_remind.models import reply_check
@@ -380,16 +436,14 @@ class TestPancakeRemind(TransactionCase):
             self.assertFalse(reply_check.is_ack(text), text)
         self.assertEqual(reply_check.rule_decision([('customer', 'chào shop', '')])[0], True, 'khách mới chào hỏi: cần trả lời')
         self.assertEqual(reply_check.rule_decision([('staff', 'gửi giá', ''), ('customer', '', '[Sticker]')])[0], False)
-        model = self.env['dac.zalo.gemini.model'].create({'name': 'gemini-test'})
-        config = self.env['dac.zalo.config'].sudo()._config()
-        config.write({'gemini_api_key': 'k', 'gemini_model_id': model.id, 'gemini_enabled': True})
         lines = [('customer', 'Shop ơi', ''), ('customer', 'Mua ngay hàng giá rẻ tại link…', '')]
-        target = 'odoo.addons.dac_zalo_assistant.models.gemini.ZaloConfigGemini._gemini_json'
-        with patch(target, return_value={'need_reply': False, 'reason': 'Tin quảng cáo'}) as gemini:
+        core = 'odoo.addons.dac_ai_core.models.ai_connection.AiConnection'
+        with patch(core + '._ready', return_value=True), \
+             patch(core + '._json', return_value=({'need_reply': False, 'level': 'none', 'summary': '', 'reason': 'Tin quảng cáo'}, 'gemini')) as ai:
             self.assertEqual(reply_check.decide(self.env, lines), (False, 'Tin quảng cáo', 'gemini'))
-        self.assertIn('KHÁCH: Mua ngay hàng giá rẻ', gemini.call_args.args[1])
-        with patch(target, side_effect=UserError('Gemini lỗi')):
-            self.assertEqual(reply_check.decide(self.env, lines)[2], 'rules', 'Gemini lỗi thì dùng luật từ khóa')
+        self.assertIn('KHÁCH: Mua ngay hàng giá rẻ', ai.call_args.args[1])
+        with patch(core + '._ready', return_value=True), patch(core + '._json', side_effect=UserError('AI lỗi')):
+            self.assertEqual(reply_check.decide(self.env, lines)[2], 'rules', 'AI lỗi thì dùng luật từ khóa')
 
     # ── Nhắc tổng cùng lead website ───────────────────────────────────────────────
 
@@ -416,8 +470,8 @@ class TestPancakeRemind(TransactionCase):
         self.assertEqual(len(message), 1)
         lines = message.text.splitlines()
         self.assertTrue(lines[0].startswith('@An @Bình Còn 3 khách chưa liên hệ:'), lines[0])
-        self.assertEqual(lines[1:], ['Nguyễn Minh Anh: https://pancake.vn/%s?c_id=c-old' % PAGE_ID, '0911222333: %s' % lead._short_link(compact=True),
-                                      'Lê Văn Cường: https://pancake.vn/%s?c_id=c-late' % PAGE_ID])
+        self.assertEqual(lines[1:], ['⚠️ Nguyễn Minh Anh: ' + self.short('c-old'), '0911222333: %s' % lead._short_link(compact=True),
+                                      'Lê Văn Cường: ' + self.short('c-late')])
 
     def test_summary_without_leads_still_sent_for_pancake_only(self):
         conv = self.conversation(name='Khách A', fm_id='c-a')
@@ -427,7 +481,7 @@ class TestPancakeRemind(TransactionCase):
         with patch.object(fields.Datetime, 'now', return_value=slot + timedelta(minutes=1)):
             self.env['dac.web.lead']._send_summary(slot)
         message = self.channel.message_ids.filtered(lambda m: m.event_key.startswith('lead-summary'))
-        self.assertEqual(message.text.splitlines()[1:], ['Khách A: https://pancake.vn/%s?c_id=c-a' % PAGE_ID])
+        self.assertEqual(message.text.splitlines()[1:], ['Khách A: ' + self.short('c-a')])
 
     def test_contact_stats_at_8_1130_17_count_web_and_pancake_since_the_previous_slot(self):
         from odoo.addons.dac_pancake_remind.models.web_lead import stats_window
@@ -513,7 +567,7 @@ class TestPancakeRemind(TransactionCase):
         self.assertEqual((contact.seen_before, contact.counts_as_new), (True, False))
         text, _styles = lead._zalo_message()
         lines = text.splitlines()
-        self.assertEqual(lines[-2], '⚠️ Số này đã nhắn Pancake trước đó: Chị Hoa — https://pancake.vn/%s?c_id=c-hoa' % PAGE_ID)
+        self.assertEqual(lines[-2], '⚠️ Số này đã nhắn Pancake trước đó: Chị Hoa — ' + self.short('c-hoa'))
         self.assertTrue(lines[-1].startswith('Xem chi tiết: '))
 
     def test_lead_phone_found_in_message_text_and_repeat_leads_are_detected(self):
@@ -568,5 +622,19 @@ class TestPancakeRemind(TransactionCase):
         self.assertEqual((data['hours'][15], data['hours'][16]), (2, 1), 'giờ Việt Nam')
         self.assertEqual([r['name'] for r in data['recent']], ['Form hôm nay', 'Zalo', 'FB', 'Kỳ trước'])
         with patch.object(fields.Datetime, 'now', return_value=now):
-            year = Contact.dashboard_data('12m')
-        self.assertEqual((len(year['series']), year['series'][0]['label'], year['series'][-1]['label']), (12, '12/25', '11/26'))
+            today = Contact.dashboard_data('today')
+            yesterday = Contact.dashboard_data('yesterday')
+            custom = Contact.dashboard_data('custom', '2026-11-14', '2026-11-16')
+            backwards = Contact.dashboard_data('custom', '2026-11-16', '2026-11-14')
+        self.assertEqual((today['bucket'], len(today['series']), today['total'], today['series'][15]['web']), ('hour', 24, 1, 1))
+        self.assertEqual(today['range'], '17/11/2026')
+        self.assertEqual(today['previous'], 0, 'so với hôm qua cùng khung giờ')
+        self.assertEqual((yesterday['total'], yesterday['label']), (0, 'Hôm qua'))
+        self.assertEqual((custom['bucket'], [r['label'] for r in custom['series']], custom['total']), ('day', ['14/11', '15/11', '16/11'], 2))
+        self.assertEqual(custom['range'], '14/11/2026 – 16/11/2026')
+        self.assertEqual(backwards['range'], custom['range'], 'đảo ngày vẫn hiểu đúng')
+        with patch.object(fields.Datetime, 'now', return_value=now):
+            two_days = Contact.dashboard_data('custom', '2026-11-15', '2026-11-15')
+            long = Contact.dashboard_data('custom', '2026-01-01', '2026-11-17')
+        self.assertEqual((two_days['total'], two_days['channels']['zalo'], two_days['channels']['messenger']), (2, 1, 1))
+        self.assertEqual((long['bucket'], long['series'][0]['label'], long['series'][-1]['label']), ('month', '01/26', '11/26'))

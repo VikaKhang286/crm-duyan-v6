@@ -1,6 +1,6 @@
 {
     'name': 'Pancake: nhắc khách chưa trả lời + thống kê khách mới',
-    'version': '18.0.4.1.0',
+    'version': '18.0.6.3.0',
     'category': '1. Duy An ERP',
     'summary': 'Khách nhắn page Pancake mà quá hạn (giờ làm việc) chưa ai trả lời → bot gửi ảnh chụp hội thoại + tag tên vào Zalo',
     'description': """
@@ -10,11 +10,14 @@ dựng ảnh giống ảnh chụp màn hình cuộc trò chuyện (avatar, tên 
 đăng ký loại thông báo "Khách Pancake chưa được trả lời" (Trợ lý Zalo → Loại thông báo), kèm tag tên và link mở thẳng hội thoại.
 Thả cảm xúc lên tin nhắc KHÔNG làm dừng nhắc; chỉ khi có nhân viên trả lời trên Pancake mới dừng.
     """,
-    'depends': ['dac_erp', 'dac_zalo_assistant', 'dac_push', 'sale'],
+    'depends': ['dac_erp', 'dac_zalo_assistant', 'dac_push', 'dac_short_link', 'sale'],
     'data': [
         'security/ir.model.access.csv',
         'data/remind_data.xml',
+        'data/scenario_data.xml',
         'views/pancake_views.xml',
+        'views/appointment_views.xml',
+        'views/scenario_views.xml',
         'views/remind_views.xml',
     ],
     'assets': {

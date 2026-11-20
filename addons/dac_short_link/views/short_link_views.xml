@@ -1,0 +1,30 @@
+<odoo>
+    <record id="short_link_list" model="ir.ui.view">
+        <field name="name">dac.short.link.list</field><field name="model">dac.short.link</field>
+        <field name="arch" type="xml"><list string="Link rút gọn" create="0" edit="0">
+            <field name="kind" widget="badge"/>
+            <field name="code"/>
+            <field name="short_url"/>
+            <field name="url" widget="url"/>
+            <field name="hits"/>
+            <field name="last_hit_at"/>
+            <field name="source" optional="show"/>
+            <field name="create_date" optional="show"/>
+        </list></field>
+    </record>
+    <record id="short_link_search" model="ir.ui.view">
+        <field name="name">dac.short.link.search</field><field name="model">dac.short.link</field>
+        <field name="arch" type="xml"><search>
+            <field name="code"/><field name="url"/><field name="source"/>
+            <filter name="kind_p" string="Pancake (/p/)" domain="[('kind', '=', 'p')]"/>
+            <filter name="kind_r" string="Lời nhắc / khách liên hệ (/r/)" domain="[('kind', '=', 'r')]"/>
+            <filter name="clicked" string="Đã có người bấm" domain="[('hits', '&gt;', 0)]"/>
+        </search></field>
+    </record>
+    <record id="short_link_action" model="ir.actions.act_window">
+        <field name="name">Link rút gọn</field><field name="res_model">dac.short.link</field><field name="view_mode">list</field>
+        <field name="help" type="html"><p>Link dài (vd hội thoại Pancake) trong tin Zalo được rút gọn thành crm.duyan.vn/r/abc. Mỗi link gốc một mã.</p></field>
+    </record>
+    <menuitem id="menu_short_link" name="Link rút gọn" parent="base.menu_administration" action="short_link_action" sequence="4"
+              groups="base.group_system"/>
+</odoo>

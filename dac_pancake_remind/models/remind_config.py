@@ -2,7 +2,6 @@ import json
 
 from odoo import api, fields, models
 from odoo.exceptions import UserError
-from odoo.exceptions import ValidationError
 
 # Luồng Pancake cũ (CRM_DAC + mục hội thoại của Kết nối Pancake): chỉ ẩn menu và tắt cron, không gỡ, không xóa dữ liệu.
 LEGACY_MENUS = ('CRM_DAC.menu_pancake_message_dashboard_main', 'CRM_DAC.menu_page_fm_sync_root',
@@ -22,21 +21,20 @@ class PancakeRemindConfig(models.Model):
         help='Tắt: không quét và không nhắc. Khi bật, chỉ xét tin nhắn đến SAU thời điểm bật (không nhắc lại khách cũ).')
     activated_at = fields.Datetime(string='Bật lúc', readonly=True,
         help='Chỉ xét tin của khách nhắn sau mốc này.')
-    wait_minutes = fields.Integer(string='Khách mới: chờ trả lời tối đa (phút làm việc)', default=15, required=True)
-    repeat_minutes = fields.Integer(string='Khách mới: nhắc lại mỗi (phút làm việc)', default=10, required=True,
-        help='Khách mới vẫn chưa được trả lời (kể cả khi đã có người thả cảm xúc lên tin nhắc) thì cứ sau khoảng này lại nhắc, '
-             'bằng cách tag tên và trả lời vào ảnh nhắc lần đầu, cho tới khi có nhân viên trả lời trên Pancake.')
-    old_wait_minutes = fields.Integer(string='Khách cũ: chờ trả lời tối đa (phút làm việc)', default=30, required=True,
-        help='Khách cũ (đã từng được nhân viên trả lời hoặc đã có đơn): quá hạn này thì AI đọc tin một lần, cần trả lời thì nhắc đúng một lần.')
-    max_reminders = fields.Integer(string='(Không dùng nữa)', default=2, required=True)
+    remind_real_channels = fields.Boolean(string='Gửi nhắc vào nhóm thật', default=False,
+        help='Tắt (mặc định, đang chạy thử): mọi tin nhắc khách, tin gom, lịch hẹn, nhắc việc từ hôm qua — kể cả của khách thật — '
+             'CHỈ gửi vào hội thoại Zalo đánh dấu "Thử nghiệm". Chỉ bật khi đã duyệt gửi vào nhóm kinh doanh thật.')
+    last_digest_at = fields.Datetime(string='Gửi tin gom gần nhất', readonly=True)
+    review_date = fields.Date(string='Đọc lại cho ngày', compute='_compute_followup_state')
+    review_done = fields.Boolean(string='Đọc lại xong', compute='_compute_followup_state')
+    morning_sent_date = fields.Date(string='Đã gửi nhắc việc ngày', compute='_compute_followup_state')
     ai_check = fields.Boolean(string='AI đọc tin trước khi nhắc', default=True,
-        help='Trước lần nhắc đầu, Gemini (Trợ lý Zalo → Gemini) đọc đoạn chat để bỏ qua khách không cần trả lời nữa: khách chỉ "ok em", '
-             'cảm ơn, gửi biểu tượng sau tin của sale, tin rác/hệ thống. Gemini chưa bật hoặc lỗi thì dùng luật từ khóa.')
+        help='Trước lần nhắc đầu, AI (Cài đặt → Kết nối AI dùng chung) đọc đoạn chat: bỏ qua khách không cần trả lời nữa '
+             '(chỉ "ok em", cảm ơn, biểu tượng sau tin của sale, tin rác), đánh giá mức gấp và tóm tắt khách cần gì. '
+             'Tắt hoặc AI lỗi thì dùng luật từ khóa.')
     stats_real_channels = fields.Boolean(string='Gửi thống kê vào nhóm thật', default=False,
         help='Tắt (mặc định): thống kê khách liên hệ lúc 8:00 / 11:30 / 17:00 chỉ gửi vào hội thoại Zalo đánh dấu "Thử nghiệm". '
              'Chỉ bật khi đã duyệt để gửi vào nhóm kinh doanh thật.')
-    only_new_customers = fields.Boolean(string='Chỉ nhắc khách mới', default=False,
-        help='Bật: bỏ qua khách cũ. Khách mới = hội thoại chưa từng có nhân viên trả lời và khách chưa có đơn hàng nào trong Odoo.')
     backfill_from = fields.Date(string='Tính thống kê từ ngày',
         help='Dùng cho nút "Tính lại thống kê": quét lại lead và hội thoại Pancake từ ngày này để lập bảng thống kê khách mới.')
     live_check = fields.Boolean(string='Tải lại tin của khách ngay trước khi nhắc', default=True,
@@ -52,16 +50,15 @@ class PancakeRemindConfig(models.Model):
     wait_count = fields.Integer(string='Khách đang chờ', compute='_compute_counts')
     reminded_24h = fields.Integer(string='Đã nhắc 24 giờ qua', compute='_compute_counts')
 
+    def _compute_followup_state(self):
+        state = self.env['dac.pancake.followup.state']._get()
+        for config in self:
+            config.review_date, config.review_done, config.morning_sent_date = state.review_date, state.review_done, state.morning_sent_date
+
     @api.depends('page_ids')
     def _compute_effective_pages(self):
         for config in self:
             config.effective_page_ids = self.env['dac.pancake.remind.wait']._pages(config)
-
-    @api.constrains('wait_minutes', 'repeat_minutes', 'old_wait_minutes')
-    def _check_numbers(self):
-        for config in self:
-            if min(config.wait_minutes, config.repeat_minutes, config.old_wait_minutes) < 1:
-                raise ValidationError('Số phút phải ≥ 1.')
 
     def _compute_counts(self):
         Wait = self.env['dac.pancake.remind.wait']
@@ -103,6 +100,19 @@ class PancakeRemindConfig(models.Model):
     def action_open_waits(self):
         return {'type': 'ir.actions.act_window', 'name': 'Khách Pancake đang chờ trả lời',
                 'res_model': 'dac.pancake.remind.wait', 'view_mode': 'list,form'}
+
+    def action_open_staff(self):
+        self.env['dac.pancake.staff'].action_refresh()
+        return self.env['ir.actions.actions']._for_xml_id('dac_pancake_remind.pancake_staff_action')
+
+    def action_open_scenarios(self):
+        return self.env['ir.actions.actions']._for_xml_id('dac_pancake_remind.scenario_action')
+
+    def action_open_events(self):
+        return self.env['ir.actions.actions']._for_xml_id('dac_pancake_remind.event_action')
+
+    def action_open_appointments(self):
+        return self.env['ir.actions.actions']._for_xml_id('dac_pancake_remind.appointment_action')
 
     def action_open_pages(self):
         return self.env['ir.actions.actions']._for_xml_id('dac_pancake_remind.pancake_page_action')

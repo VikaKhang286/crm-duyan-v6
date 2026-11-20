@@ -11,11 +11,19 @@ const CHANNELS = [
     { key: "other", label: "Kênh khác", color: "#94a3b8", icon: "fa-comments" },
 ];
 const PERIODS = [
+    { key: "today", label: "Hôm nay" },
+    { key: "yesterday", label: "Hôm qua" },
     { key: "7d", label: "7 ngày" },
     { key: "30d", label: "30 ngày" },
     { key: "month", label: "Tháng này" },
-    { key: "12m", label: "12 tháng" },
+    { key: "custom", label: "Tuỳ chọn" },
 ];
+const BUCKET_LABELS = { hour: "giờ", day: "ngày", month: "tháng" };
+
+function isoDate(date) {
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
 
 export class ContactDashboard extends Component {
     static template = "dac_pancake_remind.ContactDashboard";
@@ -26,15 +34,38 @@ export class ContactDashboard extends Component {
         this.action = useService("action");
         this.channels = CHANNELS;
         this.periods = PERIODS;
-        this.state = useState({ period: "30d", data: null, loading: true, error: false });
+        const today = new Date();
+        const monthAgo = new Date(today.getTime() - 29 * 86400000);
+        this.state = useState({
+            period: "30d", data: null, loading: true, error: false,
+            dateFrom: isoDate(monthAgo), dateTo: isoDate(today), showCustom: false,
+        });
         onWillStart(() => this.load());
+    }
+
+    selectPeriod(period) {
+        if (period === "custom") {
+            // Chọn ngày trước rồi bấm "Xem"; chưa tải lại ngay
+            this.state.showCustom = true;
+            return;
+        }
+        this.state.showCustom = false;
+        this.load(period);
+    }
+
+    applyCustom() {
+        if (!this.state.dateFrom || !this.state.dateTo) {
+            return;
+        }
+        this.load("custom");
     }
 
     async load(period = this.state.period) {
         this.state.loading = true;
         this.state.period = period;
+        const args = period === "custom" ? [period, this.state.dateFrom, this.state.dateTo] : [period];
         try {
-            this.state.data = await this.orm.call("dac.new.contact", "dashboard_data", [period]);
+            this.state.data = await this.orm.call("dac.new.contact", "dashboard_data", args);
             this.state.error = false;
         } catch {
             this.state.error = true;
@@ -81,9 +112,17 @@ export class ContactDashboard extends Component {
         return `${row.label} — ${this.columnTotal(row)} khách${parts.length ? "\n" + parts.join("\n") : ""}`;
     }
 
+    get bucketLabel() {
+        return BUCKET_LABELS[this.state.data.bucket] || "ngày";
+    }
+
+    isActive(key) {
+        return key === "custom" ? this.state.showCustom || this.state.period === "custom" : !this.state.showCustom && this.state.period === key;
+    }
+
     showLabel(index) {
         const count = this.state.data.series.length;
-        const step = count > 20 ? Math.ceil(count / 10) : 1;
+        const step = count > 20 ? Math.ceil(count / 12) : 1;
         return index % step === 0 || index === count - 1;
     }
 
@@ -105,7 +144,7 @@ export class ContactDashboard extends Component {
 
     openContacts(channel = null) {
         const data = this.state.data;
-        const domain = [["counts_as_new", "=", true], ["contact_at", ">=", data.start], ["contact_at", "<=", data.end]];
+        const domain = [["counts_as_new", "=", true], ["contact_at", ">=", data.start], ["contact_at", "<", data.end]];
         if (channel === "web") {
             domain.push(["source", "=", "web_lead"]);
         } else if (channel === "zalo") {

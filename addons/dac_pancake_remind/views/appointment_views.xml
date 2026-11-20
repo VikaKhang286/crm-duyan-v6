@@ -1,0 +1,180 @@
+<odoo>
+    <!-- ═══ Nhân viên Pancake ↔ Zalo ═══════════════════════════════════════ -->
+    <record id="pancake_staff_list" model="ir.ui.view">
+        <field name="name">dac.pancake.staff.list</field><field name="model">dac.pancake.staff</field>
+        <field name="arch" type="xml"><list string="Nhân viên Pancake ↔ Zalo" editable="bottom" create="0" decoration-warning="suggested"
+                decoration-muted="not member_id">
+            <header>
+                <button name="action_refresh" type="object" string="Cập nhật danh sách &amp; gợi ý" class="btn-primary" display="always"/>
+            </header>
+            <field name="name"/>
+            <field name="user_id" options="{'no_create': True, 'no_open': True}" placeholder="Chọn tài khoản Odoo"/>
+            <field name="member_id" options="{'no_create': True, 'no_open': True}" placeholder="Chọn người trong nhóm Zalo"/>
+            <field name="zalo_name" optional="hide"/>
+            <field name="suggested" widget="boolean" optional="show"/>
+            <button name="action_confirm" type="object" string="Xác nhận" icon="fa-check" invisible="not suggested"/>
+            <field name="message_count"/>
+            <field name="last_seen_at"/>
+            <field name="active" widget="boolean_toggle" optional="hide"/>
+        </list></field>
+    </record>
+    <record id="pancake_staff_action" model="ir.actions.act_window">
+        <field name="name">Nhân viên Pancake ↔ Zalo</field><field name="res_model">dac.pancake.staff</field>
+        <field name="view_mode">list</field>
+        <field name="help" type="html"><p class="o_view_nocontent_smiling_face">Chưa có nhân viên nào</p>
+            <p>Bấm "Cập nhật danh sách &amp; gợi ý": hệ thống lấy tên nhân viên đã trả lời khách trên Pancake (60 ngày qua) và gợi ý người
+            trùng tên trong nhóm Zalo. Ghép xong, khi nhắc khách bot sẽ tag đúng người đã chat với khách đó.</p></field>
+    </record>
+
+    <!-- ═══ Lịch hẹn với khách ═══════════════════════════════════════════ -->
+    <record id="appointment_list" model="ir.ui.view">
+        <field name="name">dac.pancake.appointment.list</field><field name="model">dac.pancake.appointment</field>
+        <field name="arch" type="xml"><list string="Lịch hẹn với khách" create="0"
+                decoration-danger="state == 'overdue'" decoration-warning="state == 'open'" decoration-muted="state in ('done', 'auto_done', 'cancelled')">
+            <field name="due_at"/>
+            <field name="customer_name"/>
+            <field name="task"/>
+            <field name="staff_id"/>
+            <field name="precision" optional="hide"/>
+            <field name="state" widget="badge" decoration-success="state in ('done', 'auto_done')" decoration-danger="state == 'overdue'"
+                   decoration-warning="state == 'open'"/>
+            <field name="followup_count" optional="show"/>
+            <field name="source" optional="hide"/>
+            <field name="promised_at" optional="hide"/>
+            <field name="done_by" optional="hide"/>
+            <field name="external_url" widget="url" optional="show"/>
+            <field name="is_test" optional="hide"/>
+            <button name="action_mark_done" type="object" string="Đã xử lý" icon="fa-check" invisible="state not in ('open', 'overdue')"/>
+        </list></field>
+    </record>
+    <record id="appointment_form" model="ir.ui.view">
+        <field name="name">dac.pancake.appointment.form</field><field name="model">dac.pancake.appointment</field>
+        <field name="arch" type="xml"><form string="Phiếu hẹn" create="0">
+            <header>
+                <button name="action_mark_done" type="object" string="Đã xử lý xong" class="btn-primary" invisible="state not in ('open', 'overdue')"/>
+                <button name="action_cancel" type="object" string="Không cần nữa" invisible="state not in ('open', 'overdue')"/>
+                <button name="action_reopen" type="object" string="Mở lại" invisible="state in ('open', 'overdue')"/>
+                <field name="state" widget="statusbar" statusbar_visible="open,done"/>
+            </header>
+            <sheet>
+                <div class="oe_title"><h1><field name="task"/></h1></div>
+                <group>
+                    <group>
+                        <field name="customer_name"/><field name="page_name"/><field name="external_url" widget="url"/>
+                        <field name="staff_id" options="{'no_create': True}"/>
+                        <field name="ticket_url" widget="url"/>
+                    </group>
+                    <group>
+                        <field name="promised_at"/><field name="due_at"/><field name="precision"/>
+                        <field name="check_at"/><field name="pre_reminded_at"/><field name="followup_count"/>
+                        <field name="done_at" invisible="not done_at"/><field name="done_by" invisible="not done_by"/>
+                    </group>
+                </group>
+                <group string="Tin hẹn của nhân viên"><field name="quote" nolabel="1" colspan="2"/></group>
+                <group>
+                    <field name="check_note"/><field name="source"/><field name="ai_source"/><field name="is_test"/>
+                </group>
+                <field name="zalo_message_ids"><list><field name="channel_id"/><field name="state"/><field name="sent_at"/><field name="text"/></list></field>
+            </sheet>
+        </form></field>
+    </record>
+    <record id="appointment_search" model="ir.ui.view">
+        <field name="name">dac.pancake.appointment.search</field><field name="model">dac.pancake.appointment</field>
+        <field name="arch" type="xml"><search>
+            <field name="customer_name"/><field name="task"/><field name="staff_id"/>
+            <filter name="open" string="Chờ xử lý" domain="[('state', 'in', ('open', 'overdue'))]"/>
+            <filter name="overdue" string="Quá hẹn" domain="[('state', '=', 'overdue')]"/>
+            <filter name="closed" string="Đã xong" domain="[('state', 'in', ('done', 'auto_done', 'cancelled'))]"/>
+            <separator/>
+            <filter name="today" string="Hạn hôm nay" domain="[('due_at', '&gt;=', context_today().strftime('%Y-%m-%d')), ('due_at', '&lt;', (context_today() + relativedelta(days=1)).strftime('%Y-%m-%d'))]"/>
+            <group expand="0" string="Nhóm theo">
+                <filter name="g_staff" string="Nhân viên" context="{'group_by': 'staff_id'}"/>
+                <filter name="g_state" string="Trạng thái" context="{'group_by': 'state'}"/>
+                <filter name="g_day" string="Ngày hẹn" context="{'group_by': 'due_at:day'}"/>
+            </group>
+        </search></field>
+    </record>
+    <record id="appointment_action" model="ir.actions.act_window">
+        <field name="name">Lịch hẹn với khách</field><field name="res_model">dac.pancake.appointment</field>
+        <field name="view_mode">list,form</field><field name="context">{'search_default_open': 1}</field>
+        <field name="help" type="html"><p class="o_view_nocontent_smiling_face">Chưa có lịch hẹn nào cần xử lý</p>
+            <p>Khi nhân viên hẹn khách trên Pancake ("chiều em gửi báo giá", "3h em gọi lại"), AI tạo phiếu hẹn ở đây,
+            nhắc trước giờ hẹn 30 phút và kiểm tra lại sau giờ hẹn 30 phút.</p></field>
+    </record>
+
+    <!-- ═══ Phiếu hẹn công khai (link trong tin Zalo) ═══════════════════════ -->
+    <template id="appointment_ticket_page" name="Phiếu hẹn với khách (công khai)">
+        <html lang="vi">
+            <head>
+                <meta charset="utf-8"/>
+                <meta name="viewport" content="width=device-width, initial-scale=1"/>
+                <meta name="robots" content="noindex, nofollow"/>
+                <title>Phiếu hẹn với khách</title>
+                <style>
+                    *{box-sizing:border-box}
+                    body{margin:0;background:#f3f4f6;color:#111827;font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+                    .wrap{max-width:480px;margin:0 auto;padding:16px 16px 40px}
+                    .card{background:#fff;border-radius:16px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+                    .top{display:flex;justify-content:space-between;gap:8px;align-items:center;color:#6b7280;font-size:13px;margin-bottom:12px}
+                    .badge{display:inline-block;padding:2px 10px;border-radius:999px;background:#eef2ff;color:#3730a3;font-size:12px;font-weight:600}
+                    h1{font-size:20px;margin:0 0 4px}
+                    .task{font-size:18px;font-weight:600;margin:6px 0 14px}
+                    .row{padding:10px 0;border-top:1px solid #f0f1f3}
+                    .row b{display:block;font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.4px}
+                    .row span{white-space:pre-wrap;word-break:break-word}
+                    .open-link{display:block;text-align:center;margin-top:12px;padding:12px;border-radius:12px;background:#eff6ff;color:#1d4ed8;font-weight:600;text-decoration:none}
+                    .state{margin:14px 0 0;padding:10px 14px;border-radius:12px;font-size:15px;font-weight:600}
+                    .state.open{background:#fef9c3;color:#854d0e}
+                    .state.overdue{background:#fee2e2;color:#991b1b}
+                    .state.done,.state.auto_done{background:#dcfce7;color:#166534}
+                    .state.cancelled{background:#f3f4f6;color:#4b5563}
+                    form{margin:0}
+                    .actions{margin-top:16px;display:grid;gap:10px}
+                    input[type=text]{width:100%;padding:12px;border:1px solid #d1d5db;border-radius:12px;font:inherit}
+                    button{width:100%;border:0;border-radius:14px;font:inherit;font-weight:700;cursor:pointer;color:#fff}
+                    .primary{background:#16a34a;height:58px;font-size:18px}
+                    .muted{background:#6b7280;height:46px;font-size:15px}
+                    button:active{opacity:.85}
+                    button:disabled{opacity:.4;cursor:not-allowed}
+                    .hint{color:#6b7280;font-size:13px;margin-top:10px}
+                </style>
+            </head>
+            <body>
+                <div class="wrap">
+                    <div class="card">
+                        <div class="top">
+                            <span class="badge">Phiếu hẹn với khách</span>
+                            <span><t t-out="a.page_name or ''"/></span>
+                        </div>
+                        <h1><t t-out="a.customer_name or 'Khách'"/></h1>
+                        <div class="task"><t t-out="a.task"/></div>
+                        <div class="row"><b>Hạn</b><span><t t-out="due"/><t t-if="precision"> (<t t-out="precision"/>)</t></span></div>
+                        <div class="row" t-if="a.staff_id"><b>Nhân viên hẹn</b><span><t t-out="a.staff_id.name"/></span></div>
+                        <div class="row" t-if="a.quote"><b>Tin hẹn</b><span><t t-out="promised"/> — “<t t-out="a.quote"/>”</span></div>
+                        <div class="row" t-if="a.check_note and is_open"><b>Kiểm tra gần nhất</b><span><t t-out="a.check_note"/></span></div>
+                        <a t-if="a.external_url" class="open-link" t-att-href="a.external_url" target="_blank" rel="noopener">Mở hội thoại trên Pancake</a>
+                        <div t-attf-class="state #{a.state}">
+                            <t t-if="just_saved and not is_open">✓ Đã lưu. </t><t t-out="state_label"/><t t-if="done_at and not is_open"> — <t t-out="done_at"/></t>
+                        </div>
+                        <form t-if="is_open" method="post" t-attf-action="/hen/#{token}/done" class="actions" id="done-form">
+                            <input type="text" name="by" maxlength="60" placeholder="Tên bạn (không bắt buộc)" autocomplete="name"/>
+                            <button class="primary" type="submit" name="result" value="done">Đã xử lý xong</button>
+                            <button class="muted" type="submit" name="result" value="cancel">Không cần nữa (khách hủy/đổi ý)</button>
+                        </form>
+                        <div class="hint" t-if="is_open">Bấm khi đã làm xong việc đã hẹn — kể cả khi làm ngoài Pancake (gọi điện, gửi email, chuyển khoản...) để bot thôi nhắc.</div>
+                        <script t-if="is_open">
+                            document.getElementById('done-form').addEventListener('submit', function (event) {
+                                var form = event.currentTarget;
+                                if (form.dataset.sent) { event.preventDefault(); return; }
+                                form.dataset.sent = '1';
+                                setTimeout(function () {
+                                    form.querySelectorAll('button').forEach(function (button) { button.disabled = true; });
+                                }, 0);
+                            });
+                        </script>
+                    </div>
+                </div>
+            </body>
+        </html>
+    </template>
+</odoo>

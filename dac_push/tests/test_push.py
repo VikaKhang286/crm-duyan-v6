@@ -264,7 +264,7 @@ class TestPushEvents(TransactionCase):
         self.assertEqual(lines[0], '@An @Bình Còn 2 khách chưa liên hệ:')
         self.assertEqual(lines[1:], ['0933939856: ' + first._short_link(compact=True), '0911222333: ' + second._short_link(compact=True)],
                          'oldest waiting first; only "phone: short link"')
-        self.assertRegex(lines[1], r'^0933939856: [^/]+/l/[\w-]{12}$')
+        self.assertRegex(lines[1], r'^0933939856: [^/]+/r/\w{4}$')
         self.assertEqual([m['uid'] for m in summary.mentions], ['111', '222'])
         self.assertFalse(summary.reply_to_id, 'a summary is a normal message, not a reply')
         self.env['dac.web.lead']._send_summary(slot)
@@ -351,10 +351,12 @@ class TestPushEvents(TransactionCase):
         self.assertEqual((first.contact_state, second.contact_state, other.contact_state), ('contacted', 'contacted', 'unreachable'))
 
     def _gemini_on(self, answer):
-        config = self.env['dac.zalo.config']._config()
-        model = self.env['dac.zalo.gemini.model'].create({'name': 'gemini-test-flash'})
-        config.write({'gemini_api_key': 'k-test', 'gemini_model_id': model.id, 'gemini_enabled': True})
-        return patch.object(type(config), '_gemini_json', return_value={'decision': answer} if isinstance(answer, str) else None,
+        # AI qua Kết nối AI dùng chung (dac_ai_core): giả một kết nối Gemini đã sẵn sàng
+        Connection = type(self.env['dac.ai.connection'])
+        ready = patch.object(Connection, '_ready', return_value=True)
+        ready.start()
+        self.addCleanup(ready.stop)
+        return patch.object(Connection, '_json', return_value=({'decision': answer}, 'gemini') if isinstance(answer, str) else None,
                             side_effect=answer if isinstance(answer, Exception) else None)
 
     def test_gemini_decides_unreachable_and_the_lead_follows_with_the_same_thanks(self):
@@ -479,9 +481,10 @@ class TestPushEvents(TransactionCase):
         self.assertEqual(styles, [{'start': 0, 'len': len('Khách yêu cầu tư vấn'), 'style': 'bold'}])
         self.assertEqual(text[:styles[0]['len']], 'Khách yêu cầu tư vấn')
         self.assertEqual(self.channel.message_ids.styles, styles)
-        base = self.env['ir.config_parameter'].sudo().get_param('web.base.url')
-        self.assertTrue(text.endswith('Xem chi tiết: %s/lead/0901234567-%s' % (base.split('://')[-1], lead.sudo().access_token)),
-                        'link = số điện thoại của lead + mã ngẫu nhiên')
+        short = text.splitlines()[-1].removeprefix('Xem chi tiết: ')
+        self.assertRegex(short, r'^[^/]+/r/\w{4}$', 'link rút gọn /r/ 4 ký tự')
+        target = self.env['dac.short.link'].sudo().search([('kind', '=', 'r'), ('code', '=', short.rsplit('/', 1)[1])]).url
+        self.assertTrue(target.endswith('/lead/0901234567-%s' % lead.sudo().access_token), 'trỏ tới trang lead: số điện thoại + mã ngẫu nhiên')
         self.assertNotIn('/lead/%s' % lead.id, text, 'link does not use the guessable sequential id')
         self.assertNotIn('http', text.splitlines()[-1], 'link is shown without a scheme to stay short')
 

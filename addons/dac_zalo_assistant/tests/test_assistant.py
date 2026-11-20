@@ -79,7 +79,7 @@ class TestZaloAssistant(TransactionCase):
         self.assertEqual(own.mapped('user_id'), self.staff)
         self.assertEqual(self.messages.with_user(self.staff).search([]).mapped('user_id'), self.staff)
         with self.assertRaises(AccessError):
-            self.config.with_user(self.staff).read(['ai_api_key'])
+            self.config.with_user(self.staff).read(['bridge_token'])
         manager = new_test_user(self.env, login='zalo_manager', groups='base.group_user,dac_erp.group_dac_erp_manager')
         with self.assertRaises(AccessError):
             self.config.with_user(manager).read(['bridge_token'])
@@ -115,11 +115,11 @@ class TestZaloAssistant(TransactionCase):
             'is_personal_reminder': True, 'deadline': fields.Datetime.now() + timedelta(days=1)})
         tasks.create({'name': 'OTHER-EMPLOYEE-SECRET', 'assigned_user_id': self.other.id,
             'is_personal_reminder': True, 'deadline': fields.Datetime.now() + timedelta(days=1)})
-        self.config.write({'ai_enabled': True, 'ai_api_key': 'mock-ai-key', 'ai_model': 'mock-model'})
+        self.config.write({'ai_enabled': True})
         self.ingest('OTHER-CHAT-SECRET', uid='zalo-b', message_id='m2')
         self.ingest('/ai Tôi cần làm gì?', message_id='m3')
         captured = []
-        with patch.object(type(self.config), '_ask_ai', side_effect=lambda prompt: captured.extend(prompt) or 'Bạn có công việc được giao.'):
+        with patch.object(type(self.config), '_ask_ai', side_effect=lambda prompt, **kw: captured.extend(prompt) or 'Bạn có công việc được giao.'):
             message = self.messages.search([('state', '=', 'ai_pending')], limit=1)
             message._process_ai(self.config)
         prompt = str(captured)
@@ -131,10 +131,14 @@ class TestZaloAssistant(TransactionCase):
 
     def test_ai_failure_is_visible_without_provider_body(self):
         self.linked()
-        self.config.write({'ai_enabled': True, 'ai_api_key': 'mock-ai-key', 'ai_model': 'mock-model'})
+        self.config.write({'ai_enabled': True})
         self.ingest('/ai test', message_id='m2')
         message = self.messages.search([('state', '=', 'ai_pending')])
-        with patch('odoo.addons.dac_zalo_assistant.models.assistant.requests.post') as post:
+        connection = self.env['dac.ai.connection'].create({'name': 'Router', 'kind': 'openai', 'base_url': 'https://router.example/v1',
+                                                           'api_key': 'k', 'sequence': -1})
+        self.env['dac.ai.model'].create({'connection_id': connection.id, 'name': 'm', 'selected': True, 'verified': True})
+        self.env['dac.ai.connection'].search([('id', '!=', connection.id)]).write({'active': False})
+        with patch('odoo.addons.dac_ai_core.models.ai_connection.requests.request') as post:
             post.return_value.status_code = 401
             post.return_value.text = 'SECRET-PROVIDER-ERROR'
             message._process_ai(self.config)
@@ -144,7 +148,7 @@ class TestZaloAssistant(TransactionCase):
 
     def test_historical_replay_cannot_trigger_ai_or_import_prelink_chat(self):
         self.linked()
-        self.config.write({'ai_enabled': True, 'ai_api_key': 'mock-ai-key', 'ai_model': 'mock-model', 'ai_auto_reply': True})
+        self.config.write({'ai_enabled': True, 'ai_auto_reply': True})
         now_ms = int((fields.Datetime.now() - fields.Datetime.to_datetime('1970-01-01')).total_seconds() * 1000)
         self.ingest('/ai old', message_id='old1', historical=True, timestamp=now_ms - 86400000)
         self.assertFalse(self.messages.search([('external_message_id', '=', 'old1')]))
@@ -163,7 +167,7 @@ class TestZaloAssistant(TransactionCase):
 
     def test_automatic_ai_daily_limit_counts_non_command_messages(self):
         self.linked()
-        self.config.write({'ai_enabled': True, 'ai_api_key': 'mock-ai-key', 'ai_model': 'mock-model', 'ai_auto_reply': True})
+        self.config.write({'ai_enabled': True, 'ai_auto_reply': True})
         conversation = self.env['dac.zalo.conversation'].search([], limit=1)
         self.messages.create([{'conversation_id': conversation.id, 'event_key': 'used:%s' % i,
             'direction': 'in', 'text': 'ordinary question', 'state': 'received', 'ai_processed': True} for i in range(50)])

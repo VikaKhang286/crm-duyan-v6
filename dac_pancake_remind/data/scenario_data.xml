@@ -1,0 +1,100 @@
+<odoo noupdate="1">
+    <!-- Kịch bản nhắc: quản trị viên chỉnh thời gian / mẫu tin / bật tắt ở Trợ lý Zalo → Pancake → Kịch bản nhắc -->
+    <record id="scenario_new_first" model="dac.pancake.remind.scenario">
+        <field name="code">new_first</field><field name="sequence">10</field><field name="group">wait</field>
+        <field name="name">Khách mới — nhắc lần đầu (ảnh hội thoại)</field>
+        <field name="description">Khách lần đầu nhắn, chưa từng được trả lời, chưa có đơn. Quá hạn (giờ làm việc) mà vẫn chưa ai trả lời trên Pancake thì AI đọc đoạn chat (bỏ qua nếu không cần trả lời), rồi gửi ảnh chụp hội thoại + tag người được cài "Nhắc tên". Khách nhắn ngoài giờ: nhắc từ 8:30.</field>
+        <field name="wait_minutes">10</field><field name="wait_label">Hạn trả lời khách mới (phút làm việc)</field>
+        <field name="template">{muc_do} · Khách mới chờ {cho}
+{tom_tat}
+{link}</field>
+        <field name="default_template">{muc_do} · Khách mới chờ {cho}
+{tom_tat}
+{link}</field>
+        <field name="placeholders">muc_do, icon, cho, tom_tat, link, ten_khach, loai_khach</field>
+    </record>
+    <record id="scenario_new_repeat" model="dac.pancake.remind.scenario">
+        <field name="code">new_repeat</field><field name="sequence">20</field><field name="group">wait</field>
+        <field name="name">Khách mới — nhắc lại (trả lời vào ảnh đã gửi)</field>
+        <field name="description">Khách mới vẫn chưa được trả lời: mỗi lần đến hạn tải lại tin Pancake, chưa ai trả lời thì tag lại và trả lời vào ảnh nhắc lần đầu (không gửi lại ảnh). Thả cảm xúc không làm dừng nhắc. Tắt kịch bản này = chỉ nhắc một lần.</field>
+        <field name="repeat_minutes">10</field><field name="repeat_label">Nhắc lại mỗi (phút làm việc)</field>
+        <field name="max_count">4</field><field name="max_label">Tổng số lần nhắc tối đa (kể cả lần đầu)</field>
+        <field name="template">{icon} Nhắc lần {lan}/{toi_da} · khách chờ {cho}</field>
+        <field name="default_template">{icon} Nhắc lần {lan}/{toi_da} · khách chờ {cho}</field>
+        <field name="placeholders">icon, lan, toi_da, cho, ten_khach</field>
+    </record>
+    <record id="scenario_ongoing" model="dac.pancake.remind.scenario">
+        <field name="code">ongoing</field><field name="sequence">30</field><field name="group">wait</field>
+        <field name="name">Đang trao đổi — khách nhắn tiếp sau khi đã được trả lời</field>
+        <field name="description">Nhân viên đã trả lời trong ngày, khách nhắn tiếp. Quá hạn thì AI đọc lại đoạn chat; cần trả lời thì đưa vào tin gom (Khẩn thì nhắc riêng có ảnh). Tắt = không nhắc loại khách này.</field>
+        <field name="wait_minutes">15</field><field name="wait_label">Hạn trả lời (phút làm việc)</field>
+    </record>
+    <record id="scenario_old" model="dac.pancake.remind.scenario">
+        <field name="code">old</field><field name="sequence">40</field><field name="group">wait</field>
+        <field name="name">Khách cũ quay lại</field>
+        <field name="description">Lần trả lời gần nhất từ hôm trước trở về trước, hoặc khách đã có đơn. Quá hạn thì AI đọc tin một lần; cần trả lời thì đưa vào tin gom (Khẩn thì nhắc riêng có ảnh). Tắt = không nhắc khách cũ.</field>
+        <field name="wait_minutes">30</field><field name="wait_label">Hạn trả lời (phút làm việc)</field>
+    </record>
+    <record id="scenario_urgent" model="dac.pancake.remind.scenario">
+        <field name="code">urgent</field><field name="sequence">50</field><field name="group">wait</field>
+        <field name="name">Khẩn (AI đánh giá) — nhắc riêng có ảnh</field>
+        <field name="description">Khách cũ / đang trao đổi mà AI đánh giá Khẩn (phàn nàn, đã chuyển khoản chờ xác nhận, cần trong hôm nay, giục lần 2…): gửi riêng ảnh hội thoại, tag nhân viên đã chat với khách. Tắt = khách khẩn cũng vào tin gom.</field>
+        <field name="template">{muc_do} · {loai_khach} chờ {cho}
+{tom_tat}
+{link}</field>
+        <field name="default_template">{muc_do} · {loai_khach} chờ {cho}
+{tom_tat}
+{link}</field>
+        <field name="placeholders">muc_do, icon, loai_khach, cho, tom_tat, link, ten_khach</field>
+    </record>
+    <record id="scenario_digest" model="dac.pancake.remind.scenario">
+        <field name="code">digest</field><field name="sequence">60</field><field name="group">wait</field>
+        <field name="name">Tin gom khách cũ / đang trao đổi</field>
+        <field name="description">Một tin liệt kê các khách cũ / đang trao đổi cần trả lời (không Khẩn), nhóm theo nhân viên đã chat với khách và tag người đó; chưa rõ người thì tag người được cài sẵn. Icon tự nâng khi khách chờ quá 1 giờ / 2 giờ. Tắt = không nhắc các khách này.</field>
+        <field name="repeat_minutes">30</field><field name="repeat_label">Gửi tin gom tối đa mỗi (phút)</field>
+        <field name="template">🗂 {so_khach} khách đang chờ trả lời</field>
+        <field name="default_template">🗂 {so_khach} khách đang chờ trả lời</field>
+        <field name="line_template">{icon} {ten_khach}: {tom_tat}{nhan_vien} · chờ {cho} — {link}</field>
+        <field name="default_line_template">{icon} {ten_khach}: {tom_tat}{nhan_vien} · chờ {cho} — {link}</field>
+        <field name="placeholders">so_khach, icon, ten_khach, tom_tat, nhan_vien, cho, link, loai_khach</field>
+    </record>
+    <record id="scenario_appt_pre" model="dac.pancake.remind.scenario">
+        <field name="code">appt_pre</field><field name="sequence">70</field><field name="group">appointment</field>
+        <field name="name">Lịch hẹn — nhắc trước giờ hẹn</field>
+        <field name="description">AI tìm lời hẹn có giờ cụ thể của nhân viên ("15h em gửi báo giá"). Trước giờ hẹn: nhắc ngắn, tag đúng người hẹn (chưa rõ người thì tag người được cài), kèm link phiếu hẹn. Nhân viên đã làm sớm (AI thấy trong tin) thì không nhắc.</field>
+        <field name="wait_minutes">30</field><field name="wait_label">Nhắc trước giờ hẹn (phút)</field>
+        <field name="template">⏰ {gio_hen} hẹn khách {ten_khach}: {viec}
+{phieu}</field>
+        <field name="default_template">⏰ {gio_hen} hẹn khách {ten_khach}: {viec}
+{phieu}</field>
+        <field name="placeholders">gio_hen, ten_khach, viec, phieu</field>
+    </record>
+    <record id="scenario_appt_post" model="dac.pancake.remind.scenario">
+        <field name="code">appt_post</field><field name="sequence">80</field><field name="group">appointment</field>
+        <field name="name">Lịch hẹn — quá hẹn chưa làm</field>
+        <field name="description">Sau giờ hẹn: AI đọc lại tin nhắn; chưa thấy làm (và nhân viên chưa bấm "Đã xử lý xong" trên phiếu) thì nhắc, trả lời vào tin nhắc trước; kiểm tra lại theo chu kỳ cho tới số lần tối đa. Hẹn trong ngày không có giờ: hạn 16:00; hẹn không rõ giờ ("lát em gửi"): hạn sau 2 giờ làm việc.</field>
+        <field name="wait_minutes">30</field><field name="wait_label">Kiểm tra sau giờ hẹn (phút làm việc)</field>
+        <field name="repeat_minutes">60</field><field name="repeat_label">Chưa làm thì kiểm tra lại mỗi (phút làm việc)</field>
+        <field name="max_count">3</field><field name="max_label">Tối đa số lần nhắc sau hẹn</field>
+        <field name="template">⏰ {qua_han}: {ten_khach} — {viec}
+Đã xử lý thì bấm xác nhận: {phieu}</field>
+        <field name="default_template">⏰ {qua_han}: {ten_khach} — {viec}
+Đã xử lý thì bấm xác nhận: {phieu}</field>
+        <field name="placeholders">qua_han, ten_khach, viec, phieu, gio_hen</field>
+    </record>
+    <record id="scenario_morning" model="dac.pancake.remind.scenario">
+        <field name="code">morning</field><field name="sequence">90</field><field name="group">appointment</field>
+        <field name="name">Nhắc việc từ hôm qua (8:00)</field>
+        <field name="description">Từ 6:00 ngày làm việc, AI đọc lại mọi hội thoại có nhân viên nhắn hôm trước, tìm việc đã hẹn chưa làm. 8:00 (muộn nhất 9:00) gửi một tin nhóm theo nhân viên: ⏰ việc đã quá hạn, 🗓 việc hẹn trong hôm nay.</field>
+        <field name="template">📋 Nhắc việc từ hôm qua ({ngay})</field>
+        <field name="default_template">📋 Nhắc việc từ hôm qua ({ngay})</field>
+        <field name="line_template">{icon} {ten_khach}: {viec}{nhan_vien} — {phieu}</field>
+        <field name="default_line_template">{icon} {ten_khach}: {viec}{nhan_vien} — {phieu}</field>
+        <field name="placeholders">ngay, icon, ten_khach, viec, nhan_vien, phieu, gio_hen</field>
+    </record>
+    <record id="scenario_stats" model="dac.pancake.remind.scenario">
+        <field name="code">stats</field><field name="sequence">100</field><field name="group">report</field>
+        <field name="name">Thống kê khách liên hệ mới (8:00 / 11:30 / 17:00)</field>
+        <field name="description">Số khách liên hệ mới (form web + Pancake, không tính nội bộ/test/trùng số) từ mốc trước, kèm số khách Pancake đang chờ; gửi chung tin tổng lead website. Gửi nhóm thật hay chỉ nhóm thử do ô "Gửi thống kê vào nhóm thật" ở cấu hình quyết định.</field>
+    </record>
+</odoo>

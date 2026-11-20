@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_ai_connection_system,AI connection admin,model_dac_ai_connection,base.group_system,1,1,1,1
+access_ai_model_system,AI model admin,model_dac_ai_model,base.group_system,1,1,1,1

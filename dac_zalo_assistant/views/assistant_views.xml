@@ -93,7 +93,7 @@
                                 </div>
                             </div>
                             <div class="dac_ui_card_body">
-                                <span invisible="not ai_enabled">Model: <strong><field name="ai_model" readonly="1" nolabel="1" groups="base.group_system"/></strong></span>
+                                <span invisible="not ai_enabled">Dùng: <strong><field name="ai_connection_summary" readonly="1" nolabel="1"/></strong></span>
                                 <span invisible="ai_enabled">AI đang tắt. Thông báo và lệnh /congviec vẫn hoạt động bình thường.</span>
                             </div>
                             <div class="dac_ui_card_foot">
@@ -140,16 +140,18 @@
                             </div>
                         </page>
                         <page name="ai" string="Trợ lý AI" groups="base.group_system">
-                            <div class="alert alert-secondary" role="note">
-                                AI là tùy chọn. Thông báo công việc và lệnh /congviec vẫn hoạt động khi AI tắt.
+                            <div class="alert alert-info" role="status">
+                                API AI nhập ở một nơi cho cả hệ thống: <b>Cài đặt → Kết nối AI dùng chung</b> (9router, Gemini..., có thứ tự chính → dự phòng).
+                                Trợ lý Zalo, nhắc khách Pancake, lịch hẹn và việc hiểu câu nhân viên trả lời lead đều dùng các kết nối đó.
+                                AI trò chuyện là tùy chọn: thông báo công việc và lệnh /congviec vẫn hoạt động khi tắt.
                             </div>
                             <group>
-                                <group string="Nhà cung cấp">
-                                    <field name="ai_enabled" widget="boolean_toggle"/>
-                                    <field name="ai_base_url" placeholder="https://nha-cung-cap.example/v1"/>
-                                    <field name="ai_model"/>
-                                    <field name="ai_api_key" password="True"/>
-                                    <button name="action_test_ai" type="object" string="Kiểm tra kết nối AI" icon="fa-flask"
+                                <group string="Kết nối">
+                                    <field name="ai_connection_summary"/>
+                                    <button name="action_open_ai_connections" type="object" string="Mở Kết nối AI dùng chung" icon="fa-plug"
+                                            class="btn-primary"/>
+                                    <field name="ai_enabled" widget="boolean_toggle" string="Bật AI trò chuyện (/ai)"/>
+                                    <button name="action_test_ai" type="object" string="Thử trò chuyện" icon="fa-flask"
                                             class="btn-secondary" invisible="not ai_enabled"/>
                                 </group>
                                 <group string="Cách trả lời">
@@ -184,11 +186,13 @@
     <record id="binding_list" model="ir.ui.view">
         <field name="name">dac.zalo.binding.list</field><field name="model">dac.zalo.binding</field>
         <field name="arch" type="xml">
-            <list create="0" delete="0" decoration-muted="state != 'linked'">
-                <field name="user_id" widget="many2one_avatar_user"/>
+            <list create="0" delete="0" editable="bottom" decoration-muted="state != 'linked'">
+                <field name="user_id" widget="many2one_avatar_user" readonly="1"/>
                 <field name="state" widget="badge" decoration-success="state == 'linked'" decoration-muted="state != 'linked'"/>
                 <field name="zalo_uid" optional="show"/>
-                <field name="linked_at"/>
+                <field name="linked_at" readonly="1"/>
+                <field name="ai_model_id" groups="base.group_system" options="{'no_create': True, 'no_open': True}"
+                       placeholder="Theo thứ tự chung"/>
                 <button name="action_revoke" type="object" string="Hủy liên kết" icon="fa-chain-broken"
                         invisible="state != 'linked'"
                         confirm="Hủy liên kết Zalo? Trợ lý sẽ ngừng nhận và gửi tin nhắn cho liên kết này."/>

@@ -215,25 +215,40 @@ class NewContact(models.Model):
     # ── Bảng số liệu (dashboard) ─────────────────────────────────────────────────
 
     @api.model
-    def _period_range(self, period, now):
-        """(bắt đầu, kết thúc, kỳ trước bắt đầu, kiểu cột 'day'|'month', nhãn) theo giờ Việt Nam; trả naive UTC."""
+    def _period_range(self, period, now, date_from=None, date_to=None):
+        """Kỳ thống kê theo giờ Việt Nam → dict naive UTC: start/end (end loại trừ), prev_start/prev_end (kỳ so sánh),
+        bucket ('hour'|'day'|'month'), label."""
         local_now = now.replace(tzinfo=timezone.utc).astimezone(TZ)
         today = local_now.replace(hour=0, minute=0, second=0, microsecond=0)
-        if period == '7d':
-            start, bucket, label = today - timedelta(days=6), 'day', '7 ngày qua'
-        elif period == 'month':
-            start, bucket, label = today.replace(day=1), 'day', 'Tháng %s' % today.strftime('%m/%Y')
-        elif period == '12m':
-            year, month = today.year, today.month - 11  # 12 tháng tính cả tháng này
-            if month <= 0:
-                year, month = year - 1, month + 12
-            start, bucket, label = today.replace(year=year, month=month, day=1), 'month', '12 tháng qua'
+        day = timedelta(days=1)
+        if period == 'custom' and date_from and date_to:
+            first, last = fields.Date.to_date(date_from), fields.Date.to_date(date_to)
+            if first > last:
+                first, last = last, first
+            first = max(first, last - timedelta(days=3 * 366))  # tối đa ~3 năm
+            start = today.replace(year=first.year, month=first.month, day=first.day)
+            end = min(today.replace(year=last.year, month=last.month, day=last.day) + day, local_now)
+            bucket = 'day' if (end - start).days <= 62 else 'month'
+            label = 'Tuỳ chọn'
+            prev_start, prev_end = start - (end - start), start
+        elif period == 'today':
+            start, end, bucket, label = today, local_now, 'hour', 'Hôm nay'
+            prev_start, prev_end = start - day, end - day  # hôm qua, cùng khung giờ
+        elif period == 'yesterday':
+            start, end, bucket, label = today - day, today, 'hour', 'Hôm qua'
+            prev_start, prev_end = start - day, start
         else:
-            start, bucket, label = today - timedelta(days=29), 'day', '30 ngày qua'
-        end = local_now
-        length = end - start
+            if period == '7d':
+                start, label = today - 6 * day, '7 ngày qua'
+            elif period == 'month':
+                start, label = today.replace(day=1), 'Tháng %s' % today.strftime('%m/%Y')
+            else:
+                start, label = today - 29 * day, '30 ngày qua'
+            end, bucket = local_now, 'day'
+            prev_start, prev_end = start - (end - start), start
         to_utc = lambda moment: moment.astimezone(timezone.utc).replace(tzinfo=None)
-        return to_utc(start), to_utc(end), to_utc(start - length), bucket, label
+        return {'start': to_utc(start), 'end': to_utc(end), 'prev_start': to_utc(prev_start), 'prev_end': to_utc(prev_end),
+                'bucket': bucket, 'label': label}
 
     @api.model
     def _channel_of(self, contact):
@@ -243,22 +258,28 @@ class NewContact(models.Model):
         return {'zalo': 'zalo', 'facebook': 'messenger', 'messenger': 'messenger'}.get(platform, 'other')
 
     @api.model
-    def dashboard_data(self, period='30d'):
-        """Số liệu cho bảng "Khách liên hệ": khách mới thật sự (không test, không nội bộ, không trùng số) theo nguồn."""
+    def dashboard_data(self, period='30d', date_from=None, date_to=None):
+        """Số liệu cho bảng "Khách liên hệ": khách mới thật sự (không test, không nội bộ, không trùng số) theo nguồn.
+        `period`: today | yesterday | 7d | 30d | month | custom (kèm `date_from`, `date_to` dạng YYYY-MM-DD)."""
         now = fields.Datetime.now()
-        start, end, prev_start, bucket, label = self._period_range(period, now)
+        window = self._period_range(period, now, date_from, date_to)
+        start, end, bucket, label = window['start'], window['end'], window['bucket'], window['label']
         real = [('counts_as_new', '=', True)]
-        contacts = self.search(real + [('contact_at', '>=', start), ('contact_at', '<=', end)], order='contact_at')
-        previous = self.search_count(real + [('contact_at', '>=', prev_start), ('contact_at', '<', start)])
+        contacts = self.search(real + [('contact_at', '>=', start), ('contact_at', '<', end)], order='contact_at')
+        previous = self.search_count(real + [('contact_at', '>=', window['prev_start']), ('contact_at', '<', window['prev_end'])])
         channels = {'web': 0, 'zalo': 0, 'messenger': 0, 'other': 0}
         local = lambda moment: moment.replace(tzinfo=timezone.utc).astimezone(TZ)
-        # Cột biểu đồ: đủ mọi ngày/tháng trong kỳ, kể cả ngày không có khách
-        keys, cursor = [], local(start)
-        while cursor <= local(end):
-            key = cursor.strftime('%Y-%m' if bucket == 'month' else '%Y-%m-%d')
-            if key not in keys:
-                keys.append(key)
-            cursor += timedelta(days=1)
+        key_format = {'hour': '%H', 'day': '%Y-%m-%d', 'month': '%Y-%m'}[bucket]
+        # Cột biểu đồ: đủ mọi giờ/ngày/tháng trong kỳ, kể cả khi không có khách
+        if bucket == 'hour':
+            keys = ['%02d' % hour for hour in range(24)]
+        else:
+            keys, cursor, last = [], local(start), local(end - timedelta(seconds=1))
+            while cursor.date() <= last.date():
+                key = cursor.strftime(key_format)
+                if key not in keys:
+                    keys.append(key)
+                cursor += timedelta(days=1)
         series = {key: dict(channels) for key in keys}
         hours = [0] * 24
         pages = {}
@@ -266,7 +287,7 @@ class NewContact(models.Model):
             channel = self._channel_of(contact)
             channels[channel] += 1
             moment = local(contact.contact_at)
-            key = moment.strftime('%Y-%m' if bucket == 'month' else '%Y-%m-%d')
+            key = moment.strftime(key_format)
             if key in series:
                 series[key][channel] += 1
             hours[moment.hour] += 1
@@ -277,15 +298,17 @@ class NewContact(models.Model):
         recent = self.search(real, order='contact_at desc, id desc', limit=12)
         return {
             'period': period, 'label': label,
-            'range': '%s – %s' % (local(start).strftime('%d/%m/%Y'), local(end).strftime('%d/%m/%Y')),
+            'range': local(start).strftime('%d/%m/%Y') if bucket == 'hour' else '%s – %s' % (
+                local(start).strftime('%d/%m/%Y'), local(end - timedelta(seconds=1)).strftime('%d/%m/%Y')),
             'total': len(contacts), 'previous': previous,
             'today': self.search_count(real + [('contact_at', '>=', today_start)]),
             'channels': channels,
-            'repeat': self.search_count([('contact_at', '>=', start), ('contact_at', '<=', end), ('seen_before', '=', True), ('is_test', '=', False)]),
-            'internal': self.search_count([('contact_at', '>=', start), ('contact_at', '<=', end), ('is_internal', '=', True)]),
+            'repeat': self.search_count([('contact_at', '>=', start), ('contact_at', '<', end), ('seen_before', '=', True), ('is_test', '=', False)]),
+            'internal': self.search_count([('contact_at', '>=', start), ('contact_at', '<', end), ('is_internal', '=', True)]),
             'waiting': Wait.search_count([('state', '=', 'waiting'), ('is_test', '=', False)]),
-            'series': [dict(series[key], key=key, label=(key[5:7] + '/' + key[2:4]) if bucket == 'month' else (key[8:10] + '/' + key[5:7]))
-                       for key in keys],
+            'bucket': bucket,
+            'series': [dict(series[key], key=key, label={'hour': lambda k: k + 'h', 'month': lambda k: k[5:7] + '/' + k[2:4],
+                                                         'day': lambda k: k[8:10] + '/' + k[5:7]}[bucket](key)) for key in keys],
             'hours': hours,
             'pages': sorted(({'name': name, 'count': count} for name, count in pages.items()), key=lambda row: -row['count']),
             'recent': [{
@@ -295,4 +318,5 @@ class NewContact(models.Model):
                 'url': contact.external_url or (contact.lead_id and '/lead/%s' % contact.lead_id.id) or '',
             } for contact in recent],
             'start': fields.Datetime.to_string(start), 'end': fields.Datetime.to_string(end),
+            'date_from': local(start).strftime('%Y-%m-%d'), 'date_to': local(end - timedelta(seconds=1)).strftime('%Y-%m-%d'),
         }

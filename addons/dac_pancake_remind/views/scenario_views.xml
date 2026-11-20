@@ -1,0 +1,129 @@
+<odoo>
+    <!-- ═══ Kịch bản nhắc ═══════════════════════════════════════════════ -->
+    <record id="scenario_list" model="ir.ui.view">
+        <field name="name">dac.pancake.remind.scenario.list</field><field name="model">dac.pancake.remind.scenario</field>
+        <field name="arch" type="xml"><list string="Kịch bản nhắc" create="0" delete="0" decoration-muted="not enabled">
+            <field name="sequence" column_invisible="1"/>
+            <field name="enabled" widget="boolean_toggle"/>
+            <field name="group" widget="badge" decoration-info="group == 'wait'" decoration-warning="group == 'appointment'"/>
+            <field name="name"/>
+            <field name="wait_minutes" string="Thời gian" invisible="not wait_label"/>
+            <field name="repeat_minutes" string="Lặp lại mỗi" invisible="not repeat_label"/>
+            <field name="max_count" string="Tối đa" invisible="not max_label"/>
+            <field name="sent_7d"/>
+            <field name="sent_count" optional="hide"/>
+            <field name="last_sent_at" optional="show"/>
+            <field name="wait_label" column_invisible="1"/>
+            <field name="repeat_label" column_invisible="1"/>
+            <field name="max_label" column_invisible="1"/>
+        </list></field>
+    </record>
+    <record id="scenario_form" model="ir.ui.view">
+        <field name="name">dac.pancake.remind.scenario.form</field><field name="model">dac.pancake.remind.scenario</field>
+        <field name="arch" type="xml"><form string="Kịch bản nhắc" create="0" delete="0">
+            <header>
+                <button name="action_save_scenario" type="object" string="Lưu" icon="fa-save" class="btn-primary"/>
+                <button name="action_reset_template" type="object" string="Khôi phục mẫu tin mặc định" icon="fa-undo" class="btn-secondary"
+                        invisible="not default_template and not default_line_template" groups="base.group_system"
+                        confirm="Đưa mẫu tin về mặc định?"/>
+            </header>
+            <sheet>
+                <div class="oe_button_box" name="button_box">
+                    <button class="oe_stat_button" type="object" name="action_open_events" icon="fa-history">
+                        <field name="sent_count" widget="statinfo" string="Đã gửi"/>
+                    </button>
+                    <button class="oe_stat_button" type="object" name="action_open_events" icon="fa-calendar">
+                        <field name="sent_7d" widget="statinfo" string="7 ngày qua"/>
+                    </button>
+                </div>
+                <widget name="web_ribbon" title="Đang tắt" bg_color="text-bg-secondary" invisible="enabled"/>
+                <div class="oe_title"><h1><field name="name"/></h1></div>
+                <div class="alert alert-info" role="status"><field name="description" nolabel="1"/></div>
+                <group>
+                    <group string="Bật / thời gian">
+                        <field name="enabled" widget="boolean_toggle"/>
+                        <field name="group" readonly="1"/>
+                        <label for="wait_minutes" string="Thời gian" invisible="not wait_label"/>
+                        <div invisible="not wait_label" class="d-flex gap-2 align-items-baseline">
+                            <field name="wait_minutes" class="oe_inline" groups="base.group_system"/><field name="wait_label" nolabel="1" class="text-muted"/>
+                        </div>
+                        <label for="repeat_minutes" string="Lặp lại" invisible="not repeat_label"/>
+                        <div invisible="not repeat_label" class="d-flex gap-2 align-items-baseline">
+                            <field name="repeat_minutes" class="oe_inline" groups="base.group_system"/><field name="repeat_label" nolabel="1" class="text-muted"/>
+                        </div>
+                        <label for="max_count" string="Tối đa" invisible="not max_label"/>
+                        <div invisible="not max_label" class="d-flex gap-2 align-items-baseline">
+                            <field name="max_count" class="oe_inline" groups="base.group_system"/><field name="max_label" nolabel="1" class="text-muted"/>
+                        </div>
+                        <field name="last_sent_at"/>
+                    </group>
+                    <group string="Xem trước" invisible="not preview">
+                        <field name="preview" nolabel="1" colspan="2" class="font-monospace" style="white-space: pre-wrap"/>
+                    </group>
+                </group>
+                <group string="Mẫu tin" invisible="not default_template and not default_line_template" groups="base.group_system">
+                    <field name="template" invisible="not default_template" placeholder="Để trống = mẫu mặc định"/>
+                    <field name="line_template" invisible="not default_line_template" placeholder="Để trống = mẫu mặc định"/>
+                    <field name="placeholder_help" class="text-muted" style="white-space: pre-wrap"/>
+                    <field name="default_template" invisible="1"/>
+                    <field name="default_line_template" invisible="1"/>
+                    <field name="placeholders" invisible="1"/>
+                </group>
+            </sheet>
+        </form></field>
+    </record>
+    <record id="scenario_action" model="ir.actions.act_window">
+        <field name="name">Kịch bản nhắc</field><field name="res_model">dac.pancake.remind.scenario</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html"><p>Các kịch bản nhắc khách Pancake: bật/tắt, chỉnh thời gian và mẫu tin.</p></field>
+    </record>
+
+    <!-- ═══ Nhật ký nhắc ════════════════════════════════════════════════ -->
+    <record id="event_list" model="ir.ui.view">
+        <field name="name">dac.pancake.remind.event.list</field><field name="model">dac.pancake.remind.event</field>
+        <field name="arch" type="xml"><list string="Nhật ký nhắc" create="0" edit="0">
+            <field name="sent_at"/>
+            <field name="scenario_id"/>
+            <field name="customer_name"/>
+            <field name="customer_count" optional="show"/>
+            <field name="level" widget="badge" decoration-danger="level == 'urgent'" decoration-warning="level == 'high'" optional="show"/>
+            <field name="channel_names"/>
+            <field name="text" optional="show"/>
+            <field name="is_test" optional="hide"/>
+            <field name="external_url" widget="url" optional="hide"/>
+        </list></field>
+    </record>
+    <record id="event_form" model="ir.ui.view">
+        <field name="name">dac.pancake.remind.event.form</field><field name="model">dac.pancake.remind.event</field>
+        <field name="arch" type="xml"><form string="Lần nhắc" create="0" edit="0">
+            <sheet>
+                <group>
+                    <group><field name="scenario_id"/><field name="sent_at"/><field name="level"/><field name="channel_names"/><field name="is_test"/></group>
+                    <group><field name="conversation_id"/><field name="external_url" widget="url"/><field name="wait_id"/><field name="appointment_id"/>
+                        <field name="customer_count"/></group>
+                </group>
+                <group string="Nội dung"><field name="text" nolabel="1" colspan="2" style="white-space: pre-wrap"/></group>
+                <field name="message_ids"><list><field name="channel_id"/><field name="state"/><field name="sent_at"/></list></field>
+            </sheet>
+        </form></field>
+    </record>
+    <record id="event_search" model="ir.ui.view">
+        <field name="name">dac.pancake.remind.event.search</field><field name="model">dac.pancake.remind.event</field>
+        <field name="arch" type="xml"><search>
+            <field name="customer_name"/><field name="scenario_id"/><field name="text"/>
+            <filter name="today" string="Hôm nay" domain="[('sent_at', '&gt;=', context_today().strftime('%Y-%m-%d'))]"/>
+            <filter name="days7" string="7 ngày qua" domain="[('sent_at', '&gt;=', (context_today() - relativedelta(days=7)).strftime('%Y-%m-%d'))]"/>
+            <filter name="urgent" string="🚨 Khẩn" domain="[('level', '=', 'urgent')]"/>
+            <group expand="0" string="Nhóm theo">
+                <filter name="g_scenario" string="Kịch bản" context="{'group_by': 'scenario_id'}"/>
+                <filter name="g_day" string="Ngày" context="{'group_by': 'sent_at:day'}"/>
+            </group>
+        </search></field>
+    </record>
+    <record id="event_action" model="ir.actions.act_window">
+        <field name="name">Nhật ký nhắc</field><field name="res_model">dac.pancake.remind.event</field>
+        <field name="view_mode">list,form</field><field name="context">{'search_default_days7': 1}</field>
+        <field name="help" type="html"><p class="o_view_nocontent_smiling_face">Chưa có lần nhắc nào</p>
+            <p>Mỗi tin nhắc đã gửi (theo kịch bản) được ghi ở đây: lúc nào, khách nào, gửi vào đâu, nội dung gì.</p></field>
+    </record>
+</odoo>

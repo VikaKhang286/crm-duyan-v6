@@ -251,17 +251,20 @@ class WebLead(models.Model):
         return '%s-%s' % (digits, token) if 6 <= len(digits) <= 15 else token
 
     def _short_link(self, compact=False):
-        """Link công khai rút gọn, không có scheme cho gọn (Zalo tự nhận ra thành link): crm.duyan.vn/lead/<sđt>-<mã>.
+        """Link rút gọn cho tin Zalo: crm.duyan.vn/r/<4 ký tự> (addon dac_short_link) → trang lead /lead/<sđt>-<mã>.
 
-        `compact=True`: crm.duyan.vn/l/<mã> — dùng ở nơi số điện thoại đã hiện ngay bên cạnh (tin nhắc tổng).
+        Không có scheme cho gọn (Zalo tự nhận ra thành link). `compact` giữ cho mã cũ gọi; nay mọi nơi dùng cùng một link.
+        Link /lead/... và /l/... đã gửi trước đây vẫn mở được.
         """
         self.ensure_one()
         # sudo(): đọc tham số hệ thống trong luồng webhook/cron (không có user)
-        base = self.env['ir.config_parameter'].sudo().get_param('web.base.url', '')
-        host = urlsplit(base).netloc or 'crm.duyan.vn'
-        if compact:
-            return '%s/l/%s' % (host, self._get_access_token())
-        return '%s/lead/%s' % (host, self._link_slug())
+        base = self.env['ir.config_parameter'].sudo().get_param('web.base.url', '').rstrip('/')
+        parsed = urlsplit(base)
+        if parsed.scheme not in ('http', 'https'):
+            base = 'https://crm.duyan.vn'
+        elif parsed.scheme == 'http' and parsed.hostname not in ('localhost', '127.0.0.1'):
+            base = 'https://' + parsed.netloc  # máy chủ thật luôn chạy https: tránh thêm một bước chuyển http → https
+        return self.env['dac.short.link']._shorten('%s/lead/%s' % (base, self._link_slug()), source='Lead website', kind='r')
 
     def _zalo_message(self):
         """Tin Zalo gọn: tiêu đề in đậm, tên (nếu có), số điện thoại, yêu cầu, ghi chú và link xem chi tiết.

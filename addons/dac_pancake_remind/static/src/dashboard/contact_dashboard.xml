@@ -12,8 +12,8 @@
                 <div class="dac_cd_tools">
                     <div class="btn-group" role="group" aria-label="Chọn kỳ">
                         <t t-foreach="periods" t-as="p" t-key="p.key">
-                            <button type="button" class="btn btn-sm" t-att-class="state.period === p.key ? 'btn-primary' : 'btn-outline-secondary'"
-                                    t-on-click="() => this.load(p.key)" t-esc="p.label"/>
+                            <button type="button" class="btn btn-sm" t-att-class="isActive(p.key) ? 'btn-primary' : 'btn-outline-secondary'"
+                                    t-on-click="() => this.selectPeriod(p.key)" t-esc="p.label"/>
                         </t>
                     </div>
                     <button type="button" class="btn btn-sm btn-outline-secondary" title="Tải lại" aria-label="Tải lại" t-on-click="() => this.load()">
@@ -22,6 +22,13 @@
                 </div>
             </div>
 
+            <div t-if="state.showCustom" class="dac_cd_custom">
+                <label for="dac_cd_from">Từ ngày</label>
+                <input id="dac_cd_from" type="date" class="form-control form-control-sm" t-model="state.dateFrom" t-att-max="state.dateTo"/>
+                <label for="dac_cd_to">đến ngày</label>
+                <input id="dac_cd_to" type="date" class="form-control form-control-sm" t-model="state.dateTo" t-att-min="state.dateFrom"/>
+                <button type="button" class="btn btn-sm btn-primary" t-on-click="applyCustom" t-att-disabled="!state.dateFrom or !state.dateTo">Xem</button>
+            </div>
             <div t-if="state.error" class="alert alert-warning" role="alert">Không tải được số liệu. Bấm tải lại để thử lần nữa.</div>
             <div t-elif="!state.data" class="dac_cd_loading"><i class="fa fa-circle-o-notch fa-spin"/> Đang tải…</div>
             <t t-else="">
@@ -52,7 +59,7 @@
 
                 <div class="dac_cd_card">
                     <div class="dac_cd_card_head">
-                        <h2>Khách mới theo <t t-esc="state.period === '12m' ? 'tháng' : 'ngày'"/></h2>
+                        <h2>Khách mới theo <t t-esc="bucketLabel"/></h2>
                         <div class="dac_cd_legend">
                             <t t-foreach="visibleChannels" t-as="c" t-key="c.key">
                                 <span><i t-att-style="'background:' + c.color"/><t t-esc="c.label"/></span>
@@ -64,7 +71,7 @@
                         <div class="dac_cd_cols">
                             <t t-foreach="d.series" t-as="row" t-key="row.key">
                                 <div class="dac_cd_col" t-att-title="columnTitle(row)">
-                                    <span class="dac_cd_col_total" t-if="columnTotal(row) and d.series.length &lt;= 31" t-esc="columnTotal(row)"/>
+                                    <span class="dac_cd_col_total" t-esc="columnTotal(row) and d.series.length &lt;= 31 ? columnTotal(row) : ''"/>
                                     <div class="dac_cd_stack">
                                         <t t-foreach="channels" t-as="c" t-key="c.key">
                                             <div t-if="row[c.key]" class="dac_cd_seg" t-att-style="segmentStyle(row, c)"/>

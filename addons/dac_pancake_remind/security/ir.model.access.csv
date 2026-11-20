@@ -13,3 +13,13 @@ access_pancake_conversation_system,Pancake conversation admin,model_dac_pancake_
 access_pancake_conversation_manager,Pancake conversation manager,model_dac_pancake_conversation,dac_erp.group_dac_erp_manager,1,0,0,0
 access_pancake_message_system,Pancake message admin,model_dac_pancake_message,base.group_system,1,1,1,1
 access_pancake_message_manager,Pancake message manager,model_dac_pancake_message,dac_erp.group_dac_erp_manager,1,0,0,0
+access_pancake_staff_system,Pancake staff admin,model_dac_pancake_staff,base.group_system,1,1,1,1
+access_pancake_staff_manager,Pancake staff manager,model_dac_pancake_staff,dac_erp.group_dac_erp_manager,1,1,0,0
+access_pancake_appointment_system,Pancake appointment admin,model_dac_pancake_appointment,base.group_system,1,1,1,1
+access_pancake_appointment_manager,Pancake appointment manager,model_dac_pancake_appointment,dac_erp.group_dac_erp_manager,1,1,0,0
+access_pancake_followup_state_system,Pancake followup state admin,model_dac_pancake_followup_state,base.group_system,1,1,1,1
+access_pancake_followup_state_manager,Pancake followup state manager,model_dac_pancake_followup_state,dac_erp.group_dac_erp_manager,1,0,0,0
+access_pancake_scenario_system,Pancake scenario admin,model_dac_pancake_remind_scenario,base.group_system,1,1,0,0
+access_pancake_scenario_manager,Pancake scenario manager,model_dac_pancake_remind_scenario,dac_erp.group_dac_erp_manager,1,1,0,0
+access_pancake_event_system,Pancake remind event admin,model_dac_pancake_remind_event,base.group_system,1,1,1,1
+access_pancake_event_manager,Pancake remind event manager,model_dac_pancake_remind_event,dac_erp.group_dac_erp_manager,1,0,0,0

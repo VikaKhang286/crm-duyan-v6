@@ -517,6 +517,11 @@ class PancakeConversation(models.Model):
         self.ensure_one()
         return {'type': 'ir.actions.act_url', 'url': self.external_url or '#', 'target': 'new'}
 
+    def _short_url(self):
+        """Link hội thoại rút gọn cho tin Zalo: crm.duyan.vn/p/abc (Pancake tự bắt đăng nhập nên mã ngắn không lộ gì)."""
+        self.ensure_one()
+        return self.env['dac.short.link']._shorten(self.external_url, source='Pancake', kind='p') if self.external_url else ''
+
 
 class PancakeMessage(models.Model):
     _name = 'dac.pancake.message'

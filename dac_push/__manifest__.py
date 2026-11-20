@@ -1,6 +1,6 @@
 {
     'name': 'Lead Website — Push DAC Odoo',
-    'version': '18.0.1.12.0',
+    'version': '18.0.1.14.0',
     'category': '1. Duy An ERP',
     'summary': 'Nhận dữ liệu đẩy từ duyan.vn (plugin Push DAC Odoo) và báo vào Zalo',
     'description': """
@@ -11,7 +11,7 @@ duyan.vn (plugin WordPress "Push DAC Odoo") → POST ký HMAC → /dac_push/v1/e
 Thêm loại dữ liệu mới: kế thừa dac.push.event và viết method _handle_<event_type> (dấu chấm → gạch dưới),
 đăng ký dac.zalo.event.type nếu muốn có thông báo Zalo.
     """,
-    'depends': ['dac_erp', 'dac_zalo_assistant'],
+    'depends': ['dac_erp', 'dac_zalo_assistant', 'dac_short_link'],
     'data': [
         'security/ir.model.access.csv',
         'data/push_data.xml',

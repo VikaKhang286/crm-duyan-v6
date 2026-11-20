@@ -49,14 +49,15 @@ REPLY_SCHEMA = {'type': 'OBJECT', 'properties': {'decision': {'type': 'STRING', 
 
 
 def ai_decision(config, text):
-    """Hỏi Gemini câu trả lời này nghĩa là gì → 'contacted' | 'unreachable' | 'other'.
-    Trả None nếu Gemini chưa bật hoặc lỗi (người gọi dùng luật từ khóa thay thế). Không raise, không log nội dung tin."""
-    if not config.gemini_enabled:
+    """Hỏi AI (OpenAI-compatible, lỗi thì Gemini) câu trả lời này nghĩa là gì → 'contacted' | 'unreachable' | 'other'.
+    Trả None nếu chưa bật AI nào hoặc AI lỗi (người gọi dùng luật từ khóa thay thế). Không raise, không log nội dung tin."""
+    if not config._ai_ready():
         return None
     try:
-        data = config._gemini_json(REPLY_SYSTEM, (text or '')[:REPLY_MAX_CHARS], REPLY_SCHEMA)
+        data, _source = config._ai_json(REPLY_SYSTEM, (text or '')[:REPLY_MAX_CHARS], REPLY_SCHEMA, name='report_contact_result',
+                                        description='Báo nhãn phân loại câu trả lời của nhân viên.', timeout=(10, 30))
     except Exception as error:  # noqa: BLE001 — tin trả lời không được làm hỏng cả lô sự kiện của bridge; chỉ log loại lỗi
-        _logger.warning('Gemini không phân loại được câu trả lời của nhân viên: %s', type(error).__name__)
+        _logger.warning('AI không phân loại được câu trả lời của nhân viên: %s', type(error).__name__)
         return None
     decision = data.get('decision')
     return decision if decision in DECISIONS else None

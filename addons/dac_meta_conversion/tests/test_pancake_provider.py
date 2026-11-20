@@ -22,6 +22,7 @@ class TestPancakeProvider(TransactionCase):
         cls.env = cls.env(context=dict(cls.env.context, tracking_disable=True, no_reset_password=True))
         cls.company = cls.env.company
         cls.company.write({'meta_conversion_enabled': False, 'meta_conversion_provider': 'pancake_pos',
+            'pancake_pos_connection_id': False,
             'pancake_pos_api_key': 'private-pos-key', 'pancake_pos_shop_id': '123',
             'pancake_pos_page_id': '987654321', 'pancake_pos_summary_sku': 'CRM-SERVICE',
             'pancake_pos_warehouse_id': 'warehouse-service', 'pancake_pos_capi_ready': True,
@@ -251,5 +252,7 @@ class TestPancakeProvider(TransactionCase):
         arch = etree.fromstring(self.env['res.config.settings'].get_view(view_id=self.env.ref('base_setup.res_config_settings_view_form').id)['arch'])
         app = arch.xpath('//app[@name="dac_pancake_connector"]')
         self.assertTrue(app)
-        self.assertTrue(app[0].xpath('.//field[@name="pancake_pos_api_key"][@password="True"]'))
+        view = self.env.ref('dac_pancake_connector.pos_connection_form')
+        connection_arch = etree.fromstring(self.env['dac.pancake.pos.connection'].get_view(view_id=view.id)['arch'])
+        self.assertTrue(connection_arch.xpath('//field[@name="pancake_pos_api_key"][@password="True"]'))
         self.assertTrue(arch.xpath('//field[@name="meta_conversion_provider"]'))

@@ -11,6 +11,14 @@
     .dac_cd_sub { color: var(--cd-muted); font-size: .85rem; }
     .dac_cd_head { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: flex-end; margin-bottom: 16px; }
     .dac_cd_tools { display: flex; gap: 8px; align-items: center; }
+    .dac_cd_custom { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; margin: -6px 0 16px;
+        label { font-size: .85rem; color: var(--cd-muted); margin: 0; }
+        input { width: auto; }
+    }
+    .dac_cd_tools { flex-wrap: wrap; max-width: 100%;
+        .btn-group { flex-wrap: wrap; }
+        .btn { white-space: nowrap; }
+    }
     .dac_cd_loading { padding: 48px; text-align: center; color: var(--cd-muted); }
     .dac_cd_kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 16px; }
     .dac_cd_kpi {
