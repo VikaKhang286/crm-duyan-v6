@@ -1,0 +1,359 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="dac_chat_playbook.ChatDashboard">
+        <div class="o_action dac_cb">
+            <!-- Đầu trang -->
+            <header class="dac_cb_head">
+                <div>
+                    <h1>Trung tâm Chatbot AI</h1>
+                    <div class="dac_cb_sub" t-if="state.data">
+                        Học cách nhân viên nhắn tin → quy tắc → system prompt cho chatbot chào khách ·
+                        Model: <b t-esc="state.data.config.model"/>
+                        <t t-if="state.data.config.auto_weekly"> · <i class="fa fa-repeat"/> tự chạy hằng tuần</t>
+                    </div>
+                </div>
+                <div class="dac_cb_tools">
+                    <button type="button" class="btn btn-primary" t-on-click="openRun">
+                        <i class="fa fa-play me-1"/>Chạy phân tích mới
+                    </button>
+                    <button type="button" class="btn btn-outline-primary" t-on-click="openDemo">
+                        <i class="fa fa-comments me-1"/>Demo chatbot
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" t-on-click="openSettings">
+                        <i class="fa fa-cog me-1"/>Thiết lập
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" title="Tải lại" aria-label="Tải lại" t-on-click="() => this.load()">
+                        <i class="fa fa-refresh" t-att-class="state.loading ? 'fa-spin' : ''"/>
+                    </button>
+                </div>
+            </header>
+
+            <div t-if="state.error" class="alert alert-warning" role="alert">Không tải được số liệu. Bấm tải lại để thử lần nữa.</div>
+            <div t-elif="!state.data" class="dac_cb_loading"><i class="fa fa-circle-o-notch fa-spin me-2"/>Đang tải…</div>
+            <t t-else="">
+                <t t-set="d" t-value="state.data"/>
+
+                <!-- Các bước thiết lập -->
+                <ol class="dac_cb_steps" aria-label="Các bước thiết lập chatbot">
+                    <t t-foreach="d.steps" t-as="step" t-key="step.key">
+                        <li class="dac_cb_step" t-att-class="step.done ? 'is-done' : (step.soon ? 'is-soon' : 'is-todo')">
+                            <span class="dac_cb_step_icon" aria-hidden="true">
+                                <i t-if="step.done" class="fa fa-check"/>
+                                <t t-else="" t-esc="step_index + 1"/>
+                            </span>
+                            <span class="dac_cb_step_body">
+                                <span class="dac_cb_step_label"><t t-esc="step.label"/>
+                                    <span t-if="step.soon" class="badge text-bg-light ms-1">Sắp có</span></span>
+                                <span class="dac_cb_step_detail" t-esc="step.detail"/>
+                                <button t-if="step.cta and !step.done" type="button" class="btn btn-sm btn-link p-0 dac_cb_step_cta"
+                                        t-on-click="() => this.stepAction(step)">Làm ngay <i class="fa fa-angle-right"/></button>
+                            </span>
+                        </li>
+                    </t>
+                </ol>
+
+                <!-- Đợt đang chạy -->
+                <t t-foreach="d.running" t-as="run" t-key="run.id">
+                    <button type="button" class="dac_cb_running" t-on-click="() => this.openAnalysis(run.id)">
+                        <span class="dac_cb_running_title"><i class="fa fa-circle-o-notch fa-spin me-2"/><t t-esc="run.name"/> đang chạy</span>
+                        <span class="progress dac_cb_progress" role="progressbar" t-att-aria-valuenow="run.progress" aria-valuemin="0" aria-valuemax="100">
+                            <span class="progress-bar progress-bar-striped progress-bar-animated" t-attf-style="width: {{ run.progress }}%"/>
+                        </span>
+                        <span class="dac_cb_running_meta"><b><t t-esc="run.progress"/>%</b> · <t t-esc="run.step"/></span>
+                    </button>
+                </t>
+
+                <!-- Chưa có dữ liệu -->
+                <section t-if="!d.latest and !d.running.length" class="dac_cb_empty">
+                    <i class="fa fa-comments-o dac_cb_empty_icon" aria-hidden="true"/>
+                    <h2>Chưa có đợt phân tích nào</h2>
+                    <p>Hệ thống thống kê toàn bộ tin nhắn Pancake, AI đọc hội thoại (kèm ảnh), đánh giá nhân viên sale, đề xuất quy tắc
+                        và viết 3 bộ system prompt cho chatbot chào khách.</p>
+                    <button type="button" class="btn btn-primary btn-lg" t-on-click="openRun"><i class="fa fa-play me-2"/>Chạy phân tích đầu tiên</button>
+                </section>
+
+                <t t-if="d.latest">
+                    <!-- Số liệu chính -->
+                    <div class="dac_cb_section_head">
+                        <h2>Số liệu đợt gần nhất</h2>
+                        <button type="button" class="btn btn-sm btn-link" t-on-click="() => this.openAnalysis(d.latest.id)">
+                            <t t-esc="d.latest.range"/> · xem báo cáo đầy đủ <i class="fa fa-angle-right"/>
+                        </button>
+                    </div>
+                    <div class="dac_cb_kpis">
+                        <t t-foreach="d.latest.kpis" t-as="kpi" t-key="kpi.key">
+                            <button type="button" class="dac_cb_kpi" t-on-click="() => this.openAnalysis(d.latest.id)">
+                                <span class="dac_cb_kpi_label" t-esc="kpi.label"/>
+                                <span class="dac_cb_kpi_value" t-esc="num(kpi.value, kpi.unit)"/>
+                                <span class="dac_cb_kpi_note" t-esc="kpi.note"/>
+                            </button>
+                        </t>
+                    </div>
+                </t>
+
+                <t t-if="d.ai">
+                    <!-- Kết luận Agent -->
+                    <section class="dac_cb_card dac_cb_summary">
+                        <div class="dac_cb_card_head">
+                            <h2><i class="fa fa-lightbulb-o me-2 text-warning"/>Agent điều phối kết luận</h2>
+                            <span class="dac_cb_meta">
+                                <t t-esc="num(d.ai.labelled)"/> hội thoại đã gán nhãn · <t t-esc="num(d.ai.images)"/> ảnh ·
+                                <t t-esc="num(d.ai.tokens_out)"/> token ra · <t t-esc="d.ai.finished"/>
+                            </span>
+                        </div>
+                        <p class="dac_cb_summary_text" t-att-class="state.showSummary ? 'is-open' : ''" t-esc="d.ai.summary"/>
+                        <div t-if="state.showSummary and d.ai.bot_scope" class="dac_cb_scope">
+                            <b>Phạm vi chatbot:</b> <t t-esc="d.ai.bot_scope"/>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-link p-0" t-on-click="toggleSummary"
+                                t-att-aria-expanded="state.showSummary ? 'true' : 'false'">
+                            <t t-if="state.showSummary">Thu gọn</t><t t-else="">Xem đầy đủ và phạm vi chatbot</t>
+                        </button>
+                    </section>
+
+                    <!-- Biểu đồ nhãn -->
+                    <div class="dac_cb_grid">
+                        <t t-call="dac_chat_playbook.ChatDashboardBars">
+                            <t t-set="title" t-value="'Kết quả hội thoại'"/>
+                            <t t-set="icon" t-value="'fa-flag-checkered'"/>
+                            <t t-set="rows" t-value="d.ai.outcome"/>
+                            <t t-set="field" t-value="'outcome'"/>
+                            <t t-set="tone" t-value="'outcome'"/>
+                        </t>
+                        <t t-call="dac_chat_playbook.ChatDashboardBars">
+                            <t t-set="title" t-value="'Vì sao mất khách'"/>
+                            <t t-set="icon" t-value="'fa-user-times'"/>
+                            <t t-set="rows" t-value="d.ai.lost"/>
+                            <t t-set="field" t-value="'lost_reason'"/>
+                            <t t-set="tone" t-value="'bad'"/>
+                        </t>
+                        <t t-call="dac_chat_playbook.ChatDashboardBars">
+                            <t t-set="title" t-value="'Sản phẩm · tỉ lệ chốt'"/>
+                            <t t-set="icon" t-value="'fa-cubes'"/>
+                            <t t-set="rows" t-value="d.ai.product"/>
+                            <t t-set="field" t-value="'product'"/>
+                            <t t-set="tone" t-value="'product'"/>
+                        </t>
+                        <t t-call="dac_chat_playbook.ChatDashboardBars">
+                            <t t-set="title" t-value="'Chatbot lo được'"/>
+                            <t t-set="icon" t-value="'fa-android'"/>
+                            <t t-set="rows" t-value="d.ai.bot_fit"/>
+                            <t t-set="field" t-value="'bot_fit'"/>
+                            <t t-set="tone" t-value="'bot'"/>
+                        </t>
+                    </div>
+
+                    <!-- Đánh giá nhân viên -->
+                    <section class="dac_cb_card" t-if="d.ai.staff.length">
+                        <div class="dac_cb_card_head">
+                            <h2><i class="fa fa-users me-2"/>Đánh giá nhân viên sale</h2>
+                            <span class="dac_cb_meta">Điểm 1–5 do AI chấm trên từng hội thoại · dùng để kèm cặp, không phải căn cứ duy nhất</span>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle dac_cb_table">
+                                <thead>
+                                    <tr>
+                                        <th>Nhân viên</th>
+                                        <th class="text-end">Hội thoại</th>
+                                        <th class="text-center">Điểm tổng</th>
+                                        <th class="text-end">Chốt</th>
+                                        <th class="text-end">Mất khách</th>
+                                        <th class="text-end">Trả lời (phút)</th>
+                                        <th>Lời khuyên</th>
+                                        <th/>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="d.ai.staff" t-as="s" t-key="s.id">
+                                        <tr class="dac_cb_row" t-on-click="() => this.toggleStaff(s.id)">
+                                            <td class="fw-semibold" t-esc="s.name"/>
+                                            <td class="text-end" t-esc="num(s.conversations)"/>
+                                            <td class="text-center"><span class="dac_cb_score" t-att-class="scoreTone(s.overall)" t-esc="s.overall or '–'"/></td>
+                                            <td class="text-end" t-esc="num(s.deal, '%')"/>
+                                            <td class="text-end" t-esc="num(s.lost, '%')"/>
+                                            <td class="text-end" t-esc="num(s.response)"/>
+                                            <td class="dac_cb_clip" t-esc="s.coaching"/>
+                                            <td class="text-end">
+                                                <button type="button" class="btn btn-sm btn-link" t-att-aria-expanded="state.openStaff === s.id ? 'true' : 'false'"
+                                                        t-att-aria-label="'Chi tiết ' + s.name">
+                                                    <i class="fa" t-att-class="state.openStaff === s.id ? 'fa-chevron-up' : 'fa-chevron-down'"/>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        <tr t-if="state.openStaff === s.id" class="dac_cb_detail">
+                                            <td colspan="8">
+                                                <div class="dac_cb_scores">
+                                                    <t t-foreach="s.scores" t-as="sc" t-key="sc.label">
+                                                        <span class="dac_cb_chip"><t t-esc="sc.label"/>: <b t-esc="sc.value ? num(sc.value) : '–'"/></span>
+                                                    </t>
+                                                </div>
+                                                <div class="dac_cb_detail_grid">
+                                                    <div><h3>Điểm mạnh</h3><p t-esc="s.strengths or '–'"/></div>
+                                                    <div><h3>Cần cải thiện</h3><p t-esc="s.improvements or '–'"/></div>
+                                                    <div><h3>Lời khuyên</h3><p t-esc="s.coaching or '–'"/></div>
+                                                </div>
+                                                <button type="button" class="btn btn-sm btn-outline-primary" t-on-click.stop="() => this.openInsights('staff_name', s.name)">
+                                                    Xem các hội thoại của <t t-esc="s.name"/>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                </t>
+
+                <div class="dac_cb_grid is-2">
+                    <!-- Quy tắc chờ duyệt -->
+                    <section class="dac_cb_card">
+                        <div class="dac_cb_card_head">
+                            <h2><i class="fa fa-list-ol me-2"/>Quy tắc chờ duyệt <span class="badge text-bg-warning ms-1" t-if="d.rules.proposed" t-esc="d.rules.proposed"/></h2>
+                            <span class="d-flex gap-1 align-items-center">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" t-on-click="reviewRules" t-att-disabled="state.reviewing"
+                                        title="AI gộp quy tắc trùng, bỏ quy tắc thừa, chỉ ra mâu thuẫn">
+                                    <i class="fa me-1" t-att-class="state.reviewing ? 'fa-circle-o-notch fa-spin' : 'fa-magic'"/>
+                                    <t t-if="state.reviewing">AI đang rà soát…</t><t t-else="">AI rà soát trùng lặp</t>
+                                </button>
+                                <button type="button" class="btn btn-sm btn-link" t-on-click="openRules">Tất cả (<t t-esc="d.rules.approved"/> đang dùng) <i class="fa fa-angle-right"/></button>
+                            </span>
+                        </div>
+                        <p t-if="!d.rules.pending.length" class="dac_cb_muted mb-0"><i class="fa fa-check-circle text-success me-1"/>Không có quy tắc nào chờ duyệt.</p>
+                        <ul class="dac_cb_rules">
+                            <t t-foreach="d.rules.pending.slice(0, 5)" t-as="r" t-key="r.id">
+                                <li class="dac_cb_rule">
+                                    <div class="dac_cb_rule_body">
+                                        <div class="dac_cb_rule_title">
+                                            <span class="badge" t-att-class="r.priority === 'must' ? 'text-bg-danger' : 'text-bg-secondary'"
+                                                  t-esc="r.priority === 'must' ? 'Bắt buộc' : (r.priority === 'should' ? 'Nên' : 'Tham khảo')"/>
+                                            <span class="dac_cb_muted small" t-esc="r.category"/>
+                                            <b t-esc="r.name"/>
+                                        </div>
+                                        <div class="dac_cb_rule_text" t-esc="r.content"/>
+                                        <div t-if="r.evidence" class="dac_cb_rule_evidence"><i class="fa fa-bar-chart me-1"/><t t-esc="r.evidence"/></div>
+                                    </div>
+                                    <div class="dac_cb_rule_actions">
+                                        <button type="button" class="btn btn-sm btn-success" t-att-disabled="state.busy[r.id]"
+                                                t-on-click="() => this.ruleAction(r, 'action_approve')" t-att-aria-label="'Duyệt ' + r.name">
+                                            <i class="fa fa-check me-1"/>Duyệt
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" t-att-disabled="state.busy[r.id]"
+                                                t-on-click="() => this.ruleAction(r, 'action_reject')" t-att-aria-label="'Bỏ ' + r.name">Bỏ</button>
+                                    </div>
+                                </li>
+                            </t>
+                        </ul>
+                        <button t-if="d.rules.proposed > 5" type="button" class="btn btn-sm btn-outline-secondary w-100 mt-2" t-on-click="openRules">
+                            Xem thêm <t t-esc="d.rules.proposed - 5"/> quy tắc chờ duyệt
+                        </button>
+                    </section>
+
+                    <!-- System prompt -->
+                    <section class="dac_cb_card">
+                        <div class="dac_cb_card_head">
+                            <h2><i class="fa fa-commenting-o me-2"/>System prompt chatbot</h2>
+                            <button type="button" class="btn btn-sm btn-link" t-on-click="openPrompts">Tất cả phiên bản <i class="fa fa-angle-right"/></button>
+                        </div>
+                        <button type="button" class="dac_cb_knowledge" t-on-click="openKnowledge">
+                            <i class="fa fa-book me-2"/>Kiến thức doanh nghiệp: <b t-esc="d.knowledge.count"/> mục
+                            (<t t-esc="num(d.knowledge.chars)"/> ký tự) · chatbot dùng để trả lời câu hỏi về công ty, sản phẩm
+                            <i class="fa fa-angle-right ms-1"/>
+                        </button>
+                        <div class="dac_cb_prompts">
+                            <t t-foreach="d.prompts" t-as="p" t-key="p.mode">
+                                <div class="dac_cb_prompt" t-att-class="p.active ? 'is-active' : ''">
+                                    <div class="dac_cb_prompt_head">
+                                        <b t-esc="p.label"/>
+                                        <span>
+                                            <span t-if="p.active" class="badge text-bg-success">Đang dùng</span>
+                                            <span t-if="p.draft" class="badge text-bg-warning ms-1">Có bản nháp mới</span>
+                                            <span t-if="!p.active and !p.draft" class="badge text-bg-light">Chưa có</span>
+                                        </span>
+                                    </div>
+                                    <div class="dac_cb_prompt_meta" t-if="p.active">
+                                        <t t-esc="p.active.name"/> · kích hoạt <t t-esc="p.active.activated_at"/><t t-if="p.active.by"> bởi <t t-esc="p.active.by"/></t>
+                                        <br/>Model trả lời: <t t-esc="p.active.model"/>
+                                    </div>
+                                    <div class="dac_cb_prompt_meta" t-if="p.draft">Bản nháp mới: <t t-esc="p.draft.name"/> — bấm "Thử" trước khi kích hoạt</div>
+                                    <div class="dac_cb_prompt_meta" t-if="!p.active and !p.draft">Chạy phân tích có AI để Agent viết bộ này.</div>
+                                    <div class="dac_cb_prompt_actions">
+                                        <t t-set="target" t-value="p.draft or p.active"/>
+                                        <button t-if="target" type="button" class="btn btn-sm btn-outline-primary" t-on-click="() => this.testPrompt(target.id)">
+                                            <i class="fa fa-comments me-1"/>Thử
+                                        </button>
+                                        <button t-if="p.draft" type="button" class="btn btn-sm btn-primary" t-on-click="() => this.activatePrompt(p)">Kích hoạt bản nháp</button>
+                                        <button t-if="target" type="button" class="btn btn-sm btn-link" t-on-click="() => this.openPrompt(target.id)">Mở</button>
+                                    </div>
+                                </div>
+                            </t>
+                        </div>
+                    </section>
+                </div>
+
+                <!-- Các đợt gần đây -->
+                <section class="dac_cb_card" t-if="d.recent.length">
+                    <div class="dac_cb_card_head">
+                        <h2><i class="fa fa-history me-2"/>Các đợt phân tích gần đây</h2>
+                        <button type="button" class="btn btn-sm btn-link" t-on-click="openAnalyses">Tất cả <i class="fa fa-angle-right"/></button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle dac_cb_table">
+                            <thead>
+                                <tr><th>Đợt</th><th>Trạng thái</th><th class="text-end">Hội thoại</th><th class="text-end">Đã gán nhãn</th>
+                                    <th class="text-end">Quy tắc</th><th>Model</th><th>Xong lúc</th></tr>
+                            </thead>
+                            <tbody>
+                                <t t-foreach="d.recent" t-as="a" t-key="a.id">
+                                    <tr class="dac_cb_row" t-on-click="() => this.openAnalysis(a.id)">
+                                        <td class="fw-semibold" t-esc="a.name"/>
+                                        <td>
+                                            <span class="badge" t-att-class="a.state === 'done' ? 'text-bg-success' : (a.state === 'failed' ? 'text-bg-danger' : (a.state === 'draft' ? 'text-bg-light' : 'text-bg-info'))"
+                                                  t-esc="a.state_label"/>
+                                            <span t-if="a.state === 'ai' or a.state === 'queued'" class="dac_cb_muted small ms-1"><t t-esc="a.progress"/>%</span>
+                                        </td>
+                                        <td class="text-end" t-esc="num(a.conversations)"/>
+                                        <td class="text-end" t-esc="num(a.labelled)"/>
+                                        <td class="text-end" t-esc="num(a.rules)"/>
+                                        <td class="dac_cb_clip" t-esc="a.model or 'Thứ tự chung'"/>
+                                        <td t-esc="a.finished or '–'"/>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </t>
+        </div>
+    </t>
+
+    <!-- Thẻ biểu đồ thanh ngang: bấm một dòng để mở các hội thoại tương ứng -->
+    <t t-name="dac_chat_playbook.ChatDashboardBars">
+        <section class="dac_cb_card">
+            <div class="dac_cb_card_head">
+                <h2><i class="fa me-2" t-att-class="icon"/><t t-esc="title"/></h2>
+            </div>
+            <p t-if="!rows.length" class="dac_cb_muted mb-0">Chưa có dữ liệu.</p>
+            <ul class="dac_cb_bars">
+                <t t-set="max" t-value="maxCount(rows)"/>
+                <t t-foreach="rows" t-as="row" t-key="row_index">
+                    <li>
+                        <button type="button" class="dac_cb_bar_row" t-on-click="() => this.openInsights(field, row.key)"
+                                t-att-aria-label="row.label + ': ' + row.count + ' hội thoại'">
+                            <span class="dac_cb_bar_label" t-esc="row.label"/>
+                            <span class="dac_cb_bar_track">
+                                <span class="dac_cb_bar_fill"
+                                      t-att-class="tone === 'outcome' ? outcomeTone(row.key) : (tone === 'bot' ? botTone(row.key) : (tone === 'bad' ? 'is-bad' : 'is-info'))"
+                                      t-attf-style="width: {{ barWidth(row.count, max) }}%"/>
+                            </span>
+                            <span class="dac_cb_bar_value">
+                                <b t-esc="num(row.count)"/>
+                                <span class="dac_cb_muted" t-if="tone !== 'product'"> · <t t-esc="num(row.share, '%')"/></span>
+                                <span class="dac_cb_muted" t-else=""> · chốt <t t-esc="num(row.deal, '%')"/></span>
+                            </span>
+                        </button>
+                    </li>
+                </t>
+            </ul>
+        </section>
+    </t>
+</templates>

@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Kiến thức doanh nghiệp lấy từ duyan.vn (đọc ngày 20/11/2026). noupdate: quản lý sửa trên giao diện, nâng cấp không ghi đè. -->
+    <data noupdate="1">
+        <!-- Công ty -->
+        <record id="kb_company_intro" model="dac.chat.knowledge">
+            <field name="name">Giới thiệu</field>
+            <field name="category">company</field>
+            <field name="scope">all</field>
+            <field name="sequence">1</field>
+            <field name="source_url">https://duyan.vn/gioi-thieu/</field>
+            <field name="content">Quảng cáo Duy An (Duy An Advertising – DAC, Công Ty TNHH TM Quảng Cáo Duy An), hoạt động từ năm 2000, hơn 25 năm kinh nghiệm thiết kế, sản xuất và thi công bảng hiệu, hộp đèn, biển bảng, in ấn và vật phẩm quảng cáo tại TP.HCM. Hơn 2.000 khách hàng. Có xưởng sản xuất trực tiếp, đội ngũ tư vấn – thiết kế – thi công riêng.</field>
+        </record>
+        <record id="kb_company_strengths" model="dac.chat.knowledge">
+            <field name="name">Điểm mạnh</field>
+            <field name="category">company</field>
+            <field name="scope">info</field>
+            <field name="sequence">2</field>
+            <field name="source_url">https://duyan.vn/</field>
+            <field name="content">Tư vấn miễn phí; miễn phí thiết kế khi thi công bảng hiệu/hộp đèn tại Duy An; xưởng sản xuất trực tiếp; nhận đơn gấp; có xuất hóa đơn VAT. Đã làm cho chuỗi Xe Đạp Giá Kho, VinFast Long An, nhà hàng Yu Shang Lou, Bệnh viện Hùng Vương, booth triển lãm Cty United.</field>
+        </record>
+
+        <!-- Liên hệ -->
+        <record id="kb_contact_main" model="dac.chat.knowledge">
+            <field name="name">Địa chỉ và hotline</field>
+            <field name="category">contact</field>
+            <field name="scope">all</field>
+            <field name="sequence">1</field>
+            <field name="source_url">https://duyan.vn/lien-he/</field>
+            <field name="content">Văn phòng chính: 189C Nguyễn Chí Thanh, Phường Chợ Lớn (P.12, Quận 5 cũ), TP.HCM. Chi nhánh: 573 Tỉnh Lộ 10, Bình Trị Đông B, Bình Tân; C7B/109 Phạm Hùng, Bình Hưng, Bình Chánh. Hotline/Zalo: 0915 555 018.</field>
+        </record>
+        <record id="kb_contact_hours" model="dac.chat.knowledge">
+            <field name="name">Giờ làm việc (theo website)</field>
+            <field name="category">contact</field>
+            <field name="scope">all</field>
+            <field name="sequence">2</field>
+            <field name="source_url">https://duyan.vn/lien-he/</field>
+            <field name="content">Website ghi trả lời 08:00–18:00 từ thứ 2 đến thứ 7; Chủ nhật vẫn có người trực Zalo/điện thoại. Khi hẹn khách, luôn dùng mốc làm việc kế tiếp trong phần Bối cảnh.</field>
+        </record>
+
+        <!-- Sản phẩm / dịch vụ -->
+        <record id="kb_product_signs" model="dac.chat.knowledge">
+            <field name="name">Bảng hiệu, chữ nổi</field>
+            <field name="category">product</field>
+            <field name="scope">info</field>
+            <field name="sequence">1</field>
+            <field name="source_url">https://duyan.vn/bang-hieu-chu-noi/</field>
+            <field name="content">Chữ nổi Mica, Inox, Alu, Formex, Tole, LED Neon; có loại có đèn và không đèn. Bảng hiệu 2D: bạt Hiflex căng khung, bạt không gân, Formex dán decal/PP, Mica dán decal hoặc in UV, Alu dán decal. Chọn chất liệu tùy thiết kế, kích thước, kiểu sáng, vị trí (trong nhà/ngoài trời) và ngân sách. Để báo giá cần logo, kích thước và ảnh mặt tiền.</field>
+        </record>
+        <record id="kb_product_lightbox" model="dac.chat.knowledge">
+            <field name="name">Hộp đèn, LED</field>
+            <field name="category">product</field>
+            <field name="scope">info</field>
+            <field name="sequence">2</field>
+            <field name="source_url">https://duyan.vn/hop-den/</field>
+            <field name="content">Hộp đèn Mica (in UV, dán decal), Hiflex, Alu, hút nổi (tròn, vuông, oval, chữ nhật), siêu mỏng (nam châm hoặc bắt ốc), tranh điện; bảng LED 1 màu, 3 màu, full màu; có màn hình LED. Chọn loại theo vị trí treo, kích thước và nhu cầu thay nội dung. Để tư vấn cần ảnh mặt bằng/vị trí lắp.</field>
+        </record>
+        <record id="kb_product_boards" model="dac.chat.knowledge">
+            <field name="name">Biển bảng</field>
+            <field name="category">product</field>
+            <field name="scope">consult</field>
+            <field name="sequence">3</field>
+            <field name="source_url">https://duyan.vn/bang-bien/</field>
+            <field name="content">Bảng menu (mica, formex), biển chức danh để bàn, biển phòng ban, biển số nhà, biển tên công ty (inox, mica), biển chỉ dẫn, biển báo giao thông.</field>
+        </record>
+        <record id="kb_product_print" model="dac.chat.knowledge">
+            <field name="name">In ấn quảng cáo</field>
+            <field name="category">product</field>
+            <field name="scope">info</field>
+            <field name="sequence">4</field>
+            <field name="source_url">https://duyan.vn/in-an/</field>
+            <field name="content">In kỹ thuật số: decal, PP, backlit, băng rôn, backdrop, canvas, poster, pano, PET, PVC. In offset: card visit, catalogue, tờ rơi, menu, phong bì, giấy tiêu đề, folder, hồ sơ năng lực, kỷ yếu, decal giấy, bao lì xì, bằng khen. Tem nhãn: decal, tem vỡ, tem kim loại, tem chống hàng giả. Để báo giá cần kích thước, số lượng, bề mặt dùng và tình trạng file thiết kế.</field>
+        </record>
+        <record id="kb_product_posm" model="dac.chat.knowledge">
+            <field name="name">Vật phẩm quảng cáo, POSM</field>
+            <field name="category">product</field>
+            <field name="scope">consult</field>
+            <field name="sequence">5</field>
+            <field name="source_url">https://duyan.vn/vat-pham-quang-cao/</field>
+            <field name="content">Standee, backdrop di động, hashtag cầm tay, wobbler, huy hiệu, móc khóa mica, thẻ tên, quà tặng quảng cáo/sự kiện, gian hàng/booth triển lãm. Để báo giá cần mẫu, kích thước và số lượng dự kiến.</field>
+        </record>
+        <record id="kb_product_build" model="dac.chat.knowledge">
+            <field name="name">Thi công và dịch vụ kèm theo</field>
+            <field name="category">product</field>
+            <field name="scope">consult</field>
+            <field name="sequence">6</field>
+            <field name="source_url">https://duyan.vn/thi-cong/</field>
+            <field name="content">Thi công mặt dựng (alu, lam tôn, lam gỗ), logo tòa nhà, pano, billboard, dán decal, treo băng rôn/phướn, lắp màn hình LED. Dịch vụ: thiết kế (logo, bảng hiệu, card, catalogue, standee, menu…), xin giấy phép biển hiệu/băng rôn, gia công cắt/khắc mica, tháo và sửa chữa biển hiệu. Có giải pháp theo ngành: văn phòng, shop, nhà hàng/cafe, nhà thuốc, phòng khám/nha khoa, showroom, spa/salon, trường học, sự kiện.</field>
+        </record>
+
+        <!-- Quy trình & khu vực -->
+        <record id="kb_process_order" model="dac.chat.knowledge">
+            <field name="name">Cách đặt hàng</field>
+            <field name="category">process</field>
+            <field name="scope">info</field>
+            <field name="sequence">1</field>
+            <field name="source_url">https://duyan.vn/lien-he/</field>
+            <field name="content">Khách không cần đến văn phòng trước: gửi nhu cầu, kích thước, ảnh hiện trạng/mặt tiền, logo hoặc file thiết kế qua Zalo/chat. Bạn phụ trách sẽ liên hệ lại để làm rõ hạng mục, địa điểm và báo giá.</field>
+        </record>
+        <record id="kb_process_area" model="dac.chat.knowledge">
+            <field name="name">Khu vực và thời gian</field>
+            <field name="category">process</field>
+            <field name="scope">info</field>
+            <field name="sequence">2</field>
+            <field name="source_url">https://duyan.vn/lien-he/</field>
+            <field name="content">Ưu tiên TP.HCM và khu vực lân cận; khách ở xa gửi địa chỉ công trình để bên em xác nhận khả năng khảo sát, thi công. Thời gian thường từ 1 đến 7 ngày tùy hạng mục, có nhận đơn gấp; thời gian cụ thể do bạn phụ trách xác nhận sau khi xem yêu cầu.</field>
+        </record>
+
+        <!-- Chính sách -->
+        <record id="kb_policy_warranty" model="dac.chat.knowledge">
+            <field name="name">Bảo hành</field>
+            <field name="category">policy</field>
+            <field name="scope">consult</field>
+            <field name="sequence">1</field>
+            <field name="source_url">https://duyan.vn/chinh-sach-bao-hanh-cua-cong-ty/</field>
+            <field name="content">Bảo hành thường từ 12 tháng trở lên tùy sản phẩm và vật liệu (trang chủ ghi 12–24 tháng); thời hạn cụ thể ghi theo báo giá/hợp đồng. Không bảo hành khi tự ý tháo sửa, hư hỏng do thiên tai, cháy, nước. Báo sự cố qua hotline, kỹ thuật liên hệ lại thường trong 24–48 giờ.</field>
+        </record>
+        <record id="kb_policy_vat" model="dac.chat.knowledge">
+            <field name="name">Hóa đơn</field>
+            <field name="category">policy</field>
+            <field name="scope">info</field>
+            <field name="sequence">2</field>
+            <field name="source_url">https://duyan.vn/</field>
+            <field name="content">Có xuất hóa đơn VAT. Giá, đặt cọc và thanh toán do bạn phụ trách trao đổi trực tiếp.</field>
+        </record>
+
+        <!-- Câu hỏi thường gặp -->
+        <record id="kb_faq_material" model="dac.chat.knowledge">
+            <field name="name">Nên chọn Mica hay Inox?</field>
+            <field name="category">faq</field>
+            <field name="scope">consult</field>
+            <field name="sequence">1</field>
+            <field name="source_url">https://duyan.vn/bang-hieu-chu-noi/</field>
+            <field name="content">Tùy thiết kế, kích thước, kiểu sáng, vị trí sử dụng và ngân sách; xem mẫu thực tế giúp so sánh đúng hơn. Gửi logo, kích thước và ảnh mặt tiền để bạn phụ trách tư vấn.</field>
+        </record>
+        <record id="kb_faq_pricing" model="dac.chat.knowledge">
+            <field name="name">Giá tính theo nội dung hay diện tích?</field>
+            <field name="category">faq</field>
+            <field name="scope">all</field>
+            <field name="sequence">2</field>
+            <field name="source_url">https://duyan.vn/bang-hieu-chu-noi/</field>
+            <field name="content">Tùy hạng mục và cấu tạo; cần nội dung, kích thước và hiện trạng để báo đúng. Chatbot không báo giá, chỉ xin thông tin để bạn phụ trách báo giá.</field>
+        </record>
+    </data>
+</odoo>

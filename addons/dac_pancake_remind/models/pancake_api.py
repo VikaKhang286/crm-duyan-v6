@@ -543,6 +543,10 @@ class PancakeMessage(models.Model):
     @api.model
     def _type_of(self, raw):
         attachments = [a for a in raw.get('attachments') or [] if isinstance(a, dict)]
+        # Tin có người thả cảm xúc: Pancake để {"type": "reaction"} trước nội dung thật (vd ảnh nhân viên gửi) → bỏ qua dấu đó
+        content = [a for a in attachments if a.get('type') != 'reaction']
+        if content:
+            attachments = content
         if not attachments:
             return 'text'
         first = attachments[0]

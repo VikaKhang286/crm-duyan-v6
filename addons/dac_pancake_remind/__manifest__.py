@@ -1,6 +1,6 @@
 {
     'name': 'Pancake: nhắc khách chưa trả lời + thống kê khách mới',
-    'version': '18.0.6.3.0',
+    'version': '18.0.6.9.0',
     'category': '1. Duy An ERP',
     'summary': 'Khách nhắn page Pancake mà quá hạn (giờ làm việc) chưa ai trả lời → bot gửi ảnh chụp hội thoại + tag tên vào Zalo',
     'description': """
@@ -19,6 +19,7 @@ Thả cảm xúc lên tin nhắc KHÔNG làm dừng nhắc; chỉ khi có nhân 
         'views/appointment_views.xml',
         'views/scenario_views.xml',
         'views/remind_views.xml',
+        'views/feedback_views.xml',
     ],
     'assets': {
         'web.assets_backend': [

@@ -1,0 +1,23 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_chat_analysis_system,Chat analysis admin,model_dac_chat_analysis,base.group_system,1,1,1,1
+access_chat_analysis_manager,Chat analysis manager,model_dac_chat_analysis,dac_erp.group_dac_erp_manager,1,1,1,1
+access_chat_analysis_staff_system,Chat analysis staff admin,model_dac_chat_analysis_staff,base.group_system,1,1,1,1
+access_chat_analysis_staff_manager,Chat analysis staff manager,model_dac_chat_analysis_staff,dac_erp.group_dac_erp_manager,1,1,1,1
+access_chat_rule_system,Chat rule admin,model_dac_chat_rule,base.group_system,1,1,1,1
+access_chat_rule_manager,Chat rule manager,model_dac_chat_rule,dac_erp.group_dac_erp_manager,1,1,1,1
+access_chat_playbook_preview_system,Playbook preview admin,model_dac_chat_playbook_preview,base.group_system,1,1,1,1
+access_chat_playbook_preview_manager,Playbook preview manager,model_dac_chat_playbook_preview,dac_erp.group_dac_erp_manager,1,1,1,1
+access_chat_prompt_system,Chat prompt admin,model_dac_chat_prompt,base.group_system,1,1,1,1
+access_chat_prompt_manager,Chat prompt manager,model_dac_chat_prompt,dac_erp.group_dac_erp_manager,1,1,1,1
+access_chat_prompt_test_system,Chat prompt test admin,model_dac_chat_prompt_test,base.group_system,1,1,1,1
+access_chat_prompt_test_manager,Chat prompt test manager,model_dac_chat_prompt_test,dac_erp.group_dac_erp_manager,1,1,1,1
+access_chat_insight_system,Chat insight admin,model_dac_chat_insight,base.group_system,1,1,1,1
+access_chat_insight_manager,Chat insight manager,model_dac_chat_insight,dac_erp.group_dac_erp_manager,1,1,1,1
+access_chat_config_system,Chat config admin,model_dac_chat_config,base.group_system,1,1,1,1
+access_chat_config_manager,Chat config manager,model_dac_chat_config,dac_erp.group_dac_erp_manager,1,1,0,0
+access_chat_run_wizard_system,Chat run wizard admin,model_dac_chat_run_wizard,base.group_system,1,1,1,1
+access_chat_run_wizard_manager,Chat run wizard manager,model_dac_chat_run_wizard,dac_erp.group_dac_erp_manager,1,1,1,1
+access_chat_task_system,Chat task admin,model_dac_chat_task,base.group_system,1,1,1,1
+access_chat_task_manager,Chat task manager,model_dac_chat_task,dac_erp.group_dac_erp_manager,1,1,0,0
+access_chat_knowledge_system,Chat knowledge admin,model_dac_chat_knowledge,base.group_system,1,1,1,1
+access_chat_knowledge_manager,Chat knowledge manager,model_dac_chat_knowledge,dac_erp.group_dac_erp_manager,1,1,1,1

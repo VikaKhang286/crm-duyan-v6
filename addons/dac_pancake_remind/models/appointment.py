@@ -77,6 +77,8 @@ class PancakeAppointment(models.Model):
     page_name = fields.Char(string='Page', related='conversation_id.page_id.name')
     external_url = fields.Char(string='Link Pancake', related='conversation_id.external_url')
     staff_id = fields.Many2one('dac.pancake.staff', string='Nhân viên hẹn', ondelete='set null', index=True)
+    staff_ids = fields.Many2many('dac.pancake.staff', 'dac_pancake_appointment_staff_rel', 'appointment_id', 'staff_id',
+        string='Nhân viên được tag', help='Người hẹn (nếu đã xác định) và những nhân viên đã xác định khác từng chat với khách; nhắc thì tag tất cả.')
     task = fields.Char(string='Việc đã hẹn', required=True)
     quote = fields.Text(string='Tin hẹn của nhân viên', readonly=True)
     message_fm_id = fields.Char(string='Mã tin hẹn', readonly=True, index=True)
@@ -96,6 +98,9 @@ class PancakeAppointment(models.Model):
     in_morning_list = fields.Boolean(string='Đã có trong tin 8:00', readonly=True)
     done_at = fields.Datetime(string='Xong lúc', readonly=True)
     done_by = fields.Char(string='Xác nhận bởi', readonly=True)
+    done_user_id = fields.Many2one('res.users', string='Người xác nhận', readonly=True, ondelete='set null', index=True,
+        help='Đăng nhập Odoo khi bấm link → đúng người đó; chưa đăng nhập → nhân viên đã xác định nhắn khách gần nhất trên Pancake; '
+        'không có → để trống (chưa xác định).')
     access_token = fields.Char(string='Mã phiếu', readonly=True, copy=False, index=True, default=lambda self: secrets.token_urlsafe(12))
     zalo_message_ids = fields.Many2many('dac.zalo.channel.message', 'dac_pancake_appointment_zalo_message_rel', 'appointment_id', 'message_id',
         string='Tin Zalo đã gửi', readonly=True, copy=False)
@@ -115,17 +120,31 @@ class PancakeAppointment(models.Model):
 
     # ── Xác nhận ─────────────────────────────────────────────────────────────
 
-    def _close(self, state, by):
-        self.filtered(lambda a: a.state in ('open', 'overdue')).write({'state': state, 'done_at': fields.Datetime.now(), 'done_by': by[:120]})
+    def _close(self, state, by, user=None):
+        self.filtered(lambda a: a.state in ('open', 'overdue')).write({
+            'state': state, 'done_at': fields.Datetime.now(), 'done_by': by[:120], 'done_user_id': user.id if user else False})
+
+    def _guess_doer(self, user=None):
+        """Ai bấm xác nhận trên phiếu: (tài khoản Odoo hoặc None, nhãn).
+        Đã đăng nhập → chính người đó. Chưa đăng nhập → nhân viên đã xác định nhắn khách gần nhất trên Pancake
+        (khách có nhiều người chat thì lấy người nhắn gần nhất). Không có ai → chưa xác định."""
+        self.ensure_one()
+        if user and not user._is_public():
+            return user, '%s (đăng nhập Odoo)' % user.name
+        people = self.env['dac.pancake.staff']._people_of_conversation(self.conversation_id.sudo())
+        if people:
+            others = people[1:].mapped('user_id.name')
+            return people[0].user_id, '%s (theo tin Pancake%s)' % (people[0].user_id.name, '; cùng chat: ' + ', '.join(others) if others else '')
+        return None, ''
 
     def action_mark_done(self):
-        self._close('done', self.env.user.name)
+        self._close('done', self.env.user.name, self.env.user)
 
     def action_cancel(self):
-        self._close('cancelled', self.env.user.name)
+        self._close('cancelled', self.env.user.name, self.env.user)
 
     def action_reopen(self):
-        self.write({'state': 'open', 'done_at': False, 'done_by': False})
+        self.write({'state': 'open', 'done_at': False, 'done_by': False, 'done_user_id': False})
 
     # ── Cron ─────────────────────────────────────────────────────────────────
 
@@ -217,10 +236,13 @@ class PancakeAppointment(models.Model):
             if source == 'morning' and due <= now:
                 # Việc tồn từ hôm qua: tin 8:00 đã nhắc, kiểm tra lại sau 2 giờ làm việc
                 check_at = add_working_minutes(max(now, utc(local(now).date(), MORNING_AT)), MORNING_RECHECK)
-            staff = Staff._for_name(row['staff']) if row['staff'] else Staff._of_conversation(conversation, before=row['at'])
+            people = Staff._people_of_conversation(conversation, before=row['at'])
+            maker = Staff._for_name(row['staff']) if row['staff'] else people[:1]
+            if maker._known():
+                people = maker | people  # người hẹn đứng đầu, cùng những người khác đã chat với khách
             # sudo(): cron tạo phiếu hẹn (người dùng thường chỉ xem)
             self.sudo().create({
-                'conversation_id': conversation.id, 'staff_id': staff.id, 'task': '; '.join(dict.fromkeys(i['task'] for i in items))[:240],
+                'conversation_id': conversation.id, 'staff_id': maker.id, 'staff_ids': [(6, 0, people.ids)], 'task': '; '.join(dict.fromkeys(i['task'] for i in items))[:240],
                 'quote': (row['text'] or row['note'] or '')[:500], 'message_fm_id': message.message_fm_id, 'promised_at': row['at'],
                 'due_at': due, 'precision': precision, 'check_at': check_at, 'source': source, 'ai_source': ai_source,
                 'is_test': name == 'test' or name.startswith('test '),
@@ -314,15 +336,23 @@ class PancakeAppointment(models.Model):
 
     # ── Gửi nhắc ─────────────────────────────────────────────────────────────
 
+    def _staff(self):
+        self.ensure_one()
+        return self.staff_ids or self.staff_id
+
     def _targets(self, channel, types):
-        return zalo_out.targets_for(channel, self.staff_id, types)
+        return zalo_out.targets_for(channel, self._staff(), types)
 
     def _values(self, now):
         late = zalo_out.working_minutes_between(self.due_at, now) if self.due_at and self.due_at < now else 0
         return {'gio_hen': local(self.due_at).strftime('%H:%M') if self.due_at else '', 'ten_khach': self.customer_name or 'Khách',
                 'viec': self.task, 'phieu': self._short_ticket(),
                 'qua_han': ('Quá hẹn %s' % zalo_out.waited_text(late)) if late else 'Đã quá hẹn',
-                'nhan_vien': '' if self.staff_id.zalo_uid or not self.staff_id else ' (%s)' % self.staff_id.name}
+                'nhan_vien': self._unmapped_names()}
+
+    def _unmapped_names(self):
+        names = [s.name for s in self._staff() if s.user_id and not s.zalo_uid]
+        return ' (%s)' % ', '.join(names) if names else ''
 
     def _send(self, config, key, build, reply=False, scenario=None):
         """Gửi một tin của phiếu này; `reply`: trả lời tin nhắc trước đó của phiếu trong cùng hội thoại."""
@@ -452,13 +482,13 @@ class PancakeAppointment(models.Model):
             mapped = {}
             unknown = []
             for appointment in items:
-                targets = zalo_out.staff_targets(channel, appointment.staff_id)
+                targets = zalo_out.staff_targets(channel, appointment._staff())
                 if targets:
-                    mapped.setdefault(targets[0], []).append(appointment)
+                    mapped.setdefault(tuple(targets), []).append(appointment)
                 else:
                     unknown.append(appointment)
-            for target, group in mapped.items():
-                out.add('\n').tags([target])
+            for targets, group in mapped.items():
+                out.add('\n').tags(list(targets))
                 for appointment in group:
                     out.add('\n' + line(appointment))
             if unknown:

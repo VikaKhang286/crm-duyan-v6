@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ── Model & thinking theo tác vụ ─────────────────────────────────── -->
+    <record id="chat_task_view_list" model="ir.ui.view">
+        <field name="name">dac.chat.task.list</field>
+        <field name="model">dac.chat.task</field>
+        <field name="arch" type="xml">
+            <list string="Model &amp; thinking theo tác vụ" editable="bottom" create="0" delete="0" sample="0">
+                <field name="stage" readonly="1" optional="show"/>
+                <field name="name" readonly="1"/>
+                <field name="ai_model_id" options="{'no_create': True}" placeholder="Theo Thiết lập / thứ tự chung"/>
+                <field name="ai_fallback" widget="boolean_toggle" optional="show"/>
+                <field name="thinking"/>
+                <field name="thinking_note" readonly="1" optional="show"/>
+                <field name="hint" readonly="1" optional="show"/>
+                <button name="action_test" type="object" string="Thử gọi" class="btn btn-link"
+                        help="Gọi thử một lượt nhỏ đúng model và thinking của dòng này (tốn rất ít token)."/>
+            </list>
+        </field>
+    </record>
+
+    <record id="chat_task_view_form" model="ir.ui.view">
+        <field name="name">dac.chat.task.form</field>
+        <field name="model">dac.chat.task</field>
+        <field name="arch" type="xml">
+            <form string="Tác vụ AI" create="0" delete="0">
+                <header>
+                    <button name="action_test" type="object" string="Thử gọi" class="btn-primary"/>
+                </header>
+                <sheet>
+                    <div class="oe_title"><h1><field name="name" readonly="1"/></h1></div>
+                    <p class="text-muted"><field name="description" readonly="1" nolabel="1"/></p>
+                    <group>
+                        <group>
+                            <field name="ai_model_id" options="{'no_create': True}" placeholder="Theo Thiết lập / thứ tự chung"/>
+                            <field name="ai_fallback"/>
+                        </group>
+                        <group>
+                            <field name="thinking"/>
+                            <field name="thinking_note"/>
+                            <field name="hint"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="chat_task_open_action" model="ir.actions.server">
+        <field name="name">Model &amp; thinking theo tác vụ</field>
+        <field name="model_id" ref="model_dac_chat_task"/>
+        <field name="state">code</field>
+        <field name="code">action = model.action_open()</field>
+    </record>
+
+    <menuitem id="menu_chat_task" name="Model &amp; thinking theo tác vụ" parent="menu_chat_playbook"
+              action="chat_task_open_action" sequence="85"/>
+</odoo>

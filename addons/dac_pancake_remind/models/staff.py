@@ -9,6 +9,7 @@ from odoo.addons.dac_push.models.contact_intent import fold
 
 STAFF_LOOKBACK = timedelta(days=60)
 LAST_STAFF_SCAN = 120  # số tin gần nhất của hội thoại để tìm người đã chat với khách
+STAFF_WINDOW = timedelta(days=30)  # chỉ tính người đã chat trong 30 ngày tính từ tin nhân viên gần nhất
 
 
 def name_key(name):
@@ -103,18 +104,40 @@ class PancakeStaff(models.Model):
             return self.browse()
 
     @api.model
-    def _of_conversation(self, conversation, before=None):
-        """Nhân viên đã chat với khách gần nhất (tin có tên nhân viên trên Pancake); không thấy → rỗng."""
+    def _people_of_conversation(self, conversation, before=None):
+        """Các nhân viên đã xác định (tên Pancake đã ghép Tài khoản Odoo) từng chat với khách, người nhắn gần nhất đứng đầu.
+        Chỉ tính trong 30 ngày tính từ tin gần nhất của họ. Tên Pancake chưa ghép tài khoản Odoo = chưa xác định → bỏ qua."""
         domain = [('conversation_id', '=', conversation.id)]
         if before:
             domain.append(('inserted_at', '<=', before))
         bots = self.env['dac.pancake.remind.wait']._bot_names()
+        people, cache, newest = self.sudo().browse(), {}, None
         # sudo(): luồng nền đọc tin Pancake
         for message in self.env['dac.pancake.message'].sudo().search(domain, order='inserted_at desc, id desc', limit=LAST_STAFF_SCAN):
             name = admin_name(message)
-            if name and name.lower() not in bots:
-                return self._for_name(name)
-        return self.browse()
+            if not name or name.lower() in bots:
+                continue
+            if name not in cache:
+                cache[name] = self._for_name(name)
+            person = cache[name]
+            if not person or not person.active or not person.user_id:
+                continue
+            if newest is None:
+                newest = message.inserted_at
+            elif message.inserted_at and newest and newest - message.inserted_at > STAFF_WINDOW:
+                break
+            if person not in people:
+                people |= person
+        return people
+
+    @api.model
+    def _of_conversation(self, conversation, before=None):
+        """Nhân viên đã xác định chat với khách gần nhất; không có → rỗng (chưa xác định)."""
+        return self._people_of_conversation(conversation, before=before)[:1]
+
+    def _known(self):
+        """Những người trong danh sách đã xác định (có Tài khoản Odoo)."""
+        return self.filtered(lambda s: s.active and s.user_id)
 
     @api.model
     def action_refresh(self):

@@ -700,7 +700,20 @@ class TestPushController(HttpCase):
         self.assertEqual(done.status_code, 303)
         lead.invalidate_recordset()
         self.assertEqual((lead.contact_state, bool(lead.contact_state_at)), ('contacted', True))
+        self.assertEqual((lead.sudo().contact_by, lead.sudo().contact_user_id), ('Chưa xác định', self.env['res.users']))
         self.assertIn('Đã liên hệ —', self.url_open('/lead/%s' % token).text)
+
+    def test_logged_in_click_records_the_user(self):
+        lead = self._lead_with_token('pub-who')
+        token = lead.sudo().access_token
+        self.assertIn('Đăng nhập Odoo', self.url_open('/lead/%s' % token).text)
+        user = self.env['res.users'].with_context(no_reset_password=True).create({
+            'name': 'Bông Lead', 'login': 'bong-lead', 'password': 'bong-lead-pw-123'})  # không có quyền xem lead → vẫn ở trang công khai
+        self.authenticate('bong-lead', 'bong-lead-pw-123')
+        self.assertIn('Sẽ ghi nhận: <b>Bông Lead</b>', self.url_open('/lead/%s' % token).text)
+        self.url_open('/lead/%s/contact' % token, data={'result': 'contacted'})
+        lead.invalidate_recordset()
+        self.assertEqual((lead.sudo().contact_user_id, lead.sudo().contact_by), (user, 'Bông Lead'))
 
     def test_decided_lead_has_locked_buttons_and_ignores_a_second_click(self):
         lead = self._lead_with_token('pub2b')

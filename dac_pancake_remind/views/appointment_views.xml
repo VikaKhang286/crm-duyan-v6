@@ -23,7 +23,9 @@
         <field name="view_mode">list</field>
         <field name="help" type="html"><p class="o_view_nocontent_smiling_face">Chưa có nhân viên nào</p>
             <p>Bấm "Cập nhật danh sách &amp; gợi ý": hệ thống lấy tên nhân viên đã trả lời khách trên Pancake (60 ngày qua) và gợi ý người
-            trùng tên trong nhóm Zalo. Ghép xong, khi nhắc khách bot sẽ tag đúng người đã chat với khách đó.</p></field>
+            trùng tên trong nhóm Zalo. Ghép xong, khi nhắc khách bot sẽ tag đúng người đã chat với khách đó.</p>
+            <p>Chỉ người đã chọn <b>Tài khoản Odoo</b> mới được tính là đã xác định: được tag khi nhắc (khách có nhiều người cùng chat thì tag tất cả)
+            và được ghi nhận khi bấm xác nhận trên phiếu hẹn mà chưa đăng nhập. Tên khác coi như chưa xác định → tag người được cài sẵn.</p></field>
     </record>
 
     <!-- ═══ Lịch hẹn với khách ═══════════════════════════════════════════ -->
@@ -41,6 +43,8 @@
             <field name="followup_count" optional="show"/>
             <field name="source" optional="hide"/>
             <field name="promised_at" optional="hide"/>
+            <field name="staff_ids" widget="many2many_tags" optional="hide"/>
+            <field name="done_user_id" optional="show"/>
             <field name="done_by" optional="hide"/>
             <field name="external_url" widget="url" optional="show"/>
             <field name="is_test" optional="hide"/>
@@ -62,12 +66,13 @@
                     <group>
                         <field name="customer_name"/><field name="page_name"/><field name="external_url" widget="url"/>
                         <field name="staff_id" options="{'no_create': True}"/>
+                        <field name="staff_ids" widget="many2many_tags" options="{'no_create': True}"/>
                         <field name="ticket_url" widget="url"/>
                     </group>
                     <group>
                         <field name="promised_at"/><field name="due_at"/><field name="precision"/>
                         <field name="check_at"/><field name="pre_reminded_at"/><field name="followup_count"/>
-                        <field name="done_at" invisible="not done_at"/><field name="done_by" invisible="not done_by"/>
+                        <field name="done_at" invisible="not done_at"/><field name="done_user_id" invisible="not done_user_id"/><field name="done_by" invisible="not done_by"/>
                     </group>
                 </group>
                 <group string="Tin hẹn của nhân viên"><field name="quote" nolabel="1" colspan="2"/></group>
@@ -137,6 +142,8 @@
                     button:active{opacity:.85}
                     button:disabled{opacity:.4;cursor:not-allowed}
                     .hint{color:#6b7280;font-size:13px;margin-top:10px}
+                    .who{margin-top:14px;padding:10px 14px;border-radius:12px;background:#f9fafb;font-size:14px;color:#374151}
+                    .who a{display:inline-block;margin-left:4px;color:#1d4ed8;font-weight:600}
                 </style>
             </head>
             <body>
@@ -152,12 +159,18 @@
                         <div class="row" t-if="a.staff_id"><b>Nhân viên hẹn</b><span><t t-out="a.staff_id.name"/></span></div>
                         <div class="row" t-if="a.quote"><b>Tin hẹn</b><span><t t-out="promised"/> — “<t t-out="a.quote"/>”</span></div>
                         <div class="row" t-if="a.check_note and is_open"><b>Kiểm tra gần nhất</b><span><t t-out="a.check_note"/></span></div>
+                        <div class="row" t-if="not is_open and a.done_by"><b>Xác nhận bởi</b><span><t t-out="a.done_by"/></span></div>
                         <a t-if="a.external_url" class="open-link" t-att-href="a.external_url" target="_blank" rel="noopener">Mở hội thoại trên Pancake</a>
                         <div t-attf-class="state #{a.state}">
                             <t t-if="just_saved and not is_open">✓ Đã lưu. </t><t t-out="state_label"/><t t-if="done_at and not is_open"> — <t t-out="done_at"/></t>
                         </div>
+                        <div class="who" t-if="is_open">
+                            <t t-if="doer">Sẽ ghi nhận: <b t-out="doer_label"/>
+                                <a t-if="not logged_in" t-att-href="login_url">Không phải bạn? Đăng nhập</a></t>
+                            <t t-else="">Chưa xác định được người làm. <a t-att-href="login_url">Đăng nhập Odoo</a> để ghi đúng tên.</t>
+                        </div>
                         <form t-if="is_open" method="post" t-attf-action="/hen/#{token}/done" class="actions" id="done-form">
-                            <input type="text" name="by" maxlength="60" placeholder="Tên bạn (không bắt buộc)" autocomplete="name"/>
+                            <input t-if="not doer" type="text" name="by" maxlength="60" placeholder="Hoặc gõ tên bạn (không bắt buộc)" autocomplete="name"/>
                             <button class="primary" type="submit" name="result" value="done">Đã xử lý xong</button>
                             <button class="muted" type="submit" name="result" value="cancel">Không cần nữa (khách hủy/đổi ý)</button>
                         </form>

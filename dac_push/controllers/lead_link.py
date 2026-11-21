@@ -1,5 +1,7 @@
 import re
 
+from werkzeug.urls import url_encode
+
 from odoo import fields, http
 from odoo.http import request
 
@@ -49,7 +51,8 @@ class LeadLinkController(http.Controller):
         html = request.env['ir.qweb']._render('dac_push.lead_public_page', {
             'lead': lead, 'token': token, 'received': local(lead.received_at), 'state_at': local(lead.contact_state_at),
             'extra': extra, 'visited': [ln for ln in (lead.visited_urls or '').splitlines() if ln.strip()],
-            'just_saved': bool(done),
+            'just_saved': bool(done), 'viewer': request.env.user if not request.env.user._is_public() else None,
+            'login_url': '/web/login?' + url_encode({'redirect': '/lead/%s' % token}),
             'form_label': dict(lead._fields['form_type'].selection).get(lead.form_type, ''),
         })
         # doctype thêm ở đây vì QWeb escape mọi chuỗi trong template (và str + Markup cũng escape, nên phải str(html)); không có doctype thì trình duyệt vào quirks mode
@@ -66,6 +69,7 @@ class LeadLinkController(http.Controller):
                                          headers=[('Content-Type', 'text/plain; charset=utf-8'), *NO_INDEX.items()])
         # sudo() ở _lead_by_token: người dùng công khai không có quyền ghi dac.web.lead; chỉ ghi trạng thái liên hệ.
         # Đã chốt rồi thì giữ nguyên (nút trên trang đã bị khóa; chặn cả bấm đúp và gửi lại); nhân viên muốn sửa thì sửa trong Odoo.
+        # Người xác nhận: đang đăng nhập Odoo → người đó; chưa đăng nhập → "Chưa xác định" (lead web không có tin Pancake để đoán)
         if lead.contact_state == 'new':
-            lead._set_contact_state(state)
+            lead._set_contact_state(state, request.env.user)
         return request.redirect('/lead/%s?done=1' % token)

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="dac_chat_playbook.ChatProgressField">
+        <div class="o_dac_chat_progress w-100">
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <div class="progress flex-grow-1" style="height: 16px;">
+                    <div t-att-class="barClass" role="progressbar" t-attf-style="width: {{ pct }}%;"/>
+                </div>
+                <strong><t t-esc="pct"/>%</strong>
+                <span t-if="running" class="text-muted small text-nowrap"><i class="fa fa-refresh fa-spin me-1"/>tự cập nhật mỗi 5 giây</span>
+            </div>
+            <div class="d-flex flex-wrap gap-3 mb-2 small">
+                <t t-foreach="steps" t-as="step" t-key="step.key">
+                    <span t-att-class="step.cls"><i t-att-class="step.icon"/> <t t-esc="step.label"/></span>
+                </t>
+            </div>
+            <div class="fw-bold mb-2" t-esc="data.step_message or ''"/>
+            <div t-if="logLines.length" class="o_dac_chat_log small">
+                <t t-foreach="logLines" t-as="line" t-key="line_index">
+                    <div t-esc="line"/>
+                </t>
+            </div>
+        </div>
+    </t>
+</templates>

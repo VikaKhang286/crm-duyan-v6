@@ -32,6 +32,8 @@
                     .danger{background:#dc2626;height:48px;font-size:16px}
                     button:active{opacity:.85}
                     button:disabled{opacity:.4;cursor:not-allowed}
+                    .who{margin-top:12px;padding:10px 14px;border-radius:12px;background:#f9fafb;font-size:14px;color:#374151}
+                    .who a{color:#1d4ed8;font-weight:600}
                 </style>
             </head>
             <body>
@@ -58,6 +60,11 @@
                             <t t-if="lead.contact_state == 'contacted'">✓ Đã liên hệ<t t-if="state_at"> — <t t-out="state_at"/></t></t>
                             <t t-elif="lead.contact_state == 'unreachable'">✕ Liên hệ không được<t t-if="state_at"> — <t t-out="state_at"/></t></t>
                             <t t-else="">Chưa liên hệ khách này</t>
+                            <t t-if="lead.contact_state != 'new' and lead.contact_by"><br/><small>Xác nhận bởi: <t t-out="lead.contact_by"/></small></t>
+                        </div>
+                        <div class="who" t-if="lead.contact_state == 'new'">
+                            <t t-if="viewer">Sẽ ghi nhận: <b t-out="viewer.name"/></t>
+                            <t t-else="">Chưa đăng nhập: sẽ ghi "chưa xác định". <a t-att-href="login_url">Đăng nhập Odoo</a> để ghi đúng tên.</t>
                         </div>
                         <!-- Đã chốt (hoặc vừa bấm xong) thì hai nút bị khóa; bấm đúp cũng chỉ gửi một lần -->
                         <form method="post" t-attf-action="/lead/#{token}/contact" class="actions" id="contact-form">

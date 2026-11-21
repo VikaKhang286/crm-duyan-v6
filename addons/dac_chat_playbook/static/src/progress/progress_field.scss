@@ -1,0 +1,11 @@
+.o_dac_chat_progress {
+    .o_dac_chat_log {
+        max-height: 240px;
+        overflow-y: auto;
+        padding: 8px 10px;
+        border-radius: 4px;
+        background-color: rgba(0, 0, 0, 0.04);
+        font-family: var(--font-monospace, monospace);
+        white-space: pre-wrap;
+    }
+}

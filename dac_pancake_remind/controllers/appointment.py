@@ -1,3 +1,5 @@
+from werkzeug.urls import url_encode
+
 from odoo import fields, http
 from odoo.http import request
 
@@ -27,23 +29,32 @@ class AppointmentTicketController(http.Controller):
         def local(dt):
             return fields.Datetime.context_timestamp(appointment.with_context(tz=TZ), dt).strftime('%H:%M %d/%m/%Y') if dt else ''
 
+        is_open = appointment.state in ('open', 'overdue')
+        doer, doer_label = appointment._guess_doer(request.env.user) if is_open else (None, '')
+        logged_in = not request.env.user._is_public()
         html = request.env['ir.qweb']._render('dac_pancake_remind.appointment_ticket_page', {
-            'a': appointment, 'token': token, 'due': local(appointment.due_at), 'promised': local(appointment.promised_at),
+            'a': appointment, 'token': token, 'doer': doer, 'doer_label': doer_label, 'logged_in': logged_in,
+            'login_url': '/web/login?' + url_encode({'redirect': '/hen/%s' % token}), 'due': local(appointment.due_at), 'promised': local(appointment.promised_at),
             'done_at': local(appointment.done_at), 'just_saved': bool(saved),
             'precision': dict(appointment._fields['precision'].selection).get(appointment.precision, ''),
             'state_label': dict(appointment._fields['state'].selection).get(appointment.state, ''),
-            'is_open': appointment.state in ('open', 'overdue'),
+            'is_open': is_open,
         })
         return request.make_response('<!DOCTYPE html>' + str(html), headers=[('Content-Type', 'text/html; charset=utf-8'), *NO_INDEX.items()])
 
     @http.route('/hen/<string:token>/done', type='http', auth='public', methods=['POST'], csrf=False, sitemap=False)
     def ticket_done(self, token, result=None, by=None, **kwargs):
-        """csrf=False có chủ đích: không có phiên đăng nhập; mã ngẫu nhiên trong link là xác thực duy nhất.
-        Chỉ cho chốt phiếu (đã xử lý / không cần nữa), không đổi gì khác. Đã chốt thì giữ nguyên."""
+        """csrf=False có chủ đích: thường không có phiên đăng nhập; mã ngẫu nhiên trong link là xác thực duy nhất.
+        Chỉ cho chốt phiếu (đã xử lý / không cần nữa), không đổi gì khác. Đã chốt thì giữ nguyên.
+        Người xác nhận: đang đăng nhập Odoo → người đó; chưa → nhân viên đã xác định nhắn khách gần nhất trên Pancake;
+        không có → "Chưa xác định" (kèm tên tự gõ nếu có)."""
         appointment = self._by_token(token)
         state = RESULTS.get(result)
         if not appointment or not state:
             return self._plain('Yêu cầu không hợp lệ.', 404 if not appointment else 400)
-        name = ' '.join((by or '').split())[:60]
-        appointment._close(state, 'Qua phiếu hẹn' + (' — %s' % name if name else ''))
+        user, label = appointment._guess_doer(request.env.user)
+        if not user:
+            name = ' '.join((by or '').split())[:60]
+            label = 'Chưa xác định' + (' — tự ghi: %s' % name if name else '')
+        appointment._close(state, 'Qua phiếu hẹn — ' + label, user)
         return request.redirect('/hen/%s?saved=1' % token)

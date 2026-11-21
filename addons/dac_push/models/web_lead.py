@@ -63,6 +63,9 @@ class WebLead(models.Model):
     received_at = fields.Datetime(string='Nhận lúc', default=fields.Datetime.now, readonly=True)
     contact_state = fields.Selection(CONTACT_STATES, string='Trạng thái liên hệ', default='new', required=True, index=True, copy=False)
     contact_state_at = fields.Datetime(string='Cập nhật liên hệ lúc', readonly=True, copy=False)
+    contact_user_id = fields.Many2one('res.users', string='Người liên hệ', readonly=True, copy=False, ondelete='set null', index=True,
+        help='Người bấm xác nhận khi đang đăng nhập Odoo (hoặc nhân viên trả lời tin Zalo đã liên kết trợ lý). Trống = chưa xác định.')
+    contact_by = fields.Char(string='Xác nhận bởi', readonly=True, copy=False)
     remind_due_at = fields.Datetime(string='Hạn nhắc liên hệ', readonly=True, copy=False, index=True,
         help='Sau mốc này (đã tính theo giờ làm việc) mà lead vẫn chưa liên hệ thì nhắc trong nhóm Zalo. Trống = không nhắc.')
     reminded_at = fields.Datetime(string='Đã nhắc lúc', readonly=True, copy=False)
@@ -107,10 +110,12 @@ class WebLead(models.Model):
             lead.write({'access_token': self._new_access_token()})
         return lead.access_token
 
-    def _set_contact_state(self, state):
-        """Ghi trạng thái liên hệ + thời điểm; dùng chung cho nút trong Odoo và nút trên trang công khai."""
+    def _set_contact_state(self, state, user=None, by=''):
+        """Ghi trạng thái liên hệ + thời điểm + người xác nhận; dùng chung cho nút trong Odoo, trang công khai và trả lời Zalo."""
         assert state in dict(CONTACT_STATES)
-        self.write({'contact_state': state, 'contact_state_at': fields.Datetime.now()})
+        user = user if user and not user._is_public() else None
+        self.write({'contact_state': state, 'contact_state_at': fields.Datetime.now(), 'contact_user_id': user.id if user else False,
+                    'contact_by': (by or (user.name if user else 'Chưa xác định'))[:120]})
 
     @api.model
     def _cron_remind_uncontacted(self):
@@ -235,10 +240,10 @@ class WebLead(models.Model):
             self.env['dac.zalo.channel']._trigger_send()
 
     def action_mark_contacted(self):
-        self._set_contact_state('contacted')
+        self._set_contact_state('contacted', self.env.user)
 
     def action_mark_unreachable(self):
-        self._set_contact_state('unreachable')
+        self._set_contact_state('unreachable', self.env.user)
 
     def _link_slug(self):
         """Phần cuối của link: <số điện thoại>-<mã ngẫu nhiên>, vd 0912345678-k3Xw9aQz. Số điện thoại để nhìn là biết lead nào;
@@ -353,6 +358,16 @@ class ZaloChannelMessageLead(models.Model):
             return  # người ngoài danh sách được nhắc thả cảm xúc: chưa tính là đã có người nhận việc
         leads._acknowledge(reaction.uid)
 
+    def _reply_person(self, uid):
+        """Người trả lời tin Zalo → (tài khoản Odoo nếu đã liên kết trợ lý, nhãn "tên (trả lời Zalo)")."""
+        if not uid:
+            return None, ''
+        # sudo(): luồng bridge (máy) không có user; chỉ tra tên/tài khoản của người vừa trả lời
+        binding = self.env['dac.zalo.binding'].sudo().search([('zalo_uid', '=', str(uid)), ('state', '=', 'linked')], limit=1)
+        member = self.channel_id.sudo().member_ids.filtered(lambda m: m.uid == str(uid))[:1]
+        name = binding.user_id.name or member.name or str(uid)
+        return binding.user_id or None, '%s (trả lời Zalo)' % name
+
     def _on_reply(self, reply):
         """Nhân viên trả lời (reply) tin báo lead / nhắc riêng / nhắc tổng → hiểu câu trả lời (Gemini nếu đã bật, không thì luật từ khóa):
         "đã liên hệ/đã gọi/đã gửi giá..." → chốt các lead của tin đó là đã liên hệ; "không nghe máy/không liên hệ được..." → liên hệ không
@@ -375,8 +390,9 @@ class ZaloChannelMessageLead(models.Model):
             decision = 'contacted' if means_contacted(text) else 'other'
         if decision == 'other':
             return
+        user, by = self._reply_person(reply.get('sender_uid'))
         for lead in leads.filtered(lambda l: l.contact_state == 'new'):
-            lead._set_contact_state(decision)
+            lead._set_contact_state(decision, user, by)
         self.channel_id._queue(THANKS_TEXT, 'lead-thanks:%s:%s' % (reply['message_id'], self.channel_id.id), self.event_type_id,
                                quote_message_id=reply['message_id'])
         self.env['dac.zalo.channel']._trigger_send()

@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="dac_chat_playbook.ChatDemo">
+        <div class="o_action dac_cd2">
+            <header class="dac_cd2_head">
+                <div>
+                    <h1>Demo chatbot</h1>
+                    <div class="dac_cd2_sub">Nhắn thử như khách để xem chất lượng trả lời, prompt gửi đi và token tiêu hao. Không gửi gì cho khách thật.</div>
+                </div>
+            </header>
+            <div t-if="!state.options" class="dac_cd2_loading"><i class="fa fa-circle-o-notch fa-spin me-2"/>Đang tải…</div>
+            <div t-elif="!state.options.prompts.length" class="alert alert-info" role="alert">
+                Chưa có bản system prompt nào. Chạy một đợt phân tích có AI để Agent viết 3 bộ prompt, rồi quay lại đây.
+            </div>
+            <div t-else="" class="dac_cd2_layout">
+                <!-- Khung chat -->
+                <section class="dac_cd2_chat_card">
+                    <div class="dac_cd2_controls">
+                        <label class="dac_cd2_field">
+                            <span>Bộ prompt</span>
+                            <select class="form-select form-select-sm" t-on-change="onPrompt" aria-label="Chọn bản system prompt">
+                                <t t-foreach="state.options.prompts" t-as="p" t-key="p.id">
+                                    <option t-att-value="p.id" t-att-selected="p.id === state.promptId" t-esc="p.label"/>
+                                </t>
+                            </select>
+                        </label>
+                        <label class="dac_cd2_field is-small">
+                            <span>Tên khách</span>
+                            <input type="text" class="form-control form-control-sm" t-model="state.customerName"/>
+                        </label>
+                        <div class="dac_cd2_field is-wide">
+                            <span>Giả lập lúc khách nhắn</span>
+                            <div class="dac_cd2_presets">
+                                <t t-foreach="state.options.presets" t-as="preset" t-key="preset.key">
+                                    <button type="button" class="btn btn-sm" t-att-class="state.preset === preset.key ? 'btn-primary' : 'btn-outline-secondary'"
+                                            t-on-click="() => this.pickPreset(preset)" t-esc="preset.label"/>
+                                </t>
+                                <input type="datetime-local" class="form-control form-control-sm dac_cd2_time" t-att-value="atLocal"
+                                       t-on-change="onTime" aria-label="Chọn ngày giờ"/>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="dac_cd2_chat" t-ref="chat" aria-live="polite">
+                        <div t-if="!state.messages.length" class="dac_cd2_hint">
+                            <i class="fa fa-comments-o"/>
+                            <p>Gõ tin nhắn như khách hàng, hoặc bấm <b>Khách thật ngẫu nhiên</b> để lấy tin mở đầu của một khách mới gần đây.</p>
+                        </div>
+                        <t t-foreach="state.messages" t-as="m" t-key="m_index">
+                            <div t-if="m.role === 'note'" class="dac_cd2_note" t-att-class="m.error ? 'is-error' : ''">
+                                <i class="fa me-1" t-att-class="m.error ? 'fa-exclamation-triangle' : 'fa-user-circle'"/><t t-esc="m.text"/>
+                            </div>
+                            <div t-else="" class="dac_cd2_msg" t-att-class="(m.role === 'customer' ? 'is-customer' : 'is-bot') + (m.blocked ? ' is-blocked' : '')">
+                                <div class="dac_cd2_bubble">
+                                    <span t-if="m.blocked" class="dac_cd2_blocked_tag"><i class="fa fa-ban me-1"/>Bị chặn, không gửi</span>
+                                    <t t-esc="m.text"/>
+                                </div>
+                                <div t-if="m.meta" class="dac_cd2_meta">
+                                    <t t-esc="num(m.meta.in)"/> vào · <t t-esc="num(m.meta.out)"/> ra · <t t-esc="m.meta.seconds"/>s
+                                </div>
+                            </div>
+                        </t>
+                        <div t-if="state.sending" class="dac_cd2_msg is-bot"><div class="dac_cd2_bubble dac_cd2_typing"><span/><span/><span/></div></div>
+                    </div>
+
+                    <div class="dac_cd2_input">
+                        <textarea class="form-control" rows="2" placeholder="Nhắn như khách… (Enter để gửi, Shift+Enter xuống dòng)"
+                                  t-model="state.input" t-ref="input" t-on-keydown="onKeydown" t-att-disabled="state.sending" aria-label="Tin nhắn của khách"/>
+                        <div class="dac_cd2_input_actions">
+                            <button type="button" class="btn btn-primary" t-on-click="send" t-att-disabled="state.sending or !state.input.trim()">
+                                <i class="fa fa-paper-plane me-1"/>Gửi
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" t-on-click="sample" t-att-disabled="state.sending">
+                                <i class="fa fa-random me-1"/>Khách thật ngẫu nhiên
+                            </button>
+                            <button type="button" class="btn btn-link" t-on-click="reset" t-att-disabled="state.sending">Làm lại</button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Bảng chi tiết -->
+                <aside class="dac_cd2_panel">
+                    <div class="dac_cd2_tabs" role="tablist">
+                        <t t-foreach="[['turn', 'Lượt này'], ['prompt', 'System prompt'], ['request', 'Request gửi đi'], ['session', 'Cả phiên']]" t-as="tab" t-key="tab[0]">
+                            <button type="button" role="tab" class="dac_cd2_tab" t-att-class="state.tab === tab[0] ? 'is-active' : ''"
+                                    t-att-aria-selected="state.tab === tab[0] ? 'true' : 'false'" t-on-click="() => this.setTab(tab[0])" t-esc="tab[1]"/>
+                        </t>
+                    </div>
+                    <div class="dac_cd2_panel_body">
+                        <p t-if="!state.last and state.tab !== 'session'" class="text-muted">Gửi một tin để xem chi tiết.</p>
+                        <t t-elif="state.tab === 'turn'">
+                            <t t-set="r" t-value="state.last"/>
+                            <div class="dac_cd2_stats">
+                                <div><span>Token vào</span><b t-esc="num(r.usage.in)"/></div>
+                                <div><span>Token ra</span><b t-esc="num(r.usage.out)"/></div>
+                                <div><span>Thời gian</span><b><t t-esc="r.seconds"/>s</b></div>
+                                <div><span>Chi phí lượt</span><b><t t-esc="cost(r.usage.in or 0, r.usage.out or 0).vnd"/>đ</b></div>
+                            </div>
+                            <dl class="dac_cd2_dl">
+                                <dt>Model</dt><dd t-esc="r.model or '–'"/>
+                                <dt>Bối cảnh</dt><dd><t t-esc="r.context.now"/> · <t t-esc="r.context.work_status"/></dd>
+                                <dt>Mốc hẹn</dt><dd t-esc="r.context.next"/>
+                                <dt>Chuyển nhân viên</dt>
+                                <dd><span class="badge" t-att-class="r.handoff ? 'text-bg-warning' : 'text-bg-light'" t-esc="r.handoff ? 'Có' : 'Không'"/>
+                                    <span t-if="r.handoff_reason" class="ms-1" t-esc="r.handoff_reason"/></dd>
+                                <dt t-if="r.blocked.length">Tin bị chặn</dt><dd t-if="r.blocked.length" class="text-danger" t-esc="r.blocked.join(' / ')"/>
+                            </dl>
+                            <h3>Thông tin đã lấy được</h3>
+                            <p t-if="!collectedRows.length" class="text-muted small">Chưa có.</p>
+                            <table t-else="" class="table table-sm dac_cd2_table">
+                                <tbody><t t-foreach="collectedRows" t-as="row" t-key="row[0]"><tr><th t-esc="row[0]"/><td t-esc="row[1]"/></tr></t></tbody>
+                            </table>
+                        </t>
+                        <t t-elif="state.tab === 'prompt'">
+                            <div class="dac_cd2_panel_tools">
+                                <span class="text-muted small"><t t-esc="num(state.last.prompt_chars)"/> ký tự · đã điền bối cảnh, quy tắc cấm, khuôn trả lời</span>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" t-on-click="() => this.copy(state.last.system_prompt)"><i class="fa fa-copy me-1"/>Chép</button>
+                            </div>
+                            <pre class="dac_cd2_pre" t-esc="state.last.system_prompt"/>
+                        </t>
+                        <t t-elif="state.tab === 'request'">
+                            <div class="dac_cd2_panel_tools">
+                                <span class="text-muted small">Phần tin nhắn gửi kèm system prompt (SĐT đã che)</span>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" t-on-click="() => this.copy(state.last.user_text)"><i class="fa fa-copy me-1"/>Chép</button>
+                            </div>
+                            <pre class="dac_cd2_pre" t-esc="state.last.user_text"/>
+                        </t>
+                        <t t-elif="state.tab === 'session'">
+                            <t t-set="c" t-value="cost(state.totals.in, state.totals.out)"/>
+                            <div class="dac_cd2_stats">
+                                <div><span>Số lượt</span><b t-esc="state.totals.turns"/></div>
+                                <div><span>Token vào</span><b t-esc="num(state.totals.in)"/></div>
+                                <div><span>Token ra</span><b t-esc="num(state.totals.out)"/></div>
+                                <div><span>Thời gian TB</span><b><t t-esc="state.totals.turns ? (state.totals.seconds / state.totals.turns).toFixed(1) : 0"/>s</b></div>
+                            </div>
+                            <div class="dac_cd2_cost">
+                                <div>Chi phí tham khảo cả phiên: <b><t t-esc="c.vnd"/>đ</b> (≈ $<t t-esc="c.usd"/>)</div>
+                                <div class="text-muted small">Theo giá trong Thiết lập: $<t t-esc="state.options.pricing.in"/> / $<t t-esc="state.options.pricing.out"/>
+                                    mỗi triệu token vào / ra, tỉ giá <t t-esc="num(state.options.pricing.rate)"/>đ. Nếu đi qua 9router gói thuê bao, số này là hạn mức gói chứ không phải tiền.</div>
+                            </div>
+                            <div t-if="prompt" class="text-muted small mt-2">Model trả lời của bản này: <t t-esc="prompt.model"/></div>
+                        </t>
+                    </div>
+                </aside>
+            </div>
+        </div>
+    </t>
+</templates>

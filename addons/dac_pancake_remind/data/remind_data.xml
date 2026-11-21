@@ -37,6 +37,16 @@
         <field name="description">Nhân viên hẹn khách trên Pancake (gửi báo giá, gửi mẫu, gọi lại...): nhắc trước giờ hẹn 30 phút, nhắc nếu quá hẹn 30 phút chưa làm, và tin "Nhắc việc từ hôm qua" lúc 8:00. Chưa hội thoại nào đăng ký loại này thì gửi vào nơi nhận "Khách Pancake chưa được trả lời".</field>
         <field name="sequence">21</field>
     </record>
+    <record id="cron_pancake_feedback" model="ir.cron">
+        <field name="name">Pancake: phản hồi của nhân viên trong nhóm Zalo</field>
+        <field name="model_id" ref="model_dac_pancake_feedback"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_process()</field>
+        <field name="interval_number">5</field>
+        <field name="interval_type">minutes</field>
+        <field name="user_id" ref="base.user_root"/>
+        <field name="active" eval="True"/>
+    </record>
     <record id="cron_pancake_followup" model="ir.cron">
         <field name="name">Pancake: lịch hẹn &amp; nhắc việc từ hôm qua</field>
         <field name="model_id" ref="model_dac_pancake_appointment"/>

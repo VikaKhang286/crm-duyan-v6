@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Bấm "Chạy phân tích" sẽ gọi _trigger() để chạy ngay; lịch 10 phút chỉ để chạy tiếp nếu lần trước bị ngắt. -->
+    <record id="cron_process_analysis" model="ir.cron">
+        <field name="name">Phân tích chat: chạy các đợt đang chờ</field>
+        <field name="model_id" ref="model_dac_chat_analysis"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_process()</field>
+        <field name="interval_number">10</field>
+        <field name="interval_type">minutes</field>
+        <field name="user_id" ref="base.user_root"/>
+        <field name="active" eval="True"/>
+    </record>
+    <!-- Chỉ tạo đợt mới từ các đợt bật "Tự chạy hằng tuần"; không có đợt nào bật thì không làm gì. -->
+    <record id="cron_weekly_analysis" model="ir.cron">
+        <field name="name">Phân tích chat: đợt tự động hằng tuần</field>
+        <field name="model_id" ref="model_dac_chat_analysis"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_weekly()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">weeks</field>
+        <field name="nextcall" eval="(DateTime.now() + relativedelta(days=1, weekday=6)).strftime('%Y-%m-%d 23:00:00')"/>
+        <field name="user_id" ref="base.user_root"/>
+        <field name="active" eval="True"/>
+    </record>
+</odoo>

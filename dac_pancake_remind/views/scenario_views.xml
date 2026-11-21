@@ -5,6 +5,7 @@
         <field name="arch" type="xml"><list string="Kịch bản nhắc" create="0" delete="0" decoration-muted="not enabled">
             <field name="sequence" column_invisible="1"/>
             <field name="enabled" widget="boolean_toggle"/>
+            <field name="real_channels" widget="boolean_toggle" invisible="group != 'wait'" readonly="not enabled"/>
             <field name="group" widget="badge" decoration-info="group == 'wait'" decoration-warning="group == 'appointment'"/>
             <field name="name"/>
             <field name="wait_minutes" string="Thời gian" invisible="not wait_label"/>
@@ -42,6 +43,7 @@
                 <group>
                     <group string="Bật / thời gian">
                         <field name="enabled" widget="boolean_toggle"/>
+                        <field name="real_channels" widget="boolean_toggle" invisible="group != 'wait'" groups="base.group_system"/>
                         <field name="group" readonly="1"/>
                         <label for="wait_minutes" string="Thời gian" invisible="not wait_label"/>
                         <div invisible="not wait_label" class="d-flex gap-2 align-items-baseline">

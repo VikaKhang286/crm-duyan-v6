@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ── Trang Tổng quan ──────────────────────────────────────────────── -->
+    <record id="chat_demo_action" model="ir.actions.client">
+        <field name="name">Demo chatbot</field>
+        <field name="tag">dac_chat_demo</field>
+    </record>
+
+    <record id="chat_dashboard_action" model="ir.actions.client">
+        <field name="name">Trung tâm Chatbot AI</field>
+        <field name="tag">dac_chat_dashboard</field>
+    </record>
+
+    <!-- ── Thiết lập ────────────────────────────────────────────────────── -->
+    <record id="chat_config_view_form" model="ir.ui.view">
+        <field name="name">dac.chat.config.form</field>
+        <field name="model">dac.chat.config</field>
+        <field name="arch" type="xml">
+            <form string="Thiết lập phân tích chat" create="0" delete="0">
+                <header>
+                    <button name="action_save" type="object" string="Lưu và về Tổng quan" class="btn-primary"/>
+                    <button name="action_open_tasks" type="object" string="Model &amp; thinking theo tác vụ" class="btn-secondary"/>
+                </header>
+                <sheet>
+                    <div class="oe_title"><h1>Thiết lập phân tích chat &amp; chatbot</h1></div>
+                    <div class="alert alert-warning" role="alert" invisible="ai_ready">
+                        Chưa có model AI dùng được. Thêm kết nối ở Cài đặt → Kết nối AI dùng chung, hoặc chọn một model bên dưới.
+                    </div>
+                    <p class="text-muted">Giá trị mặc định khi tạo đợt phân tích mới và cho đợt tự động hằng tuần. Mỗi đợt vẫn chỉnh riêng được.</p>
+                    <group>
+                        <group string="Model AI">
+                            <field name="ai_model_id" options="{'no_create': True}" placeholder="Thứ tự kết nối chung"/>
+                            <field name="ai_fallback"/>
+                            <field name="ai_ready" invisible="1"/>
+                        </group>
+                        <group string="Tự động">
+                            <field name="auto_weekly" widget="boolean_toggle"/>
+                            <field name="last_weekly_run_id" invisible="not last_weekly_run_id"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Chọn hội thoại cho AI đọc">
+                            <field name="days_back"/>
+                            <field name="conversation_limit"/>
+                            <field name="read_mode"/>
+                            <field name="customer_scope"/>
+                            <field name="only_unread"/>
+                            <field name="min_messages"/>
+                        </group>
+                        <group string="Ảnh và cách gọi AI">
+                            <field name="read_images" widget="boolean_toggle"/>
+                            <field name="images_per_conversation" invisible="not read_images"/>
+                            <field name="batch_size"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Giá tham khảo (màn hình Demo chatbot)">
+                            <field name="price_in"/>
+                            <field name="price_out"/>
+                            <field name="usd_rate"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="chat_config_open_action" model="ir.actions.server">
+        <field name="name">Thiết lập phân tích chat</field>
+        <field name="model_id" ref="model_dac_chat_config"/>
+        <field name="state">code</field>
+        <field name="code">action = model.action_open()</field>
+    </record>
+
+    <!-- ── Chạy phân tích nhanh ─────────────────────────────────────────── -->
+    <record id="chat_run_wizard_view_form" model="ir.ui.view">
+        <field name="name">dac.chat.run.wizard.form</field>
+        <field name="model">dac.chat.run.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Chạy phân tích mới">
+                <group>
+                    <group>
+                        <field name="period" widget="radio"/>
+                        <field name="date_from" invisible="period != 'custom'" required="period == 'custom'"/>
+                        <field name="date_to" invisible="period != 'custom'" required="period == 'custom'"/>
+                    </group>
+                    <group>
+                        <field name="depth" widget="radio"/>
+                    </group>
+                </group>
+                <group invisible="depth == 'stats'">
+                    <group>
+                        <field name="ai_model_id" options="{'no_create': True}" placeholder="Thứ tự kết nối chung"/>
+                        <field name="customer_scope"/>
+                    </group>
+                    <group>
+                        <field name="only_unread"/>
+                        <field name="read_images"/>
+                        <field name="summary_scope"/>
+                    </group>
+                </group>
+                <div class="alert alert-info mb-2" role="status"><i class="fa fa-clock-o me-1"/><field name="estimate" readonly="1" nolabel="1"/></div>
+                <div class="alert alert-success mb-0" role="status" invisible="not counted" style="white-space: pre-line">
+                    <i class="fa fa-calculator me-1"/><field name="count_text" readonly="1" nolabel="1"/>
+                </div>
+                <field name="counted" invisible="1"/>
+                <footer>
+                    <button name="action_start" type="object" string="Chạy" class="btn-primary"/>
+                    <button name="action_count" type="object" string="Đếm trước" class="btn-secondary" invisible="depth == 'stats'"/>
+                    <button string="Huỷ" special="cancel" class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

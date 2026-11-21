@@ -108,12 +108,14 @@ def event_types(env, codes):
     return [t for t in (Type.search([('code', '=', code)], limit=1) for code in codes) if t]
 
 
-def channels_for(env, config, codes, is_test=False):
+def channels_for(env, config, codes, is_test=False, scenario=None):
     """Hội thoại Zalo nhận tin: đăng ký loại thông báo đầu tiên trong `codes` có người đăng ký (loại sau là dự phòng).
 
-    Chưa được duyệt gửi nhóm thật (`remind_real_channels` tắt) thì CHỈ hội thoại "Thử nghiệm" nhận, kể cả dữ liệu thật."""
+    Gửi nhóm thật chỉ khi đã được duyệt: cả hệ thống (`remind_real_channels`) hoặc riêng kịch bản (`scenario.real_channels`,
+    vd chỉ "Khách mới — nhắc lần đầu"). Chưa duyệt thì CHỈ hội thoại "Thử nghiệm" nhận, kể cả dữ liệu thật."""
     Channel = env['dac.zalo.channel'].sudo()  # sudo(): xem event_types
-    only_test = True if not config.remind_real_channels else bool(is_test)
+    approved = config.remind_real_channels or bool(scenario and scenario.real_channels)
+    only_test = True if not approved else bool(is_test)
     for event_type in event_types(env, codes):
         channels = Channel.search([('active', '=', True), ('event_type_ids', 'in', event_type.id), ('is_test', '=', only_test)])
         if channels:
@@ -131,12 +133,13 @@ def fallback_targets(channel, types):
 
 
 def staff_targets(channel, staff):
-    """Nhân viên Pancake đã ghép với Zalo → [(thành viên nhóm hoặc None, tên)]; người chưa ghép thì bỏ qua."""
+    """Nhân viên đã xác định (có Tài khoản Odoo) và đã ghép Zalo → [(thành viên nhóm hoặc None, tên)]; người khác thì bỏ qua.
+    Khách có nhiều nhân viên cùng chat thì tag tất cả."""
     out, seen = [], set()
     if channel.thread_type != 'group':
         return out
     for person in staff:
-        if not person.zalo_uid:
+        if not person.zalo_uid or not person.user_id:
             continue
         member = channel.member_ids.filtered(lambda m, uid=person.zalo_uid: m.uid == uid)[:1]
         key = person.zalo_uid
@@ -152,10 +155,10 @@ def targets_for(channel, staff, types):
     return staff_targets(channel, staff) or (fallback_targets(channel, types) if channel.thread_type == 'group' else [])
 
 
-def send(env, config, codes, key, build, is_test=False, image=None, reply_to=None):
+def send(env, config, codes, key, build, is_test=False, image=None, reply_to=None, scenario=None):
     """Xếp hàng tin cho từng hội thoại nhận. `build(channel, types)` → (text, mentions) hoặc None (bỏ qua hội thoại đó).
     `reply_to`: {channel_id: tin đã gửi} để tin mới hiện dạng trả lời tin đó."""
-    channels, event_type = channels_for(env, config, codes, is_test)
+    channels, event_type = channels_for(env, config, codes, is_test, scenario)
     types = event_types(env, codes)
     Message = env['dac.zalo.channel.message']
     queued = Message

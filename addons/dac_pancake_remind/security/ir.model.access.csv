@@ -23,3 +23,5 @@ access_pancake_scenario_system,Pancake scenario admin,model_dac_pancake_remind_s
 access_pancake_scenario_manager,Pancake scenario manager,model_dac_pancake_remind_scenario,dac_erp.group_dac_erp_manager,1,1,0,0
 access_pancake_event_system,Pancake remind event admin,model_dac_pancake_remind_event,base.group_system,1,1,1,1
 access_pancake_event_manager,Pancake remind event manager,model_dac_pancake_remind_event,dac_erp.group_dac_erp_manager,1,0,0,0
+access_pancake_feedback_system,Pancake feedback admin,model_dac_pancake_feedback,base.group_system,1,1,1,1
+access_pancake_feedback_manager,Pancake feedback manager,model_dac_pancake_feedback,dac_erp.group_dac_erp_manager,1,0,0,0

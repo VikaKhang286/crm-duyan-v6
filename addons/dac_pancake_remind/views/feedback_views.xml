@@ -1,0 +1,126 @@
+<odoo>
+    <!-- ═══ Phản hồi của nhân viên trong nhóm Zalo ═══════════════════════════ -->
+    <record id="feedback_list" model="ir.ui.view">
+        <field name="name">dac.pancake.feedback.list</field><field name="model">dac.pancake.feedback</field>
+        <field name="arch" type="xml"><list string="Phản hồi trong nhóm" create="0" edit="0"
+                decoration-success="pancake_answered or intent == 'replied'" decoration-warning="intent in ('seen', 'handling') and not pancake_answered"
+                decoration-muted="state in ('logged', 'skipped')">
+            <field name="at"/>
+            <field name="customer_name"/>
+            <field name="sender_name"/>
+            <field name="user_id" optional="show"/>
+            <field name="text"/>
+            <field name="intent" widget="badge" decoration-success="intent == 'replied'" decoration-warning="intent in ('seen', 'handling')"/>
+            <field name="pancake_answered" optional="show"/>
+            <field name="result" optional="show"/>
+            <field name="kind" optional="hide"/>
+            <field name="partner_id" optional="hide"/>
+            <field name="channel_id" optional="hide"/>
+            <field name="external_url" widget="url" optional="show"/>
+            <field name="state" optional="hide"/>
+        </list></field>
+    </record>
+    <record id="feedback_form" model="ir.ui.view">
+        <field name="name">dac.pancake.feedback.form</field><field name="model">dac.pancake.feedback</field>
+        <field name="arch" type="xml"><form string="Phản hồi trong nhóm" create="0" edit="0"><sheet>
+            <div class="oe_title"><h1><field name="text" placeholder="(thả cảm xúc)"/></h1></div>
+            <group>
+                <group string="Nhân viên">
+                    <field name="sender_name"/><field name="user_id"/><field name="at"/><field name="kind"/>
+                    <field name="intent"/><field name="intent_source"/><field name="channel_id"/>
+                </group>
+                <group string="Khách">
+                    <field name="customer_name"/><field name="partner_id"/><field name="conversation_id"/><field name="external_url" widget="url"/>
+                    <field name="wait_id"/>
+                </group>
+                <group string="Trợ lý xử lý">
+                    <field name="state"/><field name="reacted"/><field name="pancake_answered"/><field name="result"/>
+                    <field name="quoted_message_id"/><field name="bot_message_id"/>
+                </group>
+            </group>
+        </sheet></form></field>
+    </record>
+    <record id="feedback_search" model="ir.ui.view">
+        <field name="name">dac.pancake.feedback.search</field><field name="model">dac.pancake.feedback</field>
+        <field name="arch" type="xml"><search>
+            <field name="customer_name"/><field name="sender_name"/><field name="user_id"/><field name="partner_id"/><field name="text"/>
+            <filter name="today" string="Hôm nay" domain="[('at', '&gt;=', context_today().strftime('%Y-%m-%d'))]"/>
+            <filter name="days7" string="7 ngày qua" domain="[('at', '&gt;=', (context_today() - relativedelta(days=7)).strftime('%Y-%m-%d'))]"/>
+            <separator/>
+            <filter name="seen_only" string="Mới xem, Pancake chưa trả lời" domain="[('intent', 'in', ('seen', 'handling')), ('pancake_answered', '=', False)]"/>
+            <filter name="claimed" string="Báo đã xử lý" domain="[('intent', '=', 'replied')]"/>
+            <group expand="0" string="Nhóm theo">
+                <filter name="g_user" string="Nhân viên" context="{'group_by': 'sender_name'}"/>
+                <filter name="g_customer" string="Khách" context="{'group_by': 'conversation_id'}"/>
+                <filter name="g_day" string="Ngày" context="{'group_by': 'at:day'}"/>
+            </group>
+        </search></field>
+    </record>
+    <record id="feedback_action" model="ir.actions.act_window">
+        <field name="name">Phản hồi trong nhóm</field><field name="res_model">dac.pancake.feedback</field>
+        <field name="view_mode">list,form</field><field name="context">{'search_default_days7': 1}</field>
+        <field name="help" type="html"><p class="o_view_nocontent_smiling_face">Chưa có phản hồi nào</p>
+            <p>Nhân viên trả lời (reply) tin nhắc khách hoặc nhắc tên trợ lý trong nhóm Zalo ("@Tro Ly Dac Đã xem"): trợ lý thả ❤️,
+            đọc lại Pancake và trả lời ngay trong luồng. Mỗi phản hồi được ghi ở đây làm bằng chứng xử lý, gắn với khách hàng.</p></field>
+    </record>
+    <menuitem id="menu_pancake_feedback" name="Phản hồi trong nhóm" parent="menu_section_pancake" action="feedback_action" sequence="21"/>
+
+    <!-- Form khách chờ: tab phản hồi -->
+    <record id="remind_wait_form_feedback" model="ir.ui.view">
+        <field name="name">dac.pancake.remind.wait.form.feedback</field><field name="model">dac.pancake.remind.wait</field>
+        <field name="inherit_id" ref="remind_wait_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='zalo_message_ids']" position="before">
+                <group>
+                    <group string="Căn cứ chốt đã xử lý">
+                        <field name="partner_id"/><field name="answer_source"/><field name="report_status" invisible="not report_status"/>
+                    </group>
+                    <group string="Sale báo trạng thái (để truy cứu)" invisible="not report_feedback_id">
+                        <field name="report_by"/><field name="report_user_id"/><field name="report_at"/><field name="report_text"/>
+                        <field name="report_feedback_id"/>
+                    </group>
+                </group>
+                <separator string="Phản hồi của nhân viên trong nhóm"/>
+                <field name="feedback_ids"><list><field name="at"/><field name="sender_name"/><field name="text"/><field name="intent"/>
+                    <field name="pancake_answered"/><field name="result"/></list></field>
+                <separator string="Tin trợ lý đã gửi"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Thành viên nhóm Zalo ↔ tài khoản Odoo -->
+    <record id="zalo_member_user_list" model="ir.ui.view">
+        <field name="name">dac.zalo.channel.member.user.list</field><field name="model">dac.zalo.channel.member</field>
+        <field name="priority">90</field>
+        <field name="arch" type="xml"><list string="Thành viên Zalo ↔ Odoo" editable="bottom" create="0" delete="0" decoration-muted="not user_id">
+            <field name="channel_id" readonly="1"/>
+            <field name="name" readonly="1"/>
+            <field name="uid" readonly="1" optional="hide"/>
+            <field name="user_id" options="{'no_create': True, 'no_open': True}" placeholder="Chọn tài khoản Odoo"/>
+        </list></field>
+    </record>
+    <record id="zalo_member_user_action" model="ir.actions.act_window">
+        <field name="name">Thành viên Zalo ↔ Odoo</field><field name="res_model">dac.zalo.channel.member</field>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="zalo_member_user_list"/>
+        <field name="domain">[('channel_id.thread_type', '=', 'group')]</field>
+        <field name="context">{'group_by': 'channel_id'}</field>
+        <field name="help" type="html"><p>Ghép người trong nhóm Zalo với tài khoản Odoo. Người chưa có tài khoản (vd anh An) vẫn được ghi nhận
+            theo tên Zalo; khi tạo tài khoản Odoo và ghép ở đây, mọi xác nhận trước đây của người đó tự gắn đúng tài khoản Odoo.</p></field>
+    </record>
+    <menuitem id="menu_zalo_member_users" name="Thành viên Zalo ↔ Odoo" parent="menu_section_pancake" action="zalo_member_user_action" sequence="41"/>
+
+    <!-- Hồ sơ khách hàng: nút xem lịch sử xử lý từ nhóm Zalo -->
+    <record id="partner_form_pancake_feedback" model="ir.ui.view">
+        <field name="name">res.partner.form.pancake.feedback</field><field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button class="oe_stat_button" type="object" name="action_open_pancake_feedback" icon="fa-comments"
+                        groups="dac_erp.group_dac_erp_manager,base.group_system" invisible="not dac_pancake_feedback_count">
+                    <field name="dac_pancake_feedback_count" widget="statinfo" string="Xử lý Pancake"/>
+                </button>
+            </xpath>
+        </field>
+    </record>
+</odoo>

@@ -45,6 +45,16 @@ class Common:
         Mention.create({'channel_id': cls.test.id, 'event_type_id': cls.event_type.id, 'member_ids': [(6, 0, kiet.ids)]})
         cls.Wait = cls.env['dac.pancake.remind.wait']
         cls.Appointment = cls.env['dac.pancake.appointment']
+        Users = cls.env['res.users'].with_context(no_reset_password=True)
+        cls.u_bang = Users.create({'name': 'Băng', 'login': 'bang-test', 'password': 'bang-test-pw-123'})
+        cls.u_bong = Users.create({'name': 'Bông', 'login': 'bong-test', 'password': 'bong-test-pw-123'})
+
+    def known(self, key, user, member=None):
+        """Ghép tên Pancake với tài khoản Odoo (+ Zalo) = nhân viên đã xác định."""
+        Staff = self.env['dac.pancake.staff']
+        staff = Staff.search([('key', '=', key)]) or Staff._for_name(key)
+        staff.write(dict({'user_id': user.id}, **({'member_id': member.id} if member else {})))
+        return staff
 
     def short(self, fm_id):
         """Link rút gọn của hội thoại (một link gốc luôn cho cùng một mã)."""
@@ -119,6 +129,7 @@ class TestFollowup(Common, TransactionCase):
         self.assertEqual((tieu_bang.member_id, tieu_bang.zalo_uid, tieu_bang.suggested), (self.tbang, '333', True))
         tieu_bang.action_confirm()
         self.assertFalse(tieu_bang.suggested)
+        tieu_bang.user_id = self.u_bang
         self.scan(T0 + timedelta(minutes=2))
         self.scan(T0 + timedelta(minutes=31))
         wait = self.Wait.search([('conversation_id', '=', conv.id)])
@@ -131,6 +142,7 @@ class TestFollowup(Common, TransactionCase):
     def test_trial_mode_writes_staff_names_without_tagging_people_outside_the_test_group(self):
         conv = self.returning_customer()
         self.env['dac.pancake.staff'].action_refresh()
+        self.known('tieu bang', self.u_bang)
         self.scan(T0 + timedelta(minutes=2))
         self.scan(T0 + timedelta(minutes=31))
         self.assertFalse(self.real.message_ids, 'chưa duyệt: không gửi nhóm thật')
@@ -144,6 +156,7 @@ class TestFollowup(Common, TransactionCase):
         self.config.remind_real_channels = True
         conv = self.returning_customer(text='Anh chuyển khoản rồi nhé, xác nhận giúp anh')
         self.env['dac.pancake.staff'].action_refresh()
+        self.known('tieu bang', self.u_bang)
 
         def ai(system, text, schema, name='report', **kwargs):
             self.assertEqual(name, 'report_wait')
@@ -170,7 +183,9 @@ class TestFollowup(Common, TransactionCase):
         message = self.real.message_ids
         self.assertEqual(len(message), 1)
         self.assertFalse(message.image, 'chờ lâu chỉ làm icon thành 🚨 trong tin gom, không tách ảnh riêng')
-        self.assertIn('🚨 Khách tối qua: Mẫu này làm được không em (Tiểu Băng) · chờ 2 giờ 5 phút', message.text)
+        self.assertIn('🚨 Khách tối qua: Mẫu này làm được không em · chờ 2 giờ 5 phút', message.text,
+                      '"Tiểu Băng" chưa ghép tài khoản Odoo = chưa xác định: không ghi tên, tag người được cài')
+        self.assertIn('@An', message.text)
 
     def test_scenario_templates_toggles_and_event_log(self):
         from odoo.exceptions import ValidationError
@@ -206,6 +221,107 @@ class TestFollowup(Common, TransactionCase):
         first.with_user(manager).enabled = False
         with self.assertRaises(UserError):
             first.with_user(manager).template = 'x'
+
+    def test_customer_chatted_by_two_known_staff_tags_both_unknown_names_fall_back(self):
+        self.config.remind_real_channels = True
+        conv = self.conversation(name='Khách Hai Người', fm_id='c-two')
+        self.message(conv, T0 - timedelta(hours=30), 'staff', text='Dạ em gửi giá', staff='Tieu Bang')
+        self.message(conv, T0 - timedelta(hours=29), 'staff', text='Em bổ sung mẫu', staff='Dao')
+        self.message(conv, T0 - timedelta(hours=28), 'staff', text='Shop xin chào', staff='Admin Lạ')  # tên chưa ghép tài khoản Odoo
+        self.message(conv, T0, text='Cho anh hỏi thêm')
+        bang = self.known('tieu bang', self.u_bang, self.tbang)
+        bong = self.known('dao', self.u_bong, self.dao)
+        stranger = self.env['dac.pancake.staff']._for_name('Admin Lạ')
+        stranger.member_id = self.tbang  # có Zalo nhưng không có tài khoản Odoo → vẫn coi như chưa xác định
+        people = self.env['dac.pancake.staff']._people_of_conversation(conv)
+        self.assertEqual(people, bong | bang, 'người nhắn gần nhất đứng đầu; tên lạ bị bỏ qua')
+        self.scan(T0 + timedelta(minutes=2))
+        self.scan(T0 + timedelta(minutes=31))
+        wait = self.Wait.search([('conversation_id', '=', conv.id)])
+        self.assertEqual((wait.staff_ids, wait.staff_id), (bong | bang, bong))
+        digest = self.real.message_ids
+        self.assertEqual(digest.text.splitlines()[1], '@Đào Duy An @Tbăng', 'khách có 2 người chat: tag cả 2')
+        self.assertEqual([m['uid'] for m in digest.mentions], ['555', '333'])
+        # Chỉ người lạ chat → chưa xác định → tag người được cài sẵn
+        lone = self.conversation(name='Khách Người Lạ', fm_id='c-lone')
+        self.message(lone, T0 - timedelta(hours=30), 'staff', text='Chào anh', staff='Admin Lạ')
+        self.assertFalse(self.env['dac.pancake.staff']._people_of_conversation(lone))
+        # Người chat quá 30 ngày trước người gần nhất thì không tính
+        old = self.conversation(name='Khách Lâu', fm_id='c-long')
+        self.message(old, T0 - timedelta(days=40), 'staff', text='Chào', staff='Dao')
+        self.message(old, T0 - timedelta(days=1), 'staff', text='Dạ', staff='Tieu Bang')
+        self.assertEqual(self.env['dac.pancake.staff']._people_of_conversation(old), bang)
+
+    def test_appointment_tags_maker_and_other_known_staff(self):
+        self.followup(T0 - timedelta(hours=1))
+        bang = self.known('tieu bang', self.u_bang, self.tbang)
+        bong = self.known('dao', self.u_bong, self.dao)
+        conv = self.conversation()
+        self.message(conv, T0 - timedelta(hours=2), 'staff', text='Dạ chị gửi mẫu giúp em', staff='Dao')
+        self.message(conv, T0, text='Báo giá giúp anh bạt 180x80')
+        self.message(conv, T0 + timedelta(minutes=2), 'staff', text='Dạ 15h em gửi báo giá anh nhé', staff='Tieu Bang')
+        self.followup(T0 + timedelta(minutes=5), self.promise_ai(line=2))
+        appointment = self.Appointment.search([('conversation_id', '=', conv.id)])
+        self.assertEqual((appointment.staff_id, appointment.staff_ids), (bang, bang | bong), 'người hẹn đứng đầu, cùng người đã chat')
+        self.config.remind_real_channels = True
+        self.followup(datetime(2026, 11, 10, 7, 31))
+        pre = self.real.message_ids
+        self.assertTrue(pre.text.startswith('@Tbăng @Đào Duy An ⏰ 15:00'), pre.text)
+        # Ai bấm xác nhận: đăng nhập → chính người đó; chưa đăng nhập → người nhắn gần nhất trên Pancake
+        self.assertEqual(appointment._guess_doer(self.u_bong)[0], self.u_bong)
+        public = self.env.ref('base.public_user')
+        user, label = appointment._guess_doer(public)
+        self.assertEqual(user, self.u_bang)
+        self.assertEqual(label, 'Băng (theo tin Pancake; cùng chat: Bông)')
+
+    def test_only_new_customer_scenario_goes_to_the_real_group_and_rechecks_pancake_after_30_minutes(self):
+        Scenario = self.env['dac.pancake.remind.scenario']
+        Scenario._get('new_first').real_channels = True
+        Scenario._get('new_repeat').repeat_minutes = 30
+        self.assertFalse(self.config.remind_real_channels, 'cả hệ thống vẫn chưa duyệt nhóm thật')
+        conv = self.conversation(name='Phạm Hằng', fm_id='c-new')
+        self.message(conv, T0, text='Cho chị hỏi giá biển bậc thang')
+        self.scan(T0 + timedelta(minutes=2))
+        self.scan(T0 + timedelta(minutes=11))
+        first = self.real.message_ids
+        self.assertEqual(len(first), 1, 'khách mới: gửi nhóm thật')
+        self.assertTrue(first.image)
+        self.assertTrue(first.text.startswith('@An '), 'tag người được cài "Nhắc tên" trong nhóm thật')
+        self.assertFalse(self.test.message_ids, 'không gửi trùng vào nhóm thử')
+        wait = self.Wait.search([('conversation_id', '=', conv.id)])
+        self.assertEqual((wait.remind_count, wait.due_at), (1, T0 + timedelta(minutes=41)), 'đọc lại Pancake sau 30 phút làm việc')
+        first.write({'state': 'sent', 'external_message_id': 'z-first'})
+        # Chưa tới 30 phút: không nhắc lại
+        self.scan(T0 + timedelta(minutes=30))
+        self.assertEqual(len(self.real.message_ids), 1)
+        # Nhân viên đã trả lời trên Pancake → tới hạn đọc lại thì dừng nhắc, đánh dấu đã trả lời
+        self.message(conv, T0 + timedelta(minutes=25), 'staff', text='Dạ chị gửi kích thước giúp em', staff='Dao')
+        self.scan(T0 + timedelta(minutes=42))
+        self.assertEqual((wait.state, wait.answered_by, wait.answered_at), ('answered', 'Dao', T0 + timedelta(minutes=25)))
+        self.assertEqual(len(self.real.message_ids), 2, 'đã có người trả lời: không nhắc nữa, chỉ thêm 1 tin đóng luồng')
+        self.assertEqual((self.real.message_ids - first).reply_to_id, first)
+        # Khách cũ (kịch bản khác) vẫn chỉ vào nhóm thử
+        old = self.returning_customer()
+        self.scan(T0 + timedelta(minutes=45))
+        self.scan(T0 + timedelta(minutes=80))
+        self.assertEqual(len(self.real.message_ids), 2)
+        self.assertTrue(self.test.message_ids, 'tin gom khách cũ vẫn chỉ nhóm thử')
+        self.assertTrue(old)
+
+    def test_new_customer_not_answered_after_30_minutes_is_reminded_again_in_the_real_group(self):
+        Scenario = self.env['dac.pancake.remind.scenario']
+        Scenario._get('new_first').real_channels = True
+        Scenario._get('new_repeat').repeat_minutes = 30
+        conv = self.conversation(name='Khách Chờ', fm_id='c-wait')
+        self.message(conv, T0, text='Shop ơi')
+        self.scan(T0 + timedelta(minutes=2))
+        self.scan(T0 + timedelta(minutes=11))
+        first = self.real.message_ids
+        first.write({'state': 'sent', 'external_message_id': 'z-1'})
+        self.scan(T0 + timedelta(minutes=42))
+        again = self.real.message_ids - first
+        self.assertEqual(again.reply_to_id, first, 'nhắc lại = trả lời vào ảnh lần đầu trong nhóm thật')
+        self.assertEqual(again.text, '@An 🔔 Dạ khách này mình đã phản hồi chưa ạ?')
 
     def test_ai_not_needed_and_rules_fallback_levels(self):
         from odoo.addons.dac_pancake_remind.models import reply_check
@@ -314,7 +430,7 @@ class TestFollowup(Common, TransactionCase):
         message = self.test.message_ids
         self.assertEqual(message.text.splitlines(), [
             '📋 Nhắc việc từ hôm qua (10/11)', 'Chưa rõ người phụ trách: @Kiệt',
-            '🗓 16:00 Khách B: Gửi mẫu thiết kế (Tiểu Băng) — %s' % appointment._short_ticket()])
+            '🗓 16:00 Khách B: Gửi mẫu thiết kế — %s' % appointment._short_ticket()])
         self.assertTrue(appointment.in_morning_list)
         self.followup(datetime(2026, 11, 10, 1, 11), ai)
         self.assertEqual(len(self.test.message_ids), 1, 'mỗi ngày một tin')
@@ -335,8 +451,27 @@ class TestAppointmentTicket(Common, HttpCase):
         self.assertIn('Gửi báo giá &lt;b&gt;bạt&lt;/b&gt;', response.text)
         self.assertIn('Đã xử lý xong', response.text)
         self.assertEqual(self.url_open('/hen/khong-co').status_code, 404)
+        self.assertIn('Chưa xác định được người làm', response.text)
         response = self.url_open('/hen/%s/done' % appointment.access_token, data={'result': 'done', 'by': 'Bảo'})
         self.assertEqual(response.status_code, 200)
         self.assertIn('Đã lưu', response.text)
-        self.assertEqual((appointment.state, appointment.done_by), ('done', 'Qua phiếu hẹn — Bảo'))
+        self.assertEqual((appointment.state, appointment.done_by, appointment.done_user_id),
+                         ('done', 'Qua phiếu hẹn — Chưa xác định — tự ghi: Bảo', self.env['res.users']))
         self.assertEqual(self.url_open('/hen/%s/done' % appointment.access_token, data={'result': 'xoa'}).status_code, 400)
+
+    def test_ticket_records_who_clicked(self):
+        conv = self.conversation(fm_id='c-who')
+        self.message(conv, T0, 'staff', text='Dạ em gửi giá', staff='Tieu Bang')
+        self.known('tieu bang', self.u_bang)
+        guessed = self.Appointment.create({'conversation_id': conv.id, 'task': 'Gửi giá', 'promised_at': T0, 'due_at': T0})
+        response = self.url_open('/hen/%s' % guessed.access_token)
+        self.assertIn('Sẽ ghi nhận: <b>Băng (theo tin Pancake)</b>', response.text)
+        self.assertIn('Không phải bạn? Đăng nhập', response.text)
+        self.url_open('/hen/%s/done' % guessed.access_token, data={'result': 'done', 'by': 'Ai đó'})
+        self.assertEqual((guessed.done_user_id, guessed.done_by), (self.u_bang, 'Qua phiếu hẹn — Băng (theo tin Pancake)'))
+        # Đăng nhập Odoo → ghi đúng người đang đăng nhập, dù Pancake là người khác
+        logged = self.Appointment.create({'conversation_id': conv.id, 'task': 'Gọi lại', 'promised_at': T0, 'due_at': T0})
+        self.authenticate('bong-test', 'bong-test-pw-123')
+        self.assertIn('Sẽ ghi nhận: <b>Bông (đăng nhập Odoo)</b>', self.url_open('/hen/%s' % logged.access_token).text)
+        self.url_open('/hen/%s/done' % logged.access_token, data={'result': 'cancel'})
+        self.assertEqual((logged.state, logged.done_user_id, logged.done_by), ('cancelled', self.u_bong, 'Qua phiếu hẹn — Bông (đăng nhập Odoo)'))

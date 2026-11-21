@@ -57,7 +57,7 @@ class ZaloBridgeController(http.Controller):
             events = body['events']
             if not isinstance(account, str) or not account or not isinstance(events, list) or len(events) > 100:
                 raise ValueError('Invalid payload')
-            reactions, replies = [], []
+            reactions, replies, mentions = [], [], []
             for item in events:
                 if not isinstance(item, dict):
                     raise ValueError('Invalid event')
@@ -73,11 +73,16 @@ class ZaloBridgeController(http.Controller):
                             and text('quoted_message_id', 40) and text('text', 500)):
                         raise ValueError('Invalid reply')
                     replies.append(item)
+                elif item.get('kind') == 'mention':
+                    if not (text('thread_id', 200) and text('sender_uid', 200) and text('message_id', 40) and text('text', 500)):
+                        raise ValueError('Invalid mention')
+                    mentions.append(item)
                 else:
                     raise ValueError('Unknown event kind')
             # sudo(): bridge là máy, không có user; chỉ ghi nhận sự kiện lên tin trợ lý đã gửi
             request.env['dac.zalo.channel.reaction'].sudo()._ingest(account, reactions)
             request.env['dac.zalo.channel.message'].sudo()._ingest_replies(account, replies)
+            request.env['dac.zalo.channel.message'].sudo()._ingest_mentions(account, mentions)
         except (ValueError, KeyError, TypeError):
             return request.make_json_response({'error': 'invalid_payload'}, status=400)
         return request.make_json_response({'accepted': True})

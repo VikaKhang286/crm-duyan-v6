@@ -78,6 +78,9 @@
                            placeholder="Để trống = mọi page đã thêm"/>
                     <field name="effective_page_ids" widget="many2many_tags" options="{'no_create': True, 'no_open': True}" readonly="1"/>
                     <field name="live_check"/>
+                    <field name="greeting_texts" placeholder="Mỗi dòng một câu chào tự động (đầu câu là đủ)"/>
+                    <field name="chatbot_wait"/>
+                    <field name="handover_texts" invisible="not chatbot_wait" placeholder="Mỗi dòng một cụm, vd: em chuyển nhân viên hỗ trợ"/>
                 </group>
             </group>
             <group string="Page Pancake (token theo từng page)">
@@ -128,10 +131,14 @@
             <field name="level" widget="badge" optional="show" decoration-danger="level == 'urgent'" decoration-warning="level == 'high'"/>
             <field name="state" widget="badge"/>
             <field name="summary" optional="show"/>
-            <field name="staff_id" optional="show"/>
+            <field name="staff_id" optional="hide"/>
+            <field name="staff_ids" widget="many2many_tags" optional="show"/>
             <field name="ai_reason" optional="hide"/>
             <field name="remind_count"/>
             <field name="last_reminded_at"/>
+            <field name="answered_by" optional="show"/>
+            <field name="answer_source" optional="show"/>
+            <field name="report_status" optional="hide"/>
             <field name="due_at" optional="hide"/>
             <field name="is_test" optional="hide"/>
             <field name="external_url" widget="url" optional="show"/>
@@ -147,10 +154,10 @@
                 </group>
                 <group>
                     <field name="state"/><field name="since"/><field name="due_at"/><field name="remind_count"/>
-                    <field name="last_reminded_at"/><field name="answered_at"/>
+                    <field name="last_reminded_at"/><field name="answered_at"/><field name="answered_by"/>
                 </group>
                 <group string="Loại khách / AI">
-                    <field name="customer_kind"/><field name="level"/><field name="summary"/><field name="staff_id"/><field name="digest_pending"/>
+                    <field name="customer_kind"/><field name="level"/><field name="topic"/><field name="summary"/><field name="note"/><field name="staff_id"/><field name="staff_ids" widget="many2many_tags"/><field name="digest_pending"/>
                     <field name="ai_state"/><field name="ai_reason"/><field name="ai_source"/><field name="ai_checked_at"/>
                 </group>
             </group>

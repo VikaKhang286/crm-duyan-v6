@@ -3,25 +3,40 @@
     <record id="scenario_new_first" model="dac.pancake.remind.scenario">
         <field name="code">new_first</field><field name="sequence">10</field><field name="group">wait</field>
         <field name="name">Khách mới — nhắc lần đầu (ảnh hội thoại)</field>
-        <field name="description">Khách lần đầu nhắn, chưa từng được trả lời, chưa có đơn. Quá hạn (giờ làm việc) mà vẫn chưa ai trả lời trên Pancake thì AI đọc đoạn chat (bỏ qua nếu không cần trả lời), rồi gửi ảnh chụp hội thoại + tag người được cài "Nhắc tên". Khách nhắn ngoài giờ: nhắc từ 8:30.</field>
+        <field name="description">Khách lần đầu nhắn, chưa từng được trả lời, chưa có đơn. Quá hạn (giờ làm việc) mà vẫn chưa ai trả lời trên Pancake thì AI đọc đoạn chat (bỏ qua nếu không cần trả lời), rồi gửi ảnh chụp hội thoại + một câu nhẹ nhàng ("Dạ có khách mới liên hệ làm bảng hiệu ạ", không nêu khách chờ bao lâu) + tag người được cài "Nhắc tên". Tin chào tự động/chatbot không tính là đã trả lời. Khách nhắn ngoài giờ: nhắc từ 8:30.</field>
         <field name="wait_minutes">10</field><field name="wait_label">Hạn trả lời khách mới (phút làm việc)</field>
-        <field name="template">{muc_do} · Khách mới chờ {cho}
-{tom_tat}
+        <field name="template">Dạ có khách mới liên hệ {chu_de} ạ
 {link}</field>
-        <field name="default_template">{muc_do} · Khách mới chờ {cho}
-{tom_tat}
+        <field name="default_template">Dạ có khách mới liên hệ {chu_de} ạ
 {link}</field>
-        <field name="placeholders">muc_do, icon, cho, tom_tat, link, ten_khach, loai_khach</field>
+        <field name="placeholders">chu_de, link, ten_khach, tom_tat, muc_do, icon, cho, loai_khach</field>
     </record>
     <record id="scenario_new_repeat" model="dac.pancake.remind.scenario">
         <field name="code">new_repeat</field><field name="sequence">20</field><field name="group">wait</field>
         <field name="name">Khách mới — nhắc lại (trả lời vào ảnh đã gửi)</field>
-        <field name="description">Khách mới vẫn chưa được trả lời: mỗi lần đến hạn tải lại tin Pancake, chưa ai trả lời thì tag lại và trả lời vào ảnh nhắc lần đầu (không gửi lại ảnh). Thả cảm xúc không làm dừng nhắc. Tắt kịch bản này = chỉ nhắc một lần.</field>
-        <field name="repeat_minutes">10</field><field name="repeat_label">Nhắc lại mỗi (phút làm việc)</field>
+        <field name="description">Như nhắc lead: đến hạn thì tải lại tin Pancake — đã có người trả lời thì cập nhật trạng thái, thôi nhắc; nhân viên đã phản hồi trong nhóm (trả lời tin nhắc, @Trợ lý, thả cảm xúc) thì thôi nhắc; còn lại tag lại và trả lời vào ảnh nhắc lần đầu (không gửi lại ảnh). Mức gấp tăng dần: lần 2 🔔, lần 3 ⚠️, lần 4 🚨. "Mẫu mỗi dòng" = câu nhắc của lần 2, 3, 4 (mỗi dòng một lần), điền vào {loi_nhac}. Thả cảm xúc không làm dừng nhắc. Tắt kịch bản này = chỉ nhắc một lần.</field>
+        <field name="repeat_minutes">30</field><field name="repeat_label">Đọc lại Pancake, chưa ai trả lời thì nhắc lại sau (phút làm việc)</field>
+        <field name="wait_minutes">60</field><field name="wait_label">Lần nhắc cuối cách lần trước (phút làm việc)</field>
         <field name="max_count">4</field><field name="max_label">Tổng số lần nhắc tối đa (kể cả lần đầu)</field>
-        <field name="template">{icon} Nhắc lần {lan}/{toi_da} · khách chờ {cho}</field>
-        <field name="default_template">{icon} Nhắc lần {lan}/{toi_da} · khách chờ {cho}</field>
-        <field name="placeholders">icon, lan, toi_da, cho, ten_khach</field>
+        <field name="template">{icon} {loi_nhac}</field>
+        <field name="default_template">{icon} {loi_nhac}</field>
+        <field name="line_template">Dạ khách này mình đã phản hồi chưa ạ?
+Dạ khách vẫn đang chờ phản hồi ạ, anh chị xem giúp em nhé!
+Dạ khách chờ lâu rồi ạ, nhờ anh chị phản hồi khách ngay giúp em!</field>
+        <field name="default_line_template">Dạ khách này mình đã phản hồi chưa ạ?
+Dạ khách vẫn đang chờ phản hồi ạ, anh chị xem giúp em nhé!
+Dạ khách chờ lâu rồi ạ, nhờ anh chị phản hồi khách ngay giúp em!</field>
+        <field name="placeholders">icon, loi_nhac, muc_do, ten_khach, chu_de, lan, toi_da, cho</field>
+    </record>
+    <record id="scenario_feedback" model="dac.pancake.remind.scenario">
+        <field name="code">feedback</field><field name="sequence">25</field><field name="group">wait</field>
+        <field name="name">Nhân viên phản hồi trong nhóm (❤️ + đọc lại Pancake)</field>
+        <field name="description">Nhân viên trả lời (reply) tin nhắc khách, hoặc nhắc tên trợ lý ("@Tro Ly Dac Đã xem"): trợ lý thả ❤️ báo đã nhận, đọc lại hội thoại trên Pancake rồi trả lời ngay dưới tin nhân viên. Khách chưa được trả lời → "Mẫu tin" (nhắc phản hồi khách ngay). Khách đã được trả lời trên Pancake, hoặc nhân viên báo đã xử lý → "Mẫu mỗi dòng" và thôi nhắc. Đến hạn kiểm tra mà thấy đã có người trả lời, trợ lý cũng trả lời vào ảnh nhắc bằng "Mẫu mỗi dòng" để đóng luồng. Mọi phản hồi lưu ở "Phản hồi trong nhóm". Tắt = trợ lý không phản hồi.</field>
+        <field name="template">Dạ vâng ạ, chị xem xong nhớ phản hồi khách {ten_khach} ngay, đừng để khách chờ nhé!</field>
+        <field name="default_template">Dạ vâng ạ, chị xem xong nhớ phản hồi khách {ten_khach} ngay, đừng để khách chờ nhé!</field>
+        <field name="line_template">✅ Khách {ten_khach} đã được trả lời ({nguoi_tra_loi}). Em ghi nhận ạ!</field>
+        <field name="default_line_template">✅ Khách {ten_khach} đã được trả lời ({nguoi_tra_loi}). Em ghi nhận ạ!</field>
+        <field name="placeholders">ten_khach, nguoi_tra_loi, ten_nhan_vien</field>
     </record>
     <record id="scenario_ongoing" model="dac.pancake.remind.scenario">
         <field name="code">ongoing</field><field name="sequence">30</field><field name="group">wait</field>

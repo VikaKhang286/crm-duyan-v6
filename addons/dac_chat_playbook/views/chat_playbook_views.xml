@@ -1,0 +1,595 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ── Quy tắc chat ─────────────────────────────────────────────────── -->
+    <record id="chat_rule_view_list" model="ir.ui.view">
+        <field name="name">dac.chat.rule.list</field>
+        <field name="model">dac.chat.rule</field>
+        <field name="arch" type="xml">
+            <list string="Quy tắc chat" decoration-muted="state == 'rejected'" decoration-success="state == 'approved'">
+                <header>
+                    <button name="action_ai_review" type="object" string="AI rà soát trùng lặp" class="btn-primary" display="always"
+                            confirm="AI sẽ đọc toàn bộ quy tắc đã duyệt và chờ duyệt: gộp quy tắc trùng, bỏ quy tắc thừa (chỉ với quy tắc chờ duyệt), chỉ ra mâu thuẫn. Mất khoảng 1–2 phút. Tiếp tục?"/>
+                </header>
+                <field name="sequence" widget="handle"/>
+                <field name="category"/>
+                <field name="name"/>
+                <field name="content"/>
+                <field name="priority" widget="badge" decoration-danger="priority == 'must'" decoration-info="priority == 'should'"/>
+                <field name="source" optional="show"/>
+                <field name="review_note" optional="show"/>
+                <field name="state" widget="badge" decoration-success="state == 'approved'" decoration-warning="state == 'proposed'"/>
+                <button name="action_approve" type="object" string="Duyệt" icon="fa-check" class="text-success" invisible="state == 'approved'"/>
+                <button name="action_reject" type="object" string="Bỏ" icon="fa-times" class="text-danger" invisible="state == 'rejected'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="chat_rule_view_form" model="ir.ui.view">
+        <field name="name">dac.chat.rule.form</field>
+        <field name="model">dac.chat.rule</field>
+        <field name="arch" type="xml">
+            <form string="Quy tắc chat">
+                <header>
+                    <button name="action_approve" type="object" string="Duyệt" class="btn-primary" invisible="state == 'approved'"/>
+                    <button name="action_reject" type="object" string="Bỏ" invisible="state == 'rejected'"/>
+                    <button name="action_reset" type="object" string="Về đề xuất" invisible="state == 'proposed'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="proposed,approved"/>
+                </header>
+                <sheet>
+                    <div class="oe_title"><h1><field name="name" placeholder="Tiêu đề quy tắc"/></h1></div>
+                    <group>
+                        <group>
+                            <field name="category"/>
+                            <field name="priority"/>
+                        </group>
+                        <group>
+                            <field name="source"/>
+                            <field name="analysis_id" invisible="not analysis_id"/>
+                            <field name="approved_by_id" invisible="not approved_by_id"/>
+                            <field name="approved_at" invisible="not approved_at"/>
+                        </group>
+                    </group>
+                    <group string="Nội dung">
+                        <field name="content" nolabel="1" colspan="2" placeholder="Chatbot phải làm gì / không được làm gì"/>
+                    </group>
+                    <group string="Câu mẫu">
+                        <field name="example" nolabel="1" colspan="2"/>
+                    </group>
+                    <group string="Bằng chứng / lý do">
+                        <field name="evidence" nolabel="1" colspan="2"/>
+                    </group>
+                    <group string="AI rà soát" invisible="not review_note and not merged_into_id">
+                        <field name="review_note" nolabel="1" colspan="2"/>
+                        <field name="merged_into_id" invisible="not merged_into_id"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="chat_rule_view_search" model="ir.ui.view">
+        <field name="name">dac.chat.rule.search</field>
+        <field name="model">dac.chat.rule</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="content"/>
+                <filter name="approved" string="Đã duyệt" domain="[('state', '=', 'approved')]"/>
+                <filter name="proposed" string="Chờ duyệt" domain="[('state', '=', 'proposed')]"/>
+                <filter name="not_rejected" string="Chưa bỏ" domain="[('state', '!=', 'rejected')]"/>
+                <separator/>
+                <filter name="must" string="Bắt buộc" domain="[('priority', '=', 'must')]"/>
+                <filter name="archived" string="Đã lưu trữ" domain="[('active', '=', False)]"/>
+                <group expand="0" string="Nhóm theo">
+                    <filter name="group_category" string="Nhóm" context="{'group_by': 'category'}"/>
+                    <filter name="group_state" string="Trạng thái" context="{'group_by': 'state'}"/>
+                    <filter name="group_source" string="Nguồn" context="{'group_by': 'source'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="chat_rule_action" model="ir.actions.act_window">
+        <field name="name">Quy tắc chat (playbook)</field>
+        <field name="res_model">dac.chat.rule</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_not_rejected': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Chưa có quy tắc</p>
+            <p>Chạy một đợt "Phân tích tin nhắn" để AI đề xuất quy tắc, rồi duyệt những quy tắc đúng.</p>
+        </field>
+    </record>
+
+    <!-- ── Xem bản hướng dẫn chatbot ────────────────────────────────────── -->
+    <record id="playbook_preview_view_form" model="ir.ui.view">
+        <field name="name">dac.chat.playbook.preview.form</field>
+        <field name="model">dac.chat.playbook.preview</field>
+        <field name="arch" type="xml">
+            <form string="Bản hướng dẫn chatbot">
+                <p class="text-muted">Đây là phần quy tắc chatbot chào khách sẽ dùng. Chỉ gồm quy tắc ĐÃ DUYỆT; muốn đổi thì sửa hoặc duyệt/bỏ quy tắc.</p>
+                <field name="text" nolabel="1" class="font-monospace"/>
+                <footer><button string="Đóng" special="cancel" class="btn-secondary"/></footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="playbook_preview_action" model="ir.actions.act_window">
+        <field name="name">Bản hướng dẫn chatbot</field>
+        <field name="res_model">dac.chat.playbook.preview</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <!-- ── System prompt chatbot ──────────────────────────────────────── -->
+    <record id="chat_prompt_view_list" model="ir.ui.view">
+        <field name="name">dac.chat.prompt.list</field>
+        <field name="model">dac.chat.prompt</field>
+        <field name="arch" type="xml">
+            <list string="System prompt chatbot" decoration-success="state == 'active'" decoration-muted="state == 'archived'"
+                  decoration-danger="state == 'failed'">
+                <field name="name"/>
+                <field name="mode"/>
+                <field name="analysis_id"/>
+                <field name="bot_model_id"/>
+                <field name="generated_by" optional="hide"/>
+                <field name="activated_at"/>
+                <field name="state" widget="badge" decoration-success="state == 'active'" decoration-info="state == 'draft'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="chat_prompt_view_form" model="ir.ui.view">
+        <field name="name">dac.chat.prompt.form</field>
+        <field name="model">dac.chat.prompt</field>
+        <field name="arch" type="xml">
+            <form string="System prompt chatbot">
+                <header>
+                    <button name="action_test" type="object" string="Thử chatbot" class="btn-primary"/>
+                    <button name="action_activate" type="object" string="Kích hoạt" invisible="state not in ('draft', 'archived')"
+                            confirm="Kích hoạt bản này: bản đang dùng chuyển sang 'Cũ' và các quy tắc đề xuất trong bản này được duyệt. Tiếp tục?"/>
+                    <button name="action_archive_prompt" type="object" string="Ngừng dùng" invisible="state != 'active'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,active,archived"/>
+                </header>
+                <sheet>
+                    <div class="oe_title"><h1><field name="name"/></h1></div>
+                    <div class="alert alert-info" role="alert" invisible="state != 'draft'">
+                        Bản nháp do Agent viết. Bấm <b>Thử chatbot</b> để xem cách trả lời (có thể giả lập Chủ nhật/buổi tối),
+                        sửa nếu cần, rồi <b>Kích hoạt</b>. Chatbot chỉ dùng bản <b>Đang dùng</b>.
+                    </div>
+                    <group>
+                        <group>
+                            <field name="mode" readonly="state == 'active'"/>
+                            <field name="bot_model_id" options="{'no_create': True}" placeholder="Thứ tự kết nối chung"/>
+                            <field name="agent_model_id" options="{'no_create': True}" readonly="1" invisible="not agent_model_id"/>
+                            <field name="generated_by" invisible="not generated_by"/>
+                        </group>
+                        <group>
+                            <field name="analysis_id" invisible="not analysis_id"/>
+                            <field name="activated_by_id" invisible="not activated_by_id"/>
+                            <field name="activated_at" invisible="not activated_at"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="System prompt" name="prompt">
+                            <p class="text-muted">Phần quy trình, giọng nhắn, thông tin cần xin, ví dụ. Biến hệ thống tự điền:
+                                {{now}}, {{work_status}}, {{next_working_time}}, {{customer_name}}. Quy tắc cấm và khuôn trả lời được
+                                gắn tự động khi chạy (xem tab "Bản đầy đủ").</p>
+                            <field name="system_prompt" nolabel="1" class="font-monospace" readonly="state == 'active'"/>
+                        </page>
+                        <page string="Thông tin cần xin" name="fields">
+                            <field name="info_fields_json" nolabel="1" class="font-monospace" readonly="state == 'active'"/>
+                        </page>
+                        <page string="Quy tắc đưa vào" name="rules">
+                            <field name="rule_ids" readonly="state == 'active'">
+                                <list>
+                                    <field name="category"/>
+                                    <field name="name"/>
+                                    <field name="content"/>
+                                    <field name="state" widget="badge" decoration-success="state == 'approved'" decoration-warning="state == 'proposed'"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Bản đầy đủ chatbot nhận" name="runtime">
+                            <p class="text-muted">Xem trước với thời điểm hiện tại và khách "Chị Lan (ví dụ)".</p>
+                            <field name="runtime_preview" nolabel="1" class="font-monospace"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="chat_prompt_view_search" model="ir.ui.view">
+        <field name="name">dac.chat.prompt.search</field>
+        <field name="model">dac.chat.prompt</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <filter name="active_prompt" string="Đang dùng" domain="[('state', '=', 'active')]"/>
+                <filter name="draft" string="Nháp" domain="[('state', '=', 'draft')]"/>
+                <group expand="0" string="Nhóm theo">
+                    <filter name="group_mode" string="Bộ" context="{'group_by': 'mode'}"/>
+                    <filter name="group_state" string="Trạng thái" context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="chat_prompt_action" model="ir.actions.act_window">
+        <field name="name">System prompt chatbot</field>
+        <field name="res_model">dac.chat.prompt</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_group_mode': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Chưa có bản system prompt</p>
+            <p>Chạy một đợt "Phân tích tin nhắn" có AI: cuối đợt, Agent tự viết bản system prompt nháp cho chatbot.</p>
+        </field>
+    </record>
+
+    <record id="chat_prompt_test_view_form" model="ir.ui.view">
+        <field name="name">dac.chat.prompt.test.form</field>
+        <field name="model">dac.chat.prompt.test</field>
+        <field name="arch" type="xml">
+            <form string="Thử chatbot">
+                <p class="text-muted">Chỉ thử, KHÔNG gửi gì cho khách. Mỗi dòng: "KH: …" (khách), "Bot: …", "NV: …" (nhân viên).</p>
+                <group>
+                    <group>
+                        <field name="prompt_id" readonly="1"/>
+                        <field name="customer_name"/>
+                    </group>
+                    <group>
+                        <field name="at"/>
+                        <field name="used_model" invisible="not used_model"/>
+                    </group>
+                </group>
+                <field name="conversation" nolabel="1" class="font-monospace" placeholder="KH: Cho em hỏi làm bảng hiệu giá sao ạ"/>
+                <group invisible="not reply">
+                    <field name="work_status"/>
+                    <field name="reply" class="fw-bold"/>
+                    <field name="collected" class="font-monospace"/>
+                    <field name="handoff"/>
+                    <field name="blocked" invisible="not blocked" class="text-danger"/>
+                </group>
+                <footer>
+                    <button name="action_send" type="object" string="Chatbot trả lời" class="btn-primary"/>
+                    <button name="action_continue" type="object" string="Nhắn tiếp" invisible="not reply"/>
+                    <button name="action_sample" type="object" string="Lấy tin khách thật ngẫu nhiên"/>
+                    <button string="Đóng" special="cancel" class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- ── Nhãn hội thoại (AI) ─────────────────────────────────────────── -->
+    <record id="chat_insight_view_list" model="ir.ui.view">
+        <field name="name">dac.chat.insight.list</field>
+        <field name="model">dac.chat.insight</field>
+        <field name="arch" type="xml">
+            <list string="Nhãn hội thoại" decoration-success="outcome == 'chot_don'" decoration-danger="outcome == 'mat_khach'">
+                <field name="read_at" optional="hide"/>
+                <field name="customer_name"/>
+                <field name="product"/>
+                <field name="intent" optional="show"/>
+                <field name="outcome" widget="badge" decoration-success="outcome == 'chot_don'" decoration-danger="outcome == 'mat_khach'"/>
+                <field name="lost_reason" optional="show"/>
+                <field name="customer_kind" optional="hide"/>
+                <field name="bot_fit" optional="show"/>
+                <field name="staff_name"/>
+                <field name="score_avg"/>
+                <field name="first_response_minutes" optional="show"/>
+                <field name="after_hours" optional="hide"/>
+                <field name="images_read" optional="hide"/>
+                <field name="summary" optional="show"/>
+                <button name="action_open_pancake" type="object" icon="fa-external-link" title="Mở trên Pancake"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="chat_insight_view_form" model="ir.ui.view">
+        <field name="name">dac.chat.insight.form</field>
+        <field name="model">dac.chat.insight</field>
+        <field name="arch" type="xml">
+            <form string="Nhãn hội thoại">
+                <header>
+                    <button name="action_open_pancake" type="object" string="Mở trên Pancake" class="btn-secondary"/>
+                </header>
+                <sheet>
+                    <div class="oe_title"><h1><field name="customer_name" readonly="1"/></h1></div>
+                    <group>
+                        <group string="Phân loại">
+                            <field name="product"/>
+                            <field name="customer_kind"/>
+                            <field name="intent"/>
+                            <field name="outcome"/>
+                            <field name="lost_reason"/>
+                            <field name="sentiment"/>
+                            <field name="urgent"/>
+                            <field name="bot_fit"/>
+                        </group>
+                        <group string="Số liệu">
+                            <field name="is_new"/>
+                            <field name="after_hours"/>
+                            <field name="first_response_minutes"/>
+                            <field name="deal_detected"/>
+                            <field name="images_read"/>
+                            <field name="read_at"/>
+                            <field name="messages_until"/>
+                            <field name="analysis_id"/>
+                            <field name="model_used"/>
+                        </group>
+                    </group>
+                    <group string="Tóm tắt"><field name="summary" nolabel="1" colspan="2"/></group>
+                    <group string="Thông tin khách đã cung cấp"><field name="info_json" nolabel="1" colspan="2"/></group>
+                    <group string="Dữ kiện từ ảnh" invisible="not image_facts"><field name="image_facts" nolabel="1" colspan="2"/></group>
+                    <group string="Đánh giá nhân viên">
+                        <group>
+                            <field name="staff_name"/>
+                            <field name="score_greeting"/>
+                            <field name="score_discovery"/>
+                            <field name="score_consulting"/>
+                        </group>
+                        <group>
+                            <field name="score_closing"/>
+                            <field name="score_clarity"/>
+                            <field name="score_attitude"/>
+                            <field name="score_avg"/>
+                        </group>
+                        <field name="staff_good" colspan="2"/>
+                        <field name="staff_improve" colspan="2"/>
+                        <field name="good_phrase" colspan="2"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="chat_insight_view_search" model="ir.ui.view">
+        <field name="name">dac.chat.insight.search</field>
+        <field name="model">dac.chat.insight</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="customer_name"/>
+                <field name="staff_name"/>
+                <field name="summary"/>
+                <field name="analysis_id"/>
+                <filter name="deal" string="Chốt đơn" domain="[('outcome', '=', 'chot_don')]"/>
+                <filter name="lost" string="Mất khách" domain="[('outcome', '=', 'mat_khach')]"/>
+                <filter name="silent" string="Khách im lặng" domain="[('outcome', '=', 'khach_im_lang')]"/>
+                <separator/>
+                <filter name="new" string="Khách mới" domain="[('is_new', '=', True)]"/>
+                <filter name="after_hours" string="Nhắn ngoài giờ" domain="[('after_hours', '=', True)]"/>
+                <filter name="has_images" string="AI đã xem ảnh" domain="[('images_read', '>', 0)]"/>
+                <filter name="low_score" string="Điểm NV dưới 3" domain="[('score_avg', '>', 0), ('score_avg', '&lt;', 3)]"/>
+                <group expand="0" string="Nhóm theo">
+                    <filter name="group_outcome" string="Kết quả" context="{'group_by': 'outcome'}"/>
+                    <filter name="group_product" string="Sản phẩm" context="{'group_by': 'product'}"/>
+                    <filter name="group_lost" string="Lý do mất khách" context="{'group_by': 'lost_reason'}"/>
+                    <filter name="group_staff" string="Nhân viên" context="{'group_by': 'staff_name'}"/>
+                    <filter name="group_bot" string="Phù hợp chatbot" context="{'group_by': 'bot_fit'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="chat_insight_view_pivot" model="ir.ui.view">
+        <field name="name">dac.chat.insight.pivot</field>
+        <field name="model">dac.chat.insight</field>
+        <field name="arch" type="xml">
+            <pivot string="Nhãn hội thoại">
+                <field name="staff_name" type="row"/>
+                <field name="outcome" type="col"/>
+                <field name="score_avg" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="chat_insight_view_graph" model="ir.ui.view">
+        <field name="name">dac.chat.insight.graph</field>
+        <field name="model">dac.chat.insight</field>
+        <field name="arch" type="xml">
+            <graph string="Nhãn hội thoại" type="bar">
+                <field name="product"/>
+                <field name="outcome"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="chat_insight_action" model="ir.actions.act_window">
+        <field name="name">Nhãn hội thoại (AI)</field>
+        <field name="res_model">dac.chat.insight</field>
+        <field name="view_mode">list,pivot,graph,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Chưa có hội thoại nào được AI gán nhãn</p>
+            <p>Chạy một đợt "Phân tích tin nhắn" có AI.</p>
+        </field>
+    </record>
+
+    <!-- ── Đợt phân tích ────────────────────────────────────────────────── -->
+    <record id="chat_analysis_view_list" model="ir.ui.view">
+        <field name="name">dac.chat.analysis.list</field>
+        <field name="model">dac.chat.analysis</field>
+        <field name="arch" type="xml">
+            <list string="Phân tích tin nhắn" decoration-danger="state == 'failed'" decoration-info="state in ('queued', 'ai')">
+                <field name="name"/>
+                <field name="date_from"/>
+                <field name="date_to"/>
+                <field name="ai_model_id"/>
+                <field name="conversation_count"/>
+                <field name="new_conversation_count"/>
+                <field name="rule_count"/>
+                <field name="progress_pct" widget="progressbar"/>
+                <field name="step_message"/>
+                <field name="state" widget="badge" decoration-success="state == 'done'" decoration-danger="state == 'failed'"
+                       decoration-info="state in ('queued', 'ai')"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="chat_analysis_view_form" model="ir.ui.view">
+        <field name="name">dac.chat.analysis.form</field>
+        <field name="model">dac.chat.analysis</field>
+        <field name="arch" type="xml">
+            <form string="Phân tích tin nhắn">
+                <header>
+                    <button name="action_run" type="object" string="Chạy phân tích" class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_run" type="object" string="Chạy lại từ đầu" invisible="state != 'failed'"
+                            confirm="Chạy lại từ đầu sẽ tính lại số liệu và chọn lại hội thoại (hội thoại đã gán nhãn vẫn được bỏ qua nếu bật 'Chỉ đọc hội thoại chưa đọc'). Tiếp tục?"/>
+                    <button name="action_run" type="object" string="Chạy lại" invisible="state != 'done'"
+                            confirm="Chạy lại sẽ thay số liệu và xóa các quy tắc ĐỀ XUẤT chưa duyệt của đợt này. Tiếp tục?"/>
+                    <button name="action_rebuild_prompt" type="object" string="Viết lại system prompt" invisible="state != 'done' or not ai_reduced"/>
+                    <button name="action_resume" type="object" string="Chạy tiếp" class="btn-primary" invisible="state != 'failed' or not report_json"/>
+                    <button name="action_reset" type="object" string="Dừng" invisible="state not in ('queued', 'ai')"/>
+                    <button name="%(playbook_preview_action)d" type="action" string="Xem bản hướng dẫn chatbot"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,queued,ai,done"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_open_rules" type="object" class="oe_stat_button" icon="fa-list-ol">
+                            <field name="rule_count" widget="statinfo" string="Quy tắc đề xuất"/>
+                        </button>
+                        <button name="action_open_insights" type="object" class="oe_stat_button" icon="fa-tags" invisible="not insight_count">
+                            <field name="insight_count" widget="statinfo" string="Hội thoại đã gán nhãn"/>
+                        </button>
+                        <button name="action_open_prompt" type="object" class="oe_stat_button" icon="fa-commenting" invisible="not prompt_id">
+                            <div class="o_stat_info"><span class="o_stat_value">3 bộ</span><span class="o_stat_text">System prompt</span></div>
+                        </button>
+                    </div>
+                    <div class="oe_title"><h1><field name="name"/></h1></div>
+                    <div class="mb-3" invisible="state == 'draft'">
+                        <field name="progress_pct" widget="dac_chat_progress" nolabel="1"/>
+                    </div>
+                    <field name="step_message" invisible="1"/>
+                    <field name="progress_log" invisible="1"/>
+                    <field name="ai_batches_done" invisible="1"/>
+                    <field name="ai_batches_total" invisible="1"/>
+                    <field name="coord_rounds" invisible="1"/>
+                    <div class="alert alert-danger" role="alert" invisible="state != 'failed'">
+                        <field name="error_message" readonly="1"/>
+                    </div>
+                    <group>
+                        <group string="Dữ liệu">
+                            <field name="date_from" readonly="state in ('queued', 'ai')"/>
+                            <field name="date_to" readonly="state in ('queued', 'ai')"/>
+                            <field name="page_ids" widget="many2many_tags" placeholder="Mọi page" readonly="state in ('queued', 'ai')"/>
+                            <field name="conversation_count" invisible="not report_json"/>
+                            <field name="new_conversation_count" invisible="not report_json"/>
+                        </group>
+                        <group string="AI">
+                            <field name="ai_model_id" options="{'no_create': True}" placeholder="Thứ tự kết nối chung"
+                                   readonly="state in ('queued', 'ai')"/>
+                            <field name="ai_fallback" invisible="not ai_model_id"/>
+                            <field name="ai_conversation_limit" readonly="state in ('queued', 'ai')"/>
+                            <field name="read_mode" readonly="state in ('queued', 'ai')"/>
+                            <field name="customer_scope" readonly="state in ('queued', 'ai')"/>
+                            <field name="only_unread" readonly="state in ('queued', 'ai')"/>
+                            <field name="min_messages" readonly="state in ('queued', 'ai')"/>
+                            <field name="read_images" readonly="state in ('queued', 'ai')"/>
+                            <field name="images_per_conversation" invisible="not read_images" readonly="state in ('queued', 'ai')"/>
+                            <field name="ai_batch_size" readonly="state in ('queued', 'ai')"/>
+                            <field name="summary_scope" readonly="state in ('queued', 'ai')"/>
+                            <field name="auto_weekly"/>
+                            <field name="candidate_count" invisible="not report_json"/>
+                            <field name="images_sent" invisible="not images_sent"/>
+                            <field name="skipped_batches" invisible="not skipped_batches"/>
+                            <field name="tokens_in" invisible="not tokens_in"/>
+                            <field name="tokens_out" invisible="not tokens_out"/>
+                            <label for="ai_batches_done" string="Tiến độ AI" invisible="not ai_batches_total"/>
+                            <div invisible="not ai_batches_total">
+                                <field name="ai_batches_done" class="oe_inline"/> / <field name="ai_batches_total" class="oe_inline"/> lô
+                            </div>
+                            <field name="ai_used_models" invisible="not ai_used_models"/>
+                        </group>
+                    </group>
+                    <field name="report_json" invisible="1"/>
+                    <field name="ai_reduced" invisible="1"/>
+                    <notebook>
+                        <page string="Báo cáo" name="report">
+                            <field name="report_html" readonly="1" nolabel="1"/>
+                        </page>
+                        <page string="Theo nhân viên" name="staff" invisible="not staff_line_ids">
+                            <field name="staff_line_ids" readonly="1">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="pancake_staff_id" optional="hide"/>
+                                    <field name="conversations"/>
+                                    <field name="turns"/>
+                                    <field name="messages"/>
+                                    <field name="messages_per_turn"/>
+                                    <field name="turn_1" optional="show"/>
+                                    <field name="turn_2" optional="show"/>
+                                    <field name="turn_3" optional="hide"/>
+                                    <field name="turn_4plus" optional="hide"/>
+                                    <field name="chars_avg"/>
+                                    <field name="chars_median" optional="show"/>
+                                    <field name="chars_p90" optional="hide"/>
+                                    <field name="question_pct" optional="show"/>
+                                    <field name="polite_pct" optional="show"/>
+                                    <field name="media_pct" optional="hide"/>
+                                    <field name="response_in_hours_median"/>
+                                    <field name="new_first_replies"/>
+                                    <field name="new_engaged_pct"/>
+                                    <field name="new_quoted_pct" optional="show"/>
+                                    <field name="new_deal_pct"/>
+                                    <field name="new_phone_pct" optional="hide"/>
+                                    <field name="ai_conversations" optional="show"/>
+                                    <field name="ai_overall" optional="show"/>
+                                    <field name="ai_discovery" optional="hide"/>
+                                    <field name="ai_closing" optional="hide"/>
+                                    <field name="ai_strengths" optional="show"/>
+                                    <field name="ai_improvements" optional="show"/>
+                                    <field name="ai_coaching" optional="hide"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Quy tắc đề xuất" name="rules" invisible="not rule_ids">
+                            <field name="rule_ids">
+                                <list decoration-muted="state == 'rejected'" decoration-success="state == 'approved'">
+                                    <field name="category"/>
+                                    <field name="name"/>
+                                    <field name="content"/>
+                                    <field name="evidence" optional="show"/>
+                                    <field name="priority" widget="badge"/>
+                                    <field name="source"/>
+                                    <field name="state" widget="badge" decoration-success="state == 'approved'" decoration-warning="state == 'proposed'"/>
+                                    <button name="action_approve" type="object" string="Duyệt" icon="fa-check" class="text-success" invisible="state == 'approved'"/>
+                                    <button name="action_reject" type="object" string="Bỏ" icon="fa-times" class="text-danger" invisible="state == 'rejected'"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Agent điều phối" name="ai" invisible="not ai_summary and not coord_log">
+                            <group>
+                                <field name="ai_summary"/>
+                                <field name="coord_bot_scope"/>
+                                <field name="rules_review_summary"/>
+                                <field name="coord_rounds"/>
+                                <field name="coord_log" class="font-monospace"/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="chat_analysis_action" model="ir.actions.act_window">
+        <field name="name">Phân tích tin nhắn</field>
+        <field name="res_model">dac.chat.analysis</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Tạo đợt phân tích đầu tiên</p>
+            <p>Chọn khoảng ngày và model AI, bấm "Chạy phân tích". Hệ thống thống kê cách nhân viên nhắn tin, AI đọc hội thoại mẫu
+               và đề xuất quy tắc cho chatbot chào khách.</p>
+        </field>
+    </record>
+
+    <menuitem id="menu_chat_playbook" name="Phân tích chat &amp; chatbot" parent="dac_pancake_remind.menu_section_pancake" sequence="50"
+              groups="dac_erp.group_dac_erp_manager,base.group_system"/>
+    <menuitem id="menu_chat_dashboard" name="Tổng quan" parent="menu_chat_playbook" action="chat_dashboard_action" sequence="1"/>
+    <menuitem id="menu_chat_analysis" name="Phân tích tin nhắn" parent="menu_chat_playbook" action="chat_analysis_action" sequence="10"/>
+    <menuitem id="menu_chat_insight" name="Nhãn hội thoại (AI)" parent="menu_chat_playbook" action="chat_insight_action" sequence="15"/>
+    <menuitem id="menu_chat_rule" name="Quy tắc chat (playbook)" parent="menu_chat_playbook" action="chat_rule_action" sequence="20"/>
+    <menuitem id="menu_chat_prompt" name="System prompt chatbot" parent="menu_chat_playbook" action="chat_prompt_action" sequence="25"/>
+    <menuitem id="menu_chat_knowledge" name="Kiến thức doanh nghiệp" parent="menu_chat_playbook" action="chat_knowledge_action" sequence="27"/>
+    <menuitem id="menu_chat_demo" name="Demo chatbot" parent="menu_chat_playbook" action="chat_demo_action" sequence="30"/>
+    <menuitem id="menu_chat_config" name="Thiết lập" parent="menu_chat_playbook" action="chat_config_open_action" sequence="90"/>
+</odoo>

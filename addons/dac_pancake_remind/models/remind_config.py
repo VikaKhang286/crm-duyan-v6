@@ -39,6 +39,14 @@ class PancakeRemindConfig(models.Model):
         help='Dùng cho nút "Tính lại thống kê": quét lại lead và hội thoại Pancake từ ngày này để lập bảng thống kê khách mới.')
     live_check = fields.Boolean(string='Tải lại tin của khách ngay trước khi nhắc', default=True,
         help='Bật: trước khi nhắc, lấy lại tin mới nhất của đúng hội thoại đó để không nhắc nhầm khi nhân viên vừa trả lời.')
+    greeting_texts = fields.Text(string='Câu chào tự động',
+        help='Mỗi dòng một câu (đầu câu là đủ). Tin của page bắt đầu bằng các câu này — cùng các câu chỉ chào hỏi như "Dạ em chào chị ạ", '
+             '"Cảm ơn anh đã liên hệ" — KHÔNG tính là nhân viên đã trả lời khách.')
+    chatbot_wait = fields.Boolean(string='Chờ chatbot bàn giao', default=False,
+        help='Bật khi đã có chatbot AI chào/hỏi thông tin khách trên Pancake: trong lúc chatbot đang trò chuyện thì chưa nhắc vào nhóm; '
+             'chỉ nhắc khi chatbot bàn giao (tin có câu bàn giao bên dưới) hoặc chatbot im lặng 10 phút sau tin khách.')
+    handover_texts = fields.Text(string='Câu chatbot bàn giao cho nhân viên',
+        help='Mỗi dòng một cụm, vd "em chuyển nhân viên hỗ trợ", "nhân viên sẽ liên hệ". Tin chatbot có cụm này = bàn giao → nhắc ngay.')
     page_ids = fields.Many2many('dac.pancake.page', 'dac_pancake_remind_config_dpage_rel', 'config_id', 'page_id',
         string='Chỉ áp dụng cho page',
         help='Page Pancake dùng cho nhắc khách chưa trả lời, nhắc tổng, thống kê khách mới và kiểm tra trùng số lead. '

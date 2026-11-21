@@ -135,6 +135,24 @@ class ZaloChannel(models.Model):
             vals.update(self.env['dac.zalo.channel.message']._image_vals(image))
         return messages.create(vals)
 
+    def _on_mention(self, mention):
+        """Móc cho addon khác: một thành viên nhóm nhắc tên trợ lý (@Trợ lý) mà không trả lời tin nào của trợ lý.
+        `mention`: dict {thread_id, sender_uid, message_id, text (đã bỏ phần "@Trợ lý"), timestamp}."""
+        return None
+
+    def _react(self, message_id, icon='heart'):
+        """Trợ lý thả cảm xúc ('heart' / 'like') lên một tin trong hội thoại này (vd ❤️ báo đã nhận tin nhân viên).
+        Lỗi (bridge cũ, mất kết nối, tin quá cũ) → False, không raise."""
+        self.ensure_one()
+        config = self.env['dac.zalo.config'].sudo()._config()  # sudo(): đọc cấu hình bridge (luồng nền)
+        try:
+            result = config._bridge_request('/react', {'account_id': config.assistant_uid, 'thread_id': self.thread_id,
+                                                       'thread_type': self.thread_type, 'message_id': str(message_id), 'icon': icon})
+            return bool(result.get('reacted'))
+        except Exception as error:  # noqa: BLE001 — chỉ là xác nhận đã nhận, không được chặn việc khác
+            _logger.info('Zalo: không thả được cảm xúc (%s)', type(error).__name__)
+            return False
+
     def _mention_members(self, event_type):
         """Thành viên cần nhắc tên cho loại thông báo này (chỉ nhóm; tối đa MAX_MENTIONS người)."""
         self.ensure_one()
@@ -383,6 +401,19 @@ class ZaloChannelMessage(models.Model):
             for message in self.search([('channel_id.thread_id', '=', item['thread_id']), ('channel_id.thread_type', '=', 'group'),
                                         ('external_message_id', '=', item['quoted_message_id']), ('state', '=', 'sent')]):
                 message._on_reply(item)
+
+    @api.model
+    def _ingest_mentions(self, account_id, mentions):
+        """Nhận lô tin nhắc tên trợ lý trong nhóm từ bridge (đã xác thực); chỉ nhóm đã thêm vào Odoo."""
+        config = self.env['dac.zalo.config']._config()
+        if not config.assistant_uid or config.assistant_uid != account_id:
+            return
+        Channel = self.env['dac.zalo.channel']
+        for item in mentions:
+            if item['sender_uid'] == account_id:
+                continue
+            for channel in Channel.search([('thread_id', '=', item['thread_id']), ('thread_type', '=', 'group'), ('active', '=', True)]):
+                channel._on_mention(item)
 
     def _on_reaction(self, reaction):
         """Móc cho addon khác: một thành viên vừa thả cảm xúc lên tin này (`reaction` là dac.zalo.channel.reaction)."""

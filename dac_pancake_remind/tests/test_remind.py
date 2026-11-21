@@ -29,11 +29,11 @@ def jpeg():
 
 def reset_scenarios(env):
     """Kịch bản về mặc định (DB thử có thể đã chỉnh tay)."""
-    values = {'new_first': {'wait_minutes': 10}, 'new_repeat': {'repeat_minutes': 10, 'max_count': 4}, 'ongoing': {'wait_minutes': 15},
+    values = {'new_first': {'wait_minutes': 10}, 'new_repeat': {'repeat_minutes': 10, 'wait_minutes': 10, 'max_count': 4}, 'ongoing': {'wait_minutes': 15},
               'old': {'wait_minutes': 30}, 'digest': {'repeat_minutes': 30}, 'appt_pre': {'wait_minutes': 30},
               'appt_post': {'wait_minutes': 30, 'repeat_minutes': 60, 'max_count': 3}}
     for scenario in env['dac.pancake.remind.scenario'].search([]):
-        scenario.write(dict(values.get(scenario.code, {}), enabled=True, template=scenario.default_template,
+        scenario.write(dict(values.get(scenario.code, {}), enabled=True, real_channels=False, template=scenario.default_template,
                             line_template=scenario.default_line_template))
 
 
@@ -111,7 +111,7 @@ class TestPancakeRemind(TransactionCase):
         config = self.env['dac.pancake.remind.config'].new({})
         self.assertEqual((config.ai_check, config.remind_real_channels), (True, False))
         defaults = {s.code: (s.wait_minutes, s.repeat_minutes, s.max_count) for s in self.env['dac.pancake.remind.scenario'].search([])}
-        self.assertEqual(sorted(defaults), sorted(['new_first', 'new_repeat', 'ongoing', 'old', 'urgent', 'digest', 'appt_pre', 'appt_post', 'morning', 'stats']))
+        self.assertEqual(sorted(defaults), sorted(['new_first', 'new_repeat', 'ongoing', 'old', 'urgent', 'digest', 'appt_pre', 'appt_post', 'morning', 'stats', 'feedback']))
         self.assertEqual((defaults['new_first'][0], defaults['new_repeat'][1:], defaults['ongoing'][0], defaults['old'][0], defaults['digest'][1]),
                          (10, (10, 4), 15, 30, 30))
 
@@ -183,7 +183,8 @@ class TestPancakeRemind(TransactionCase):
         self.scan(T0 + timedelta(minutes=11))
         message = self.channel.message_ids
         self.assertEqual(len(message), 1)
-        self.assertEqual(message.text, '@An @Bình ⚠️ CHÚ Ý · Khách mới chờ 11 phút\nCho mình hỏi giá\n' + self.short('c1'))
+        self.assertEqual(message.text, '@An @Bình Dạ có khách mới liên hệ ạ\n' + self.short('c1'),
+                         'nhẹ nhàng: không nêu khách chờ bao lâu (luật từ khóa không có chủ đề → bỏ trống)')
         self.assertEqual([m['uid'] for m in message.mentions], ['111', '222'])
         self.assertTrue(message.image)
         self.assertEqual((message.image_width, message.image_height), (40, 60))
@@ -199,8 +200,6 @@ class TestPancakeRemind(TransactionCase):
         self.scan(T0 + timedelta(minutes=11))
         first = self.channel.message_ids
         first.write({'state': 'sent', 'external_message_id': 'z1'})
-        reaction = self.env['dac.zalo.channel.reaction'].create({'message_id': first.id, 'uid': '111', 'icon': '/-heart'})
-        first._on_reaction(reaction)  # người được tag thả cảm xúc: KHÔNG dừng nhắc
         wait = self.Wait.search([('conversation_id', '=', conv.id)])
         self.scan(T0 + timedelta(minutes=15))
         self.assertEqual(wait.remind_count, 1, 'chưa đủ 10 phút')
@@ -213,12 +212,20 @@ class TestPancakeRemind(TransactionCase):
             self.assertEqual(reply.reply_to_id, first, 'trả lời vào ảnh nhắc lần đầu')
             self.assertFalse(reply.image, 'không gửi lại ảnh')
             self.assertEqual([m['uid'] for m in reply.mentions], ['111', '222'])
-        self.assertEqual(sorted(replies.mapped('text')), ['@An @Bình ⚠️ Nhắc lần 2/4 · khách chờ 22 phút', '@An @Bình ⚠️ Nhắc lần 3/4 · khách chờ 33 phút'])
-        self.message(conv, T0 + timedelta(minutes=35), 'staff')
-        self.scan(T0 + timedelta(minutes=45))
+        self.assertEqual(replies.sorted('id').mapped('text'), ['@An @Bình 🔔 Dạ khách này mình đã phản hồi chưa ạ?',
+                                                              '@An @Bình ⚠️ Dạ khách vẫn đang chờ phản hồi ạ, anh chị xem giúp em nhé!'])
+        # Như lead: người được tag thả cảm xúc lên tin nhắc → thôi nhắc (vẫn chờ tin trả lời trên Pancake)
+        reaction = self.env['dac.zalo.channel.reaction'].create({'message_id': first.id, 'uid': '111', 'icon': '/-heart'})
+        first._on_reaction(reaction)
+        self.scan(T0 + timedelta(minutes=44))
+        self.assertEqual((wait.state, wait.remind_count, len(self.channel.message_ids)), ('done', 3, 3))
+        self.message(conv, T0 + timedelta(minutes=50), 'staff')
+        self.scan(T0 + timedelta(minutes=55))
         self.assertEqual(wait.state, 'answered')
         self.scan(T0 + timedelta(hours=3))
-        self.assertEqual(len(self.channel.message_ids), 3, 'có người trả lời thì thôi nhắc')
+        self.assertEqual(len(self.channel.message_ids), 4, 'có người trả lời thì thôi nhắc (chỉ thêm 1 tin đóng luồng)')
+        closing = self.channel.message_ids.filtered(lambda m: m.text.startswith('✅'))
+        self.assertEqual(closing.reply_to_id, first, 'tin đóng luồng trả lời vào ảnh nhắc lần đầu')
 
     def test_new_customer_gets_at_most_4_reminders_and_escalates_with_waiting_time(self):
         conv = self.conversation()
@@ -227,14 +234,20 @@ class TestPancakeRemind(TransactionCase):
         self.scan(T0 + timedelta(minutes=11))
         first = self.channel.message_ids
         first.write({'state': 'sent', 'external_message_id': 'z1'})
-        self.env.ref('dac_pancake_remind.scenario_new_repeat').repeat_minutes = 30
-        for minutes in (42, 73, 124, 200):  # 124 phút sau 10:00 = 12:04, đúng 2 giờ làm việc
-            self.scan(T0 + timedelta(minutes=minutes))
+        self.env.ref('dac_pancake_remind.scenario_new_repeat').write({'repeat_minutes': 30, 'wait_minutes': 60})
         wait = self.Wait.search([('conversation_id', '=', conv.id)])
+        self.scan(T0 + timedelta(minutes=42))   # lần 2: 30 phút sau lần 1
+        self.scan(T0 + timedelta(minutes=73))   # lần 3: 30 phút sau lần 2
+        from odoo.addons.dac_push.models.working_time import add_working_minutes
+        self.assertEqual(wait.due_at, add_working_minutes(T0 + timedelta(minutes=73), 60), 'lần 4 cách lần 3 một tiếng (giờ làm việc)')
+        self.scan(wait.due_at - timedelta(minutes=5))
+        self.assertEqual(wait.remind_count, 3, 'chưa đủ 1 tiếng')
+        self.scan(wait.due_at + timedelta(minutes=1))  # lần 4
         self.assertEqual((wait.remind_count, wait.state), (4, 'done'))
         texts = (self.channel.message_ids - first).sorted('id').mapped('text')
-        self.assertEqual(texts, ['@An @Bình ⚠️ Nhắc lần 2/4 · khách chờ 42 phút', '@An @Bình ⚠️ Nhắc lần 3/4 · khách chờ 1 giờ 13 phút',
-                                 '@An @Bình 🚨 Nhắc lần 4/4 · khách chờ 2 giờ'], 'chờ quá 1 giờ: Chú ý; quá 2 giờ: Khẩn')
+        self.assertEqual(texts, ['@An @Bình 🔔 Dạ khách này mình đã phản hồi chưa ạ?',
+                                 '@An @Bình ⚠️ Dạ khách vẫn đang chờ phản hồi ạ, anh chị xem giúp em nhé!',
+                                 '@An @Bình 🚨 Dạ khách chờ lâu rồi ạ, nhờ anh chị phản hồi khách ngay giúp em!'], 'mức gấp tăng dần theo lượt')
 
     def test_repeat_waits_while_the_first_image_is_not_sent_yet(self):
         conv = self.conversation()

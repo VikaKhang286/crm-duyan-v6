@@ -7,3 +7,4 @@ from . import appointment
 from . import scenario
 from . import new_contact
 from . import web_lead
+from . import group_feedback

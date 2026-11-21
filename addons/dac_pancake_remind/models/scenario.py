@@ -11,13 +11,16 @@ SAMPLE = {
     'icon': '⚠️', 'muc_do': '⚠️ CHÚ Ý', 'loai_khach': 'Khách mới', 'cho': '12 phút', 'ten_khach': 'Nguyễn Hoa',
     'tom_tat': 'Hỏi giá in 500 tờ rơi A5, cần chiều nay', 'link': 'https://pancake.vn/…?c_id=…', 'lan': 2, 'toi_da': 4,
     'so_khach': 3, 'nhan_vien': ' (Tiểu Băng)', 'gio_hen': '15:00', 'viec': 'Gửi báo giá bạt 180×80', 'phieu': 'crm.duyan.vn/hen/…',
-    'qua_han': 'Quá hẹn 31 phút', 'ngay': '19/11',
+    'qua_han': 'Quá hẹn 31 phút', 'ngay': '19/11', 'nguoi_tra_loi': 'Dao', 'ten_nhan_vien': 'Bong', 'chu_de': 'làm bảng hiệu', 'loi_nhac': 'Dạ khách vẫn đang chờ phản hồi ạ, anh chị xem giúp em nhé!',
 }
 PLACEHOLDERS = {
     'icon': 'icon mức gấp (🚨 ⚠️ 🔔)', 'muc_do': 'mức gấp có chữ (🚨 KHẨN / ⚠️ CHÚ Ý / 🔔)', 'loai_khach': 'Khách mới / Đang trao đổi / Khách cũ',
     'cho': 'khách đã chờ (giờ làm việc)', 'ten_khach': 'tên khách', 'tom_tat': 'AI tóm tắt khách cần gì', 'link': 'link hội thoại Pancake',
     'lan': 'lần nhắc thứ mấy', 'toi_da': 'số lần nhắc tối đa', 'so_khach': 'số khách trong tin gom', 'nhan_vien': '" (tên nhân viên)" nếu chưa ghép Zalo',
     'gio_hen': 'giờ hẹn', 'viec': 'việc đã hẹn', 'phieu': 'link phiếu hẹn', 'qua_han': '"Quá hẹn 31 phút" / "Đã quá hẹn"', 'ngay': 'ngày (dd/mm)',
+    'loi_nhac': 'câu nhắc của lượt này (lần 2, 3, 4 lấy lần lượt từng dòng ở "Mẫu mỗi dòng")',
+    'chu_de': 'khách liên hệ về việc gì (AI, vd "làm bảng hiệu"; không rõ thì trống)',
+    'nguoi_tra_loi': 'ai đã trả lời khách (tên Pancake, hoặc "X báo đã xử lý trong nhóm")', 'ten_nhan_vien': 'tên Zalo của nhân viên vừa nhắn',
 }
 FIELD_RE = re.compile(r'^[a-z_]+$')
 
@@ -39,6 +42,9 @@ class PancakeRemindScenario(models.Model):
     group = fields.Selection([('wait', 'Khách chờ'), ('appointment', 'Lịch hẹn'), ('report', 'Báo cáo')],
         string='Nhóm', required=True, default='wait')
     enabled = fields.Boolean(string='Bật', default=True)
+    real_channels = fields.Boolean(string='Gửi nhóm thật',
+        help='Riêng kịch bản này được gửi vào nhóm thật (vd DAC.Kinh Doanh) dù ô "Gửi nhắc vào nhóm thật" của cấu hình còn tắt. '
+        'Tắt = chỉ nhóm thử nghiệm nhận. Tin nhắc lại trả lời vào tin lần đầu nên đi theo nhóm của tin lần đầu.')
     description = fields.Text(string='Khi nào gửi / gửi gì', readonly=True)
     wait_minutes = fields.Integer(string='Thời gian (phút)', aggregator=None)
     repeat_minutes = fields.Integer(string='Lặp lại mỗi (phút)', aggregator=None)
@@ -151,7 +157,9 @@ class PancakeRemindScenario(models.Model):
         self.ensure_one()
         template = (self.line_template or self.default_line_template) if line else (self.template or self.default_template)
         text = self._render_template(template or '', values)
-        return '\n'.join(part for part in text.split('\n') if part.strip())  # bỏ dòng trống (vd chưa có tóm tắt)
+        # bỏ dòng trống (vd chưa có tóm tắt) và khoảng trắng thừa khi một biến trống (vd chưa có {chu_de})
+        lines = (re.sub(r' {2,}', ' ', part).strip() for part in text.split('\n'))
+        return '\n'.join(re.sub(r' ([,.!?])', r'\1', line) for line in lines if line)
 
     def _log(self, messages, conversation=None, wait=None, appointment=None, level=False, is_test=False, count=1):
         """Ghi Nhật ký nhắc cho các tin vừa xếp hàng gửi."""

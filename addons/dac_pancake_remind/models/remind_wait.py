@@ -16,6 +16,7 @@ from odoo.addons.dac_zalo_assistant.models import channels as zalo_channels
 
 from . import chat_image, reply_check, zalo_out
 from .pancake_api import PancakeError
+from .staff import admin_name
 from .zalo_out import HEADLINE, ICONS, LEVELS, RANK, Builder, escalate, waited_text, working_minutes_between
 
 _logger = logging.getLogger(__name__)
@@ -33,6 +34,8 @@ MAX_PER_RUN = 30                       # số khách xử lý (đồng bộ + d�
 POLL_OVERLAP = timedelta(minutes=5)    # lấy chồng lên lần trước một chút để không sót hội thoại cập nhật sát mốc
 OLD_CONVERSATION = timedelta(days=7)   # hội thoại bắt đầu trước đó hơn 7 ngày = khách cũ quay lại, không phải khách mới
 SHOWN_MESSAGES = 8
+ROUND_LEVELS = {2: 'normal', 3: 'high'}  # mức gấp của lượt nhắc lại khách mới; lượt 4 trở đi: urgent
+CHATBOT_IDLE_MINUTES = 10             # chatbot im lặng quá chừng này sau tin khách = coi như bàn giao
 SYSTEM_TYPES = {'reaction', 'pzl_chat_recommended', 'zalo_system_message', 'pzl_new_friend_request'}
 BOT_NAMES = ('chatbot', 'pancake bot', 'auto')
 MAX_PICTURE_BYTES = 3 * 1024 * 1024
@@ -44,11 +47,54 @@ NOTES = {'sticker': '[Sticker]', 'audio': '[Tin nhắn thoại]', 'video': '[Vid
 
 # Thông báo của hệ thống Zalo nằm lẫn trong hội thoại, không phải khách nhắn:
 #  "12/11 Sinh nhật của Pham Thi Kim Oanh Hãy gửi lời chúc tốt đẹp!", "Hôm nay là sinh nhật của ...", "Zalo chỉ hiển thị tin nhắn từ sau ..."
-IGNORED_TEXT = re.compile(r'^(?:\d{1,2} \d{1,2} )?(?:hom nay la )?sinh nhat cua .+ hay gui loi chuc|^zalo chi hien thi tin nhan')
+IGNORED_TEXT = re.compile(r'^(?:\d{1,2} \d{1,2} )?(?:hom nay la )?sinh nhat cua .+ hay gui loi chuc|^zalo chi hien thi tin nhan'
+                          r'|^ban vua ket ban voi |^ban nhan duoc loi moi ket ban')
 
 
 def plain_text(message):
     return fold(re.sub(r'<[^>]+>', ' ', message.content_html or ''))
+
+
+# Tin của page chỉ để chào / cảm ơn đã liên hệ (lời chào tự động, chatbot) — không tính là nhân viên đã trả lời
+GREETING_PHRASES = re.compile(
+    r'\b(?:xin chao|chao mung|chao|hello|hi|'
+    r'(?:cam on|thanks?)(?: \w+){0,4} (?:da )?(?:lien he|quan tam|nhan tin|ghe tham|ung ho|ghe|inbox|ib)(?: voi)?|'
+    r'(?:co the|xin phep|rat vui duoc|san sang) (?:ho tro|giup do|giup|tu van|phuc vu)|ho tro gi|giup gi|tu van gi|can gi|'
+    r'rat vui|hen gap lai|chuc \w+(?: \w+){0,3} ngay tot lanh)\b')
+GREETING_FILLER = {
+    'da', 'vang', 'a', 'anh', 'chi', 'em', 'ban', 'quy', 'khach', 'shop', 'minh', 'nhe', 'nha', 'oi', 'voi', 'cua', 'ben', 'cho', 'la',
+    'toi', 'chung', 'duoc', 'rat', 'vui', 'ah', 'ak', 'nhieu', 'lam', 'gi', 'khong', 'ko', 'k', 'va', 'the', 'nao', 'ha', 'hom', 'nay',
+    'duy', 'an', 'dac', 'cong', 'ty', 'quang', 'cao', 'in', 'an', 'ạ', 'nhen', 'ne', 'day', 'o', 'tai', 'luc', 'luon', 'sang', 'chieu',
+    'toi', 'buoi', 'qua', 'xin', 'phep',
+}
+
+
+class Senders(tuple):
+    """Tên bot (chữ thường) + câu chào tự động / câu bàn giao đã cài trong cấu hình (đã bỏ dấu)."""
+    greetings = ()
+    handovers = ()
+
+    def __new__(cls, names, greetings=(), handovers=()):
+        self = super().__new__(cls, names)
+        self.greetings, self.handovers = tuple(greetings), tuple(handovers)
+        return self
+
+
+def is_greeting(text, greetings=()):
+    """Chỉ là lời chào/cảm ơn đã liên hệ (không có nội dung trao đổi thật)."""
+    folded = fold(text or '')
+    if not folded:
+        return False
+    if any(folded.startswith(g) for g in greetings):
+        return True
+    rest = GREETING_PHRASES.sub(' ', folded).split()
+    return bool(GREETING_PHRASES.search(folded)) and len(rest) <= 12 and set(rest) <= GREETING_FILLER
+
+
+def has_content(raw):
+    """Tin có nội dung thật ngoài dấu hệ thống (vd ảnh nhân viên gửi mà Pancake gắn kèm {"type": "reaction"} ở đầu)."""
+    attachments = raw.get('attachments') if isinstance(raw, dict) else None
+    return any(isinstance(a, dict) and a.get('type') and a.get('type') not in SYSTEM_TYPES for a in attachments or [])
 
 
 def classify(message, bots=BOT_NAMES):
@@ -56,11 +102,11 @@ def classify(message, bots=BOT_NAMES):
     chat nhóm/cộng đồng Zalo...).
 
     Tin của page có from.id == page_id (hoặc có admin_name/admin_id khi nhân viên gửi từ Pancake)."""
-    if message.type_content in SYSTEM_TYPES:
-        return None
     try:
         raw = json.loads(message.raw_json or '{}')
     except ValueError:
+        return None
+    if message.type_content in SYSTEM_TYPES and not has_content(raw):
         return None
     if not isinstance(raw, dict) or raw.get('is_removed') or raw.get('type', 'INBOX') != 'INBOX':
         return None
@@ -69,7 +115,13 @@ def classify(message, bots=BOT_NAMES):
         return None  # nhóm/cộng đồng Zalo, không phải khách hỏi hàng
     if sender.get('id') and sender.get('id') == raw.get('page_id') or sender.get('admin_id') or sender.get('admin_name'):
         name = (sender.get('admin_name') or '').strip().lower()
-        return 'bot' if name in bots else 'staff'
+        if name in bots:
+            return 'bot'
+        if not has_content(raw):
+            text = plain_text(message)
+            if is_greeting(text, getattr(bots, 'greetings', ())) or any(h in text for h in getattr(bots, 'handovers', ())):
+                return 'bot'  # lời chào / chatbot: chưa phải nhân viên trả lời
+        return 'staff'
     if IGNORED_TEXT.match(plain_text(message)):
         return None
     return 'customer'
@@ -123,8 +175,13 @@ class PancakeRemindWait(models.Model):
         'Hai loại sau được gom vào một tin mỗi 30 phút, trừ khi AI đánh giá Khẩn.')
     level = fields.Selection(LEVELS, string='Mức độ gấp', readonly=True, help='AI đánh giá; tự nâng khi khách chờ quá 1 giờ / 2 giờ làm việc.')
     summary = fields.Char(string='Khách cần gì (AI tóm tắt)', readonly=True)
+    topic = fields.Char(string='Khách liên hệ về', readonly=True, help='AI: cụm ngắn điền vào "Có khách mới liên hệ ___", vd "làm bảng hiệu".')
+    note = fields.Char(string='Ghi chú', readonly=True)
     staff_id = fields.Many2one('dac.pancake.staff', string='Nhân viên phụ trách', readonly=True, ondelete='set null',
         help='Người đã chat với khách gần nhất trên Pancake; được tag khi nhắc (xem Nhân viên Pancake ↔ Zalo).')
+    staff_ids = fields.Many2many('dac.pancake.staff', 'dac_pancake_wait_staff_rel', 'wait_id', 'staff_id', string='Nhân viên đã chat',
+        readonly=True, help='Mọi nhân viên đã xác định (có Tài khoản Odoo) từng chat với khách trong 30 ngày; nhắc thì tag tất cả. '
+        'Tên Pancake chưa ghép tài khoản Odoo = chưa xác định → tag người được cài sẵn.')
     digest_pending = fields.Boolean(string='Chờ vào tin gom', readonly=True, index=True)
     ai_state = fields.Selection([('none', 'Chưa đọc'), ('needed', 'Cần trả lời'), ('not_needed', 'Không cần trả lời')],
         string='AI đánh giá', default='none', readonly=True)
@@ -138,6 +195,21 @@ class PancakeRemindWait(models.Model):
     zalo_message_ids = fields.Many2many('dac.zalo.channel.message', 'dac_pancake_wait_zalo_message_rel', 'wait_id', 'message_id',
         string='Tin Zalo đã gửi', readonly=True, copy=False)
     answered_at = fields.Datetime(string='Trả lời lúc', readonly=True)
+    answered_by = fields.Char(string='Người trả lời', readonly=True,
+        help='Tên nhân viên trên Pancake của tin trả lời đầu tiên (đọc lại Pancake khi tới hạn kiểm tra), '
+             'hoặc nhân viên báo đã xử lý trong nhóm Zalo.')
+    partner_id = fields.Many2one('res.partner', string='Khách hàng', related='conversation_id.partner_id', store=True, index=True)
+    answer_source = fields.Selection([('pancake', 'Có tin trả lời trên Pancake'), ('staff', 'Sale báo trong nhóm Zalo')],
+        string='Căn cứ chốt', readonly=True)
+    report_feedback_id = fields.Many2one('dac.pancake.feedback', string='Sale báo trạng thái', readonly=True, ondelete='set null',
+        help='Tin trong nhóm Zalo mà sale báo trạng thái khách (đã lên đơn / đã liên hệ / đã trả lời): ai, lúc nào, nói gì.')
+    report_status = fields.Selection([('order', 'Đã lên đơn / chốt'), ('contacted', 'Đã liên hệ (gọi điện, cửa hàng, Zalo riêng...)'),
+        ('replied', 'Đã trả lời khách')], string='Trạng thái sale báo', readonly=True)
+    report_user_id = fields.Many2one('res.users', string='Người báo (Odoo)', related='report_feedback_id.user_id')
+    report_by = fields.Char(string='Người báo (Zalo)', related='report_feedback_id.sender_name')
+    report_text = fields.Char(string='Sale đã nhắn', related='report_feedback_id.text')
+    report_at = fields.Datetime(string='Báo lúc', related='report_feedback_id.at')
+    feedback_ids = fields.One2many('dac.pancake.feedback', 'wait_id', string='Phản hồi trong nhóm', readonly=True)
 
     # ── Quét ──────────────────────────────────────────────────────────────────────
 
@@ -240,9 +312,10 @@ class PancakeRemindWait(models.Model):
             # Theo dõi cũ đã có nhân viên trả lời (xét trực tiếp trong dữ liệu, không phụ thuộc cửa sổ quét) thì đóng lại
             open_waits = self.search([('conversation_id', '=', conversation_id), ('state', 'in', OPEN_STATES)])
             for wait in open_waits:
-                answered_at = wait._answered_since()
-                if answered_at:
-                    wait.write({'state': 'answered', 'answered_at': answered_at})
+                vals = wait._answer_vals()
+                if vals:
+                    wait.write(vals)
+                    wait._announce_answered()
             if conversation.is_internal:
                 continue  # nội bộ: không nhắc trả lời
             open_waits = open_waits.filtered(lambda w: w.state in OPEN_STATES)
@@ -252,6 +325,12 @@ class PancakeRemindWait(models.Model):
                 if later:
                     wait.write({'state': 'waiting', 'since': min(later), 'due_at': zalo_out.due_after(min(later), self._minutes(config, wait.customer_kind)),
                                 'ai_state': 'none', 'ai_reason': False, 'ai_source': False, 'level': False, 'summary': False})
+            # Đã chốt "đã trả lời" (kể cả nhân viên báo xử lý ngoài Pancake): chỉ tính tin khách nhắn SAU lúc chốt
+            closed = self.search([('conversation_id', '=', conversation_id), ('state', '=', 'answered'), ('answered_at', '!=', False)],
+                                 order='answered_at desc', limit=1).answered_at
+            if first_unanswered and closed and first_unanswered <= closed:
+                later = [m.inserted_at for m in items if m.inserted_at > closed and classify(m, bots) == 'customer']
+                first_unanswered = min(later) if later else None
             if first_unanswered and not open_waits:
                 name = fold(conversation.customer_name or 'Khách')
                 kind = self._kind(conversation, first_unanswered, bots)
@@ -265,9 +344,15 @@ class PancakeRemindWait(models.Model):
 
     @api.model
     def _bot_names(self):
+        """Tên bot + câu chào tự động + câu chatbot bàn giao (xem Senders)."""
         # sudo(): tham số hệ thống (tên bot, tùy chọn); cron không có quyền đọc
         param = self.env['ir.config_parameter'].sudo().get_param('pancake.bot_names')
-        return tuple(n.strip().lower() for n in param.split(',') if n.strip()) if param else BOT_NAMES
+        names = tuple(n.strip().lower() for n in param.split(',') if n.strip()) if param else BOT_NAMES
+        config = self.env['dac.pancake.remind.config']._get()
+
+        def lines(text):
+            return [fold(line) for line in (text or '').splitlines() if len(fold(line)) >= 4]
+        return Senders(names, lines(config.greeting_texts), lines(config.handover_texts) if config.chatbot_wait else ())
 
     @api.model
     def _process(self, config, now):
@@ -281,7 +366,8 @@ class PancakeRemindWait(models.Model):
                     if wait.conversation_id.is_internal:
                         wait.state = 'ignored'
                         continue
-                    if not zalo_out.channels_for(self.env, config, CODES, wait.is_test)[0]:
+                    first = self.env['dac.pancake.remind.scenario']._get('new_first' if wait.customer_kind == 'new' else 'urgent')
+                    if not zalo_out.channels_for(self.env, config, CODES, wait.is_test, first)[0]:
                         continue  # chưa hội thoại Zalo nào nhận loại tin này: chưa dựng ảnh, khi có người đăng ký sẽ nhắc ngay
                     wait._remind(config, now)
             except Exception:  # noqa: BLE001
@@ -289,13 +375,53 @@ class PancakeRemindWait(models.Model):
 
     # ── Nhắc ─────────────────────────────────────────────────────────────────────
 
-    def _answered_since(self):
-        """Có nhân viên (không phải bot) trả lời sau tin đầu tiên của khách chưa? Thả cảm xúc không tính là trả lời."""
+    def _acknowledged(self):
+        """Có nhân viên phản hồi trong nhóm Zalo (trả lời tin nhắc, @Trợ lý, thả cảm xúc) sau lần nhắc gần nhất."""
         self.ensure_one()
-        later = self.env['dac.pancake.message'].sudo().search([('conversation_id', '=', self.conversation_id.id), ('inserted_at', '>', self.since)])
+        since = self.last_reminded_at or self.since
+        return bool(self.feedback_ids.filtered(lambda f: f.at and f.at >= since))
+
+    def _chatbot_holding(self, config, now):
+        """Đang chờ chatbot: khách mới, chatbot (hoặc lời chào tự động) đã nhắn sau tin khách, chưa bàn giao và chưa im lặng quá
+        10 phút → lùi lần kiểm tra 10 phút, chưa nhắc vào nhóm. Bàn giao (câu bàn giao) / chatbot im lặng → nhắc ngay."""
+        self.ensure_one()
+        if not config.chatbot_wait or self.customer_kind != 'new' or self.remind_count:
+            return False
         bots = self._bot_names()
-        replies = later.filtered(lambda m: classify(m, bots) == 'staff')
+        later = self.env['dac.pancake.message'].sudo().search([('conversation_id', '=', self.conversation_id.id), ('inserted_at', '>=', self.since)],
+                                                              order='inserted_at, id')
+        kinds = [(m, classify(m, bots)) for m in later]
+        bot_msgs = [m for m, kind in kinds if kind == 'bot']
+        if not bot_msgs:
+            return False
+        if any(h in plain_text(m) for m in bot_msgs for h in bots.handovers):
+            return False  # chatbot đã bàn giao cho nhân viên
+        last_customer = max((m.inserted_at for m, kind in kinds if kind == 'customer'), default=self.since)
+        if last_customer > bot_msgs[-1].inserted_at and working_minutes_between(last_customer, now) >= CHATBOT_IDLE_MINUTES:
+            return False  # khách nhắn mà chatbot không trả lời nữa
+        self.write({'due_at': add_working_minutes(now, CHATBOT_IDLE_MINUTES), 'note': 'Chatbot đang trò chuyện với khách: chờ bàn giao'})
+        return True
+
+    def _replies(self):
+        """Tin nhân viên (không phải bot) trả lời sau tin đầu tiên của khách, cũ → mới. Thả cảm xúc không tính là trả lời."""
+        self.ensure_one()
+        later = self.env['dac.pancake.message'].sudo().search([('conversation_id', '=', self.conversation_id.id), ('inserted_at', '>', self.since)],
+                                                              order='inserted_at, id')
+        bots = self._bot_names()
+        return later.filtered(lambda m: classify(m, bots) == 'staff')
+
+    def _answered_since(self):
+        """Có nhân viên trả lời chưa → lúc trả lời gần nhất, chưa → False."""
+        replies = self._replies()
         return max(replies.mapped('inserted_at')) if replies else False
+
+    def _answer_vals(self):
+        """Đã có người trả lời → giá trị đánh dấu "Đã có người trả lời" (lúc, ai); chưa → {}."""
+        replies = self._replies()
+        if not replies:
+            return {}
+        return {'state': 'answered', 'answered_at': max(replies.mapped('inserted_at')), 'digest_pending': False, 'answer_source': 'pancake',
+                'answered_by': admin_name(replies[0]) or 'Page (trả lời ngoài Pancake)'}
 
     def _live_sync(self, config):
         if not config.live_check:
@@ -308,10 +434,27 @@ class PancakeRemindWait(models.Model):
             _logger.warning('Nhắc khách Pancake: không đồng bộ lại được hội thoại %s', self.conversation_id.id)
 
     def _close_if_answered(self):
-        answered = self._answered_since()
-        if answered:
-            self.write({'state': 'answered', 'answered_at': answered, 'digest_pending': False})
-        return bool(answered)
+        vals = self._answer_vals()
+        if vals:
+            self.write(vals)
+            self._announce_answered()
+        return bool(vals)
+
+    def _announce_answered(self):
+        """Đóng luồng trong nhóm: trả lời vào ảnh nhắc khách này "đã được trả lời (ai)" để mọi người khỏi vào xem nữa."""
+        self.ensure_one()
+        scenario = self.env['dac.pancake.remind.scenario']._get('feedback')
+        originals = self.zalo_message_ids.filtered(lambda m: m.image and m.state == 'sent' and m.channel_id.active)
+        if not scenario.enabled or not originals:
+            return
+        text = scenario._render({'ten_khach': self.customer_name or 'Khách', 'nguoi_tra_loi': self.answered_by or 'đã có người trả lời',
+                                 'ten_nhan_vien': ''}, line=True)
+        sent = self.env['dac.zalo.channel.message']
+        for original in originals:
+            sent |= original.channel_id._queue(text, 'pancake-answered:%s:%s' % (self.id, original.channel_id.id), original.event_type_id,
+                                               reply_to=original)
+        self.env['dac.zalo.channel']._trigger_send()
+        scenario._log(sent, self.conversation_id, wait=self, is_test=self.is_test)
 
     def _remind(self, config, now):
         """Đến hạn: đọc lại tin (đã có ai trả lời chưa) → AI đánh giá (lần đầu) → khách mới hoặc Khẩn: nhắc riêng có ảnh;
@@ -325,13 +468,21 @@ class PancakeRemindWait(models.Model):
         self._live_sync(config)
         if self._close_if_answered():
             return
+        if self._chatbot_holding(config, now):
+            return
+        if self.remind_count and self._acknowledged():
+            # Như lead: nhân viên đã phản hồi trong nhóm (trả lời / @Trợ lý / thả cảm xúc) sau lần nhắc trước → thôi nhắc.
+            # Vẫn còn "mở": nhân viên trả lời trên Pancake thì lượt quét sau tự chuyển sang "Đã có người trả lời".
+            self.write({'state': 'done', 'due_at': False, 'note': 'Nhân viên đã phản hồi trong nhóm: thôi nhắc, chờ tin trả lời trên Pancake'})
+            return
         waited = working_minutes_between(self.since, now)
         if self.ai_state == 'none':
             result = reply_check.assess(self.env, self._chat_lines(conversation), self.customer_kind, waited, use_ai=config.ai_check)
             vals = {'ai_state': 'needed' if result['need'] else 'not_needed', 'ai_reason': result['reason'], 'ai_source': result['source'],
-                    'ai_checked_at': now, 'level': result['level'], 'summary': result['summary']}
-            if not self.staff_id and self.customer_kind != 'new':
-                vals['staff_id'] = self.env['dac.pancake.staff']._of_conversation(conversation, before=self.since).id
+                    'ai_checked_at': now, 'level': result['level'], 'summary': result['summary'], 'topic': result.get('topic') or False}
+            if not self.staff_ids and self.customer_kind != 'new':
+                people = self.env['dac.pancake.staff']._people_of_conversation(conversation, before=self.since)
+                vals.update(staff_ids=[(6, 0, people.ids)], staff_id=people[:1].id)
             self.write(vals)
             if not result['need']:
                 self.write({'state': 'not_needed', 'due_at': False})
@@ -350,9 +501,16 @@ class PancakeRemindWait(models.Model):
         first = Scenario._get('new_first' if self.customer_kind == 'new' else 'urgent')
         values = {'icon': ICONS.get(level, '🔔'), 'muc_do': HEADLINE.get(level, '🔔'), 'loai_khach': KIND_LABELS.get(self.customer_kind, 'Khách'),
                   'cho': waited_text(waited), 'ten_khach': conversation.customer_name or 'Khách', 'tom_tat': self.summary or '',
-                  'link': conversation._short_url(), 'lan': self.remind_count + 1, 'toi_da': max(limit, self.remind_count + 1)}
+                  'link': conversation._short_url(), 'lan': self.remind_count + 1, 'toi_da': max(limit, self.remind_count + 1),
+                  'chu_de': self.topic or ''}
         originals = self.zalo_message_ids.filtered(lambda m: m.image)
         number = self.remind_count + 1
+        if self.customer_kind == 'new' and number > 1:
+            # Khách chờ càng lâu càng gấp: lần 2 🔔, lần 3 ⚠️, lần 4 trở đi 🚨 (AI đã thấy Khẩn thì luôn 🚨)
+            level = 'urgent' if self.level == 'urgent' else ROUND_LEVELS.get(number, 'urgent')
+            phrases = [p.strip() for p in (repeat.line_template or repeat.default_line_template or '').splitlines() if p.strip()]
+            values.update(icon=ICONS[level], muc_do=HEADLINE[level],
+                          loi_nhac=phrases[min(number - 2, len(phrases) - 1)] if phrases else 'Dạ khách này mình đã phản hồi chưa ạ?')
         key = 'pancake-wait:%s:%s' % (self.id, number)
         Message = self.env['dac.zalo.channel.message']
         if originals.filtered(lambda m: m.state == 'sent'):
@@ -361,7 +519,7 @@ class PancakeRemindWait(models.Model):
             types = zalo_out.event_types(self.env, CODES)
             for original in originals.filtered(lambda m: m.state == 'sent' and m.channel_id.active):
                 channel = original.channel_id
-                out = Builder().tags(zalo_out.targets_for(channel, self.staff_id, types))
+                out = Builder().tags(zalo_out.targets_for(channel, self._staff(), types))
                 out.add((' ' if out.parts else '') + repeat._render(values))
                 text, mentions = out.result()
                 sent |= channel._queue(text, '%s:%s' % (key, channel.id), original.event_type_id, mentions=mentions, reply_to=original)
@@ -372,16 +530,18 @@ class PancakeRemindWait(models.Model):
             return  # ảnh nhắc lần đầu chưa gửi đi được (bridge đang lỗi?): chờ, lượt sau xét lại
         else:
             def build(channel, types):
-                out = Builder().tags(zalo_out.targets_for(channel, self.staff_id, types))
+                out = Builder().tags(zalo_out.targets_for(channel, self._staff(), types))
                 out.add((' ' if out.parts else '') + first._render(values))
                 return out.result()
-            sent = zalo_out.send(self.env, config, CODES, key, build, is_test=self.is_test, image=self._render_image(conversation, now))
+            sent = zalo_out.send(self.env, config, CODES, key, build, is_test=self.is_test, image=self._render_image(conversation, now), scenario=first)
             first._log(sent, conversation, wait=self, level=level, is_test=self.is_test)
         if not sent:
             return
         vals = {'remind_count': number, 'last_reminded_at': now, 'zalo_message_ids': [(4, m.id) for m in sent]}
         if self.customer_kind == 'new' and number < limit:
-            vals['due_at'] = add_working_minutes(now, repeat.repeat_minutes)
+            # Lần nhắc cuối cách xa hơn (mặc định: lần 2, 3 cách 30 phút; lần 4 cách lần 3 một tiếng)
+            gap = repeat.wait_minutes if number + 1 == limit and repeat.wait_minutes else repeat.repeat_minutes
+            vals['due_at'] = add_working_minutes(now, gap)
         else:
             vals.update(state='done', due_at=False)  # đã nhắc đủ (khách mới 4 lần; khách cũ/đang trao đổi Khẩn 1 lần)
         self.write(vals)
@@ -418,7 +578,7 @@ class PancakeRemindWait(models.Model):
                 return digest._render({
                     'icon': ICONS.get(levels[wait.id], '🔔'), 'ten_khach': conversation.customer_name or 'Khách',
                     'tom_tat': wait.summary or KIND_LABELS.get(wait.customer_kind, ''), 'loai_khach': KIND_LABELS.get(wait.customer_kind, ''),
-                    'nhan_vien': ' (%s)' % wait.staff_id.name if wait.staff_id and not wait.staff_id.zalo_uid else '',
+                    'nhan_vien': wait._unmapped_names(),
                     'cho': waited_text(working_minutes_between(wait.since, now)),
                     'link': conversation._short_url() or conversation.page_id.name or ''}, line=True)
 
@@ -426,13 +586,13 @@ class PancakeRemindWait(models.Model):
                 out = Builder().add(digest._render({'so_khach': len(group)}))
                 mapped, unknown = {}, []
                 for wait in group:
-                    targets = zalo_out.staff_targets(channel, wait.staff_id)
+                    targets = zalo_out.staff_targets(channel, wait._staff())
                     if targets:
-                        mapped.setdefault(targets[0], []).append(wait)
+                        mapped.setdefault(tuple(targets), []).append(wait)
                     else:
                         unknown.append(wait)
-                for target, waits in mapped.items():
-                    out.add('\n').tags([target])
+                for targets, waits in mapped.items():
+                    out.add('\n').tags(list(targets))
                     for wait in waits:
                         out.add('\n' + line(wait))
                 if unknown:
@@ -450,6 +610,16 @@ class PancakeRemindWait(models.Model):
             digest._log(sent, is_test=is_test, count=len(group), level=levels[group[0].id])
             group.write({'state': 'done', 'digest_pending': False, 'remind_count': 1, 'last_reminded_at': now,
                          'zalo_message_ids': [(4, m.id) for m in sent]})
+
+    def _staff(self):
+        """Nhân viên cần tag cho khách này: mọi người đã xác định từng chat (khách có 2 người cùng chat thì tag cả 2)."""
+        self.ensure_one()
+        return self.staff_ids or self.staff_id
+
+    def _unmapped_names(self):
+        """" (tên)" cho nhân viên đã xác định nhưng chưa ghép Zalo (không tag được thì ghi tên)."""
+        names = [s.name for s in self._staff() if s.user_id and not s.zalo_uid]
+        return ' (%s)' % ', '.join(names) if names else ''
 
     def _chat_lines(self, conversation):
         """Các tin gần nhất của khách/nhân viên (cũ → mới) dạng (loại, chữ, ghi chú ảnh/file) để AI đọc."""

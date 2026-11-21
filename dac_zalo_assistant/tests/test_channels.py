@@ -387,6 +387,13 @@ class TestZaloReactionEndpoint(HttpCase):
         self.assertEqual((response.status_code, response.json()), (200, {'accepted': True}))
         self.assertEqual(seen, [(message.id, '111', 'Đã gọi')], 'a reply to the assistant message reaches the hook')
         self.assertEqual(self.env['dac.zalo.channel.reaction'].search_count([('message_id', '=', message.id), ('uid', '=', '111')]), 1)
+        # "@Trợ lý ..." không trả lời tin nào của trợ lý → móc _on_mention của nhóm
+        mention = {'kind': 'mention', 'thread_id': 'GR1', 'sender_uid': '111', 'message_id': '9002', 'text': 'Đã xem'}
+        self.assertEqual(post({'account_id': 'bot-test', 'events': [{'kind': 'mention', 'thread_id': 'GR1'}]}).status_code, 400)
+        mentioned = []
+        with patch.object(type(message.channel_id), '_on_mention', lambda rec, item: mentioned.append((rec.id, item['text']))):
+            response = post({'account_id': 'bot-test', 'events': [mention]})
+        self.assertEqual((response.status_code, mentioned), (200, [(message.channel_id.id, 'Đã xem')]))
 
 
 @tagged('post_install', '-at_install')
