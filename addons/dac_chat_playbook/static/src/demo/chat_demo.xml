@@ -4,8 +4,9 @@
         <div class="o_action dac_cd2">
             <header class="dac_cd2_head">
                 <div>
-                    <h1>Demo chatbot</h1>
-                    <div class="dac_cd2_sub">Nhắn thử như khách để xem chất lượng trả lời, prompt gửi đi và token tiêu hao. Không gửi gì cho khách thật.</div>
+                    <h1>Huấn luyện &amp; kiểm thử</h1>
+                    <div class="dac_cd2_sub">Nhắn thử như khách; rê chuột vào câu bot trả lời để góp ý, rồi cho AI Agent tối ưu system prompt từ góp ý.
+                        Không gửi gì cho khách thật.</div>
                 </div>
             </header>
             <div t-if="!state.options" class="dac_cd2_loading"><i class="fa fa-circle-o-notch fa-spin me-2"/>Đang tải…</div>
@@ -27,6 +28,14 @@
                         <label class="dac_cd2_field is-small">
                             <span>Tên khách</span>
                             <input type="text" class="form-control form-control-sm" t-model="state.customerName"/>
+                        </label>
+                        <label class="dac_cd2_field is-small">
+                            <span>Kênh</span>
+                            <select class="form-select form-select-sm" t-model="state.channel" aria-label="Kênh khách nhắn">
+                                <t t-foreach="state.options.channels || []" t-as="c" t-key="c.key">
+                                    <option t-att-value="c.key" t-esc="c.label"/>
+                                </t>
+                            </select>
                         </label>
                         <div class="dac_cd2_field is-wide">
                             <span>Giả lập lúc khách nhắn</span>
@@ -51,9 +60,24 @@
                                 <i class="fa me-1" t-att-class="m.error ? 'fa-exclamation-triangle' : 'fa-user-circle'"/><t t-esc="m.text"/>
                             </div>
                             <div t-else="" class="dac_cd2_msg" t-att-class="(m.role === 'customer' ? 'is-customer' : 'is-bot') + (m.blocked ? ' is-blocked' : '')">
-                                <div class="dac_cd2_bubble">
-                                    <span t-if="m.blocked" class="dac_cd2_blocked_tag"><i class="fa fa-ban me-1"/>Bị chặn, không gửi</span>
-                                    <t t-esc="m.text"/>
+                                <div class="dac_cd2_bubble_row">
+                                    <button t-if="m.role === 'bot' and m.turnEnd" type="button" class="dac_cd2_fb_btn" t-att-class="m.feedback ? 'has-feedback' : ''"
+                                            t-on-click="() => this.openFeedback(m_index)" title="Góp ý cho cả lượt trả lời này" aria-label="Góp ý cho cả lượt trả lời này">
+                                        <i class="fa" t-att-class="m.feedback ? 'fa-commenting' : 'fa-commenting-o'"/>
+                                    </button>
+                                    <div class="dac_cd2_bubble">
+                                        <span t-if="m.blocked" class="dac_cd2_blocked_tag"><i class="fa fa-ban me-1"/>Bị chặn, không gửi</span>
+                                        <t t-esc="m.text"/>
+                                    </div>
+                                </div>
+                                <div t-if="m.feedback and state.fbFor !== m_index" class="dac_cd2_fb_saved"><i class="fa fa-check me-1"/>Góp ý cho lượt này: <t t-esc="m.feedback"/></div>
+                                <div t-if="state.fbFor === m_index" class="dac_cd2_fb_form">
+                                    <textarea class="form-control form-control-sm" rows="2" t-model="state.fbText" placeholder="Góp ý cho cả lượt trả lời này: vd nhắn ngắn hơn, tách 2 tin, đừng hỏi số điện thoại…"
+                                              t-on-keydown="(ev) => this.onFeedbackKeydown(ev, m_index)" aria-label="Nội dung góp ý"/>
+                                    <div class="dac_cd2_fb_actions">
+                                        <button type="button" class="btn btn-sm btn-primary" t-on-click="() => this.saveFeedback(m_index)" t-att-disabled="!state.fbText.trim()">Lưu góp ý</button>
+                                        <button type="button" class="btn btn-sm btn-link" t-on-click="cancelFeedback">Hủy</button>
+                                    </div>
                                 </div>
                                 <div t-if="m.meta" class="dac_cd2_meta">
                                     <t t-esc="num(m.meta.in)"/> vào · <t t-esc="num(m.meta.out)"/> ra · <t t-esc="m.meta.seconds"/>s
@@ -63,6 +87,28 @@
                         <div t-if="state.sending" class="dac_cd2_msg is-bot"><div class="dac_cd2_bubble dac_cd2_typing"><span/><span/><span/></div></div>
                     </div>
 
+                    <div t-if="state.optimizing" class="dac_cd2_improve is-busy" role="status">
+                        <i class="fa fa-circle-o-notch fa-spin me-2"/>Đang cải tiến prompt (Haiku, thinking tối đa)… <t t-esc="state.optimizing.seconds"/>s
+                    </div>
+                    <div t-elif="state.improved" class="dac_cd2_improve is-done" role="status">
+                        <div class="dac_cd2_improve_head">
+                            <span><i class="fa fa-check-circle me-1"/>Đã có bản cải tiến: <b t-esc="state.improved.name"/>
+                                <span class="text-muted small">(<t t-esc="state.improved.seconds"/>s<t t-if="state.improved.model"> · <t t-esc="state.improved.model"/></t>)</span></span>
+                            <span class="d-flex gap-1">
+                                <button type="button" class="btn btn-sm btn-primary" t-on-click="tryImproved" t-att-disabled="state.sending">
+                                    <i class="fa fa-play me-1"/>Thử nghiệm bản cải tiến
+                                </button>
+                                <button type="button" class="btn btn-sm btn-link" t-on-click="() => this.state.improved = null">Để sau</button>
+                            </span>
+                        </div>
+                        <pre t-if="state.improved.note" class="dac_cd2_improve_note" t-esc="state.improved.note"/>
+                    </div>
+                    <div t-elif="state.feedback.pending" class="dac_cd2_improve">
+                        <span><i class="fa fa-commenting me-1"/><t t-esc="state.feedback.pending"/> góp ý chưa cải tiến vào bản này</span>
+                        <button type="button" class="btn btn-sm btn-primary" t-on-click="optimize" t-att-disabled="state.sending">
+                            <i class="fa fa-magic me-1"/>Cải tiến
+                        </button>
+                    </div>
                     <div class="dac_cd2_input">
                         <textarea class="form-control" rows="2" placeholder="Nhắn như khách… (Enter để gửi, Shift+Enter xuống dòng)"
                                   t-model="state.input" t-ref="input" t-on-keydown="onKeydown" t-att-disabled="state.sending" aria-label="Tin nhắn của khách"/>
@@ -81,13 +127,47 @@
                 <!-- Bảng chi tiết -->
                 <aside class="dac_cd2_panel">
                     <div class="dac_cd2_tabs" role="tablist">
-                        <t t-foreach="[['turn', 'Lượt này'], ['prompt', 'System prompt'], ['request', 'Request gửi đi'], ['session', 'Cả phiên']]" t-as="tab" t-key="tab[0]">
+                        <t t-foreach="[['feedback', 'Góp ý' + (state.feedback.pending ? ' (' + state.feedback.pending + ')' : '')], ['turn', 'Lượt này'], ['prompt', 'System prompt'], ['request', 'Request gửi đi'], ['session', 'Cả phiên']]" t-as="tab" t-key="tab[0]">
                             <button type="button" role="tab" class="dac_cd2_tab" t-att-class="state.tab === tab[0] ? 'is-active' : ''"
                                     t-att-aria-selected="state.tab === tab[0] ? 'true' : 'false'" t-on-click="() => this.setTab(tab[0])" t-esc="tab[1]"/>
                         </t>
                     </div>
                     <div class="dac_cd2_panel_body">
-                        <p t-if="!state.last and state.tab !== 'session'" class="text-muted">Gửi một tin để xem chi tiết.</p>
+                        <t t-if="state.tab === 'feedback'">
+                            <div class="dac_cd2_optimize">
+                                <button type="button" class="btn btn-primary w-100" t-on-click="optimize"
+                                        t-att-disabled="state.optimizing or !state.feedback.pending">
+                                    <t t-if="state.optimizing"><i class="fa fa-circle-o-notch fa-spin me-1"/>Đang cải tiến… <t t-esc="state.optimizing.seconds"/>s</t>
+                                    <t t-else=""><i class="fa fa-magic me-1"/>Cải tiến từ <t t-esc="state.feedback.pending"/> góp ý</t>
+                                </button>
+                                <div class="text-muted small mt-1">
+                                    Haiku (thinking tối đa) viết lại system prompt của bản đang thử theo các góp ý đang bật, tạo một <b>bản nháp mới</b>
+                                    (bản cũ giữ nguyên). Xong bấm <b>Thử nghiệm bản cải tiến</b> để gửi lại các tin khách vừa thử với bản mới.
+                                </div>
+                            </div>
+                            <div t-if="state.feedback.note" class="dac_cd2_changes">
+                                <h3>Agent đã sửa (so với <t t-esc="state.feedback.parent"/>)</h3>
+                                <pre class="dac_cd2_pre" t-esc="state.feedback.note"/>
+                            </div>
+                            <h3>Góp ý của bộ này</h3>
+                            <p t-if="!state.feedback.items.length" class="text-muted small">Chưa có góp ý. Rê chuột vào câu bot trả lời trong khung chat và bấm biểu tượng góp ý.</p>
+                            <ul class="dac_cd2_fb_list">
+                                <li t-foreach="state.feedback.items" t-as="f" t-key="f.id" t-att-class="f.active ? '' : 'is-off'">
+                                    <div class="dac_cd2_fb_text" t-esc="f.text"/>
+                                    <div t-if="f.bot" class="dac_cd2_fb_ctx">Khách: “<t t-esc="f.customer"/>” → Bot: “<t t-esc="f.bot"/>”</div>
+                                    <div class="dac_cd2_fb_meta">
+                                        <span t-esc="f.date"/> · <span t-esc="f.source"/><t t-if="f.author"> · <t t-esc="f.author"/></t>
+                                        <span t-if="f.applied" class="badge text-bg-success ms-1">Đã có trong bản này</span>
+                                        <span t-elif="!f.active" class="badge text-bg-light ms-1">Đang tắt</span>
+                                        <span class="dac_cd2_fb_tools">
+                                            <button type="button" class="btn btn-sm btn-link" t-on-click="() => this.toggleFeedback(f)" t-esc="f.active ? 'Tắt' : 'Bật'"/>
+                                            <button type="button" class="btn btn-sm btn-link text-danger" t-on-click="() => this.deleteFeedback(f)">Xóa</button>
+                                        </span>
+                                    </div>
+                                </li>
+                            </ul>
+                        </t>
+                        <p t-elif="!state.last and state.tab !== 'session'" class="text-muted">Gửi một tin để xem chi tiết.</p>
                         <t t-elif="state.tab === 'turn'">
                             <t t-set="r" t-value="state.last"/>
                             <div class="dac_cd2_stats">
@@ -100,6 +180,7 @@
                                 <dt>Model</dt><dd t-esc="r.model or '–'"/>
                                 <dt>Bối cảnh</dt><dd><t t-esc="r.context.now"/> · <t t-esc="r.context.work_status"/></dd>
                                 <dt>Mốc hẹn</dt><dd t-esc="r.context.next"/>
+                                <dt>Kênh</dt><dd t-esc="r.context.channel"/>
                                 <dt>Chuyển nhân viên</dt>
                                 <dd><span class="badge" t-att-class="r.handoff ? 'text-bg-warning' : 'text-bg-light'" t-esc="r.handoff ? 'Có' : 'Không'"/>
                                     <span t-if="r.handoff_reason" class="ms-1" t-esc="r.handoff_reason"/></dd>

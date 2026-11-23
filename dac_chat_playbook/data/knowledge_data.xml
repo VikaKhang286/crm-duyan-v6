@@ -30,12 +30,12 @@
             <field name="content">Văn phòng chính: 189C Nguyễn Chí Thanh, Phường Chợ Lớn (P.12, Quận 5 cũ), TP.HCM. Chi nhánh: 573 Tỉnh Lộ 10, Bình Trị Đông B, Bình Tân; C7B/109 Phạm Hùng, Bình Hưng, Bình Chánh. Hotline/Zalo: 0915 555 018.</field>
         </record>
         <record id="kb_contact_hours" model="dac.chat.knowledge">
-            <field name="name">Giờ làm việc (theo website)</field>
+            <field name="name">Giờ làm việc</field>
             <field name="category">contact</field>
             <field name="scope">all</field>
             <field name="sequence">2</field>
             <field name="source_url">https://duyan.vn/lien-he/</field>
-            <field name="content">Website ghi trả lời 08:00–18:00 từ thứ 2 đến thứ 7; Chủ nhật vẫn có người trực Zalo/điện thoại. Khi hẹn khách, luôn dùng mốc làm việc kế tiếp trong phần Bối cảnh.</field>
+            <field name="content">Thứ 2 đến thứ 7: 8:00–12:00 và 13:30–17:30 (nghỉ trưa 12:00–13:30). Chủ nhật nghỉ. Khi hẹn khách, luôn dùng mốc làm việc kế tiếp trong phần Bối cảnh.</field>
         </record>
 
         <!-- Sản phẩm / dịch vụ -->

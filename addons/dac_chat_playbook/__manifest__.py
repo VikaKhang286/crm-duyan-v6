@@ -1,6 +1,6 @@
 {
     'name': 'Phân tích chat & quy tắc chatbot',
-    'version': '18.0.1.8.1',
+    'version': '18.0.1.12.0',
     'category': '1. Duy An ERP',
     'summary': 'Model AI được chỉ định đọc lại tin nhắn Pancake, thống kê cách nhân viên nhắn và đề xuất quy tắc cho chatbot chào khách',
     'description': """
@@ -14,7 +14,7 @@ Bước chuẩn bị cho chatbot chào khách mới:
 * Chạy nền bằng cron, mỗi lần một lô, an toàn với giới hạn thời gian của worker. Chỉ đọc dữ liệu Pancake, không gửi tin cho khách.
     """,
     'author': 'Duy An',
-    'depends': ['dac_pancake_remind', 'dac_ai_core'],
+    'depends': ['dac_pancake_remind', 'dac_ai_core', 'dac_zalo_assistant'],
     'data': [
         'security/ir.model.access.csv',
         'data/cron.xml',
@@ -24,6 +24,7 @@ Bước chuẩn bị cho chatbot chào khách mới:
         'views/chat_dashboard_views.xml',
         'views/chat_playbook_views.xml',
         'views/chat_task_views.xml',
+        'views/chat_greeting_views.xml',
     ],
     'assets': {
         'web.assets_backend': [

@@ -1,6 +1,7 @@
 /** @odoo-module **/
-// Demo chatbot: nhắn thử với một bản system prompt, xem câu trả lời, prompt gửi đi, token và chi phí tham khảo. Không gửi gì cho khách.
-import { Component, onPatched, onWillStart, useRef, useState } from "@odoo/owl";
+// Huấn luyện & kiểm thử: nhắn thử với một bản system prompt, góp ý từng câu bot trả lời, cho Agent tối ưu prompt từ góp ý.
+// Xem câu trả lời, prompt gửi đi, token và chi phí tham khảo. Không gửi gì cho khách.
+import { Component, onPatched, onWillStart, onWillUnmount, useRef, useState } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 
@@ -32,8 +33,9 @@ export class ChatDemo extends Component {
         this.chatRef = useRef("chat");
         this.inputRef = useRef("input");
         this.state = useState({
-            options: null, promptId: false, at: false, preset: "now", customerName: "Chị Lan", input: "",
+            options: null, promptId: false, at: false, preset: "now", customerName: "Chị Lan", channel: "zalo", input: "",
             messages: [], last: null, sending: false, tab: "turn",
+            feedback: { items: [], pending: 0 }, fbFor: null, fbText: "", optimizing: null, improved: null, replaying: false,
             totals: { turns: 0, in: 0, out: 0, seconds: 0 },
         });
         onWillStart(async () => {
@@ -42,7 +44,9 @@ export class ChatDemo extends Component {
             const wanted = this.props.action?.params?.prompt_id || this.props.action?.context?.prompt_id;
             this.state.promptId = options.prompts.some((p) => p.id === wanted) ? wanted : options.default_prompt_id;
             this.state.at = options.presets[0]?.at || false;
+            await this.loadFeedback();
         });
+        onWillUnmount(() => clearTimeout(this.pollTimer));
         onPatched(() => {
             const el = this.chatRef.el;
             if (el && this.scrollPending) {
@@ -83,7 +87,133 @@ export class ChatDemo extends Component {
 
     onPrompt(ev) {
         this.state.promptId = parseInt(ev.target.value);
+        this.loadFeedback();
     }
+
+    // ── Góp ý → Agent tối ưu prompt ─────────────────────────────────────────
+    async loadFeedback() {
+        if (!this.state.promptId) {
+            return;
+        }
+        this.state.feedback = await this.orm.call("dac.chat.prompt", "demo_feedback", [this.state.promptId]);
+    }
+
+    openFeedback(index) {
+        this.state.fbFor = index;
+        this.state.fbText = "";
+    }
+
+    cancelFeedback() {
+        this.state.fbFor = null;
+        this.state.fbText = "";
+    }
+
+    /** Lượt chứa tin `index`: các tin khách liền trước + các tin bot của lượt (cũ → mới). */
+    turnOf(index) {
+        const msgs = this.state.messages;
+        let i = index;
+        const bot = [];
+        while (i >= 0 && msgs[i].role !== "customer") {
+            if (msgs[i].role === "bot" && !msgs[i].blocked) {
+                bot.unshift(msgs[i].text);
+            }
+            i--;
+        }
+        const customer = [];
+        while (i >= 0 && msgs[i].role === "customer") {
+            customer.unshift(msgs[i].text);
+            i--;
+        }
+        return { customer, bot };
+    }
+
+    async saveFeedback(index) {
+        const text = this.state.fbText.trim();
+        const m = this.state.messages[index];
+        if (!text || !m) {
+            return;
+        }
+        const turn = this.turnOf(index);
+        this.state.feedback = await this.orm.call("dac.chat.prompt", "demo_feedback_add",
+            [this.state.promptId, text, turn.customer.join("\n"), turn.bot.join("\n")]);
+        m.feedback = text;
+        this.cancelFeedback();
+    }
+
+    onFeedbackKeydown(ev, index) {
+        if (ev.key === "Enter" && !ev.shiftKey) {
+            ev.preventDefault();
+            this.saveFeedback(index);
+        } else if (ev.key === "Escape") {
+            this.cancelFeedback();
+        }
+    }
+
+    async toggleFeedback(item) {
+        this.state.feedback = await this.orm.call("dac.chat.prompt", "demo_feedback_toggle", [item.id, this.state.promptId]);
+    }
+
+    async deleteFeedback(item) {
+        this.state.feedback = await this.orm.call("dac.chat.prompt", "demo_feedback_delete", [item.id, this.state.promptId]);
+    }
+
+    async optimize() {
+        if (this.state.optimizing) {
+            return;
+        }
+        const result = await this.orm.call("dac.chat.prompt", "demo_optimize", [this.state.promptId]);
+        this.state.improved = null;
+        this.state.optimizing = { id: result.id, from: this.state.promptId, started: Date.now(), seconds: 0 };
+        this.poll();
+    }
+
+    async poll() {
+        const job = this.state.optimizing;
+        if (!job) {
+            return;
+        }
+        job.seconds = Math.round((Date.now() - job.started) / 1000);
+        const status = await this.orm.call("dac.chat.prompt", "demo_prompt_state", [job.id]);
+        if (status.state === "draft") {
+            this.state.options = await this.orm.call("dac.chat.prompt", "demo_options", []);
+            this.state.optimizing = null;
+            this.state.improved = { id: job.id, name: status.name, note: status.note, model: status.model, seconds: job.seconds };
+            await this.loadFeedback();
+            return;
+        }
+        if (status.state !== "queued") {
+            this.state.optimizing = null;
+            this.notification.add(`Cải tiến lỗi: ${status.error || "không rõ"}`, { type: "danger", sticky: true });
+            return;
+        }
+        this.pollTimer = setTimeout(() => this.poll(), 3000);
+    }
+
+    /** Chuyển sang bản cải tiến và gửi lại đúng các tin khách của phiên vừa thử để so sánh. */
+    async tryImproved() {
+        const improved = this.state.improved;
+        if (!improved) {
+            return;
+        }
+        const customers = this.state.messages.filter((m) => m.role === "customer").map((m) => m.text).slice(0, 8);
+        this.state.promptId = improved.id;
+        this.state.improved = null;
+        this.reset();
+        await this.loadFeedback();
+        this.state.replaying = true;
+        try {
+            for (const text of customers) {
+                this.state.input = text;
+                await this.send();
+            }
+        } finally {
+            this.state.replaying = false;
+        }
+        this.notification.add(customers.length ? "Đã gửi lại các tin khách với bản cải tiến. Góp ý tiếp nếu chưa ổn." : "Đã chuyển sang bản cải tiến.",
+            { type: "success" });
+    }
+
+
 
     pickPreset(preset) {
         this.state.preset = preset.key;
@@ -137,13 +267,17 @@ export class ChatDemo extends Component {
             .filter((m) => (m.role === "customer" || m.role === "bot") && !m.blocked)
             .map((m) => [m.role, m.text]);
         try {
-            const result = await this.orm.call("dac.chat.prompt", "demo_reply", [this.state.promptId, history, this.state.at, this.state.customerName]);
+            const result = await this.orm.call("dac.chat.prompt", "demo_reply", [this.state.promptId, history, this.state.at, this.state.customerName, this.state.channel]);
             const usage = result.usage || {};
             const meta = { in: usage.in || 0, out: usage.out || 0, seconds: result.seconds, model: result.model };
             result.messages.forEach((m, i) => {
                 this.state.messages.push({ role: "bot", text: m, meta: i === result.messages.length - 1 ? meta : null });
             });
             (result.blocked || []).forEach((m) => this.state.messages.push({ role: "bot", text: m, blocked: true }));
+            const lastBot = [...this.state.messages].reverse().find((m) => m.role === "bot");
+            if (lastBot) {
+                lastBot.turnEnd = true; // góp ý gắn với cả lượt trả lời, icon hiện ở tin cuối của lượt
+            }
             if (result.handoff) {
                 this.state.messages.push({ role: "note", text: `Chuyển nhân viên: ${result.handoff_reason || "bot báo cần người xử lý"}` });
             }

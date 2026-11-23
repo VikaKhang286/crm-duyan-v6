@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ── Lời chào khách mới (chờ duyệt qua Zalo) ─────────────────────────── -->
+    <record id="chat_greeting_view_list" model="ir.ui.view">
+        <field name="name">dac.chat.greeting.list</field>
+        <field name="model">dac.chat.greeting</field>
+        <field name="arch" type="xml">
+            <list string="Lời chào khách mới" create="0" decoration-muted="state in ('returning', 'expired', 'cancelled', 'staff_replied')"
+                  decoration-success="state == 'sent'" decoration-danger="state == 'failed'">
+                <field name="since"/>
+                <field name="customer_name"/>
+                <field name="platform" optional="show"/>
+                <field name="messages_text"/>
+                <field name="returning_reason" optional="show"/>
+                <field name="version" optional="hide"/>
+                <field name="state" widget="badge" decoration-warning="state == 'waiting'" decoration-success="state == 'sent'"
+                       decoration-danger="state == 'failed'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="chat_greeting_view_form" model="ir.ui.view">
+        <field name="name">dac.chat.greeting.form</field>
+        <field name="model">dac.chat.greeting</field>
+        <field name="arch" type="xml">
+            <form string="Lời chào khách mới" create="0" edit="0">
+                <header>
+                    <button name="action_approve" type="object" string="Duyệt &amp; gửi khách" class="btn-primary" invisible="state != 'waiting'"
+                            confirm="Bot sẽ tải lại tin mới nhất; nếu nhân viên chưa nhắn và khách không nhắn thêm thì gửi lời chào này cho khách. Tiếp tục?"/>
+                    <button name="action_cancel" type="object" string="Bỏ, không gửi" invisible="state != 'waiting'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="waiting,sent"/>
+                </header>
+                <sheet>
+                    <div class="oe_title"><h1><field name="customer_name"/></h1></div>
+                    <group>
+                        <group>
+                            <field name="since"/>
+                            <field name="platform"/>
+                            <field name="external_url" widget="url"/>
+                            <field name="returning_reason" invisible="not returning_reason"/>
+                        </group>
+                        <group>
+                            <field name="version"/>
+                            <field name="prompt_id"/>
+                            <field name="sent_at" invisible="not sent_at"/>
+                            <field name="tokens_in"/>
+                            <field name="tokens_out"/>
+                            <field name="error_message" invisible="not error_message"/>
+                        </group>
+                    </group>
+                    <group string="Tin bot định gửi">
+                        <field name="messages_text" nolabel="1" colspan="2"/>
+                        <field name="handoff_reason" invisible="not handoff_reason"/>
+                    </group>
+                    <notebook>
+                        <page string="Nhật ký" name="log">
+                            <field name="log" nolabel="1"/>
+                        </page>
+                        <page string="Người duyệt trả lời" name="replies">
+                            <field name="reply_ids" nolabel="1">
+                                <list>
+                                    <field name="create_date"/>
+                                    <field name="text"/>
+                                    <field name="action" widget="badge"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="chat_greeting_view_search" model="ir.ui.view">
+        <field name="name">dac.chat.greeting.search</field>
+        <field name="model">dac.chat.greeting</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="customer_name"/>
+                <filter name="waiting" string="Chờ duyệt" domain="[('state', '=', 'waiting')]"/>
+                <filter name="sent" string="Đã gửi" domain="[('state', '=', 'sent')]"/>
+                <filter name="returning" string="Khách đã liên hệ" domain="[('state', '=', 'returning')]"/>
+                <group expand="0" string="Nhóm theo">
+                    <filter name="group_state" string="Trạng thái" context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="chat_greeting_action" model="ir.actions.act_window">
+        <field name="name">Lời chào khách mới</field>
+        <field name="res_model">dac.chat.greeting</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html"><p>Chưa có lời chào nào. Bật "Chào khách mới" ở Thiết lập; bot soạn lời chào cho khách mới nhắn Pancake và gửi người duyệt qua Zalo.</p></field>
+    </record>
+
+    <!-- ── Góp ý của người duyệt ───────────────────────────────────────────── -->
+    <record id="chat_feedback_view_list" model="ir.ui.view">
+        <field name="name">dac.chat.feedback.list</field>
+        <field name="model">dac.chat.feedback</field>
+        <field name="arch" type="xml">
+            <list string="Góp ý cho chatbot" editable="top">
+                <field name="create_date" readonly="1"/>
+                <field name="mode"/>
+                <field name="source" optional="show"/>
+                <field name="text"/>
+                <field name="customer_text" optional="hide"/>
+                <field name="bot_text" optional="show"/>
+                <field name="applied_prompt_ids" widget="many2many_tags" optional="show"/>
+                <field name="author" optional="show"/>
+                <field name="greeting_id" optional="hide"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="chat_feedback_action" model="ir.actions.act_window">
+        <field name="name">Góp ý cho chatbot</field>
+        <field name="res_model">dac.chat.feedback</field>
+        <field name="view_mode">list</field>
+        <field name="context">{'active_test': False}</field>
+        <field name="help" type="html"><p>Góp ý của người duyệt (Zalo) và của admin ở màn hình Huấn luyện &amp; kiểm thử. Góp ý chưa được Agent viết vào bản prompt thì được chèn vào system prompt mỗi lần trả lời. Tắt dòng nào để bỏ góp ý đó.</p></field>
+    </record>
+
+    <record id="cron_greeting" model="ir.cron">
+        <field name="name">Chatbot: chào khách mới (duyệt qua Zalo)</field>
+        <field name="model_id" ref="model_dac_chat_greeting"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_run()</field>
+        <field name="interval_number">2</field>
+        <field name="interval_type">minutes</field>
+        <field name="user_id" ref="base.user_root"/>
+        <field name="active" eval="True"/>
+    </record>
+
+    <menuitem id="menu_chat_greeting" name="Lời chào khách mới" parent="menu_chat_playbook" action="chat_greeting_action" sequence="32"/>
+    <menuitem id="menu_chat_feedback" name="Góp ý cho chatbot" parent="menu_chat_playbook" action="chat_feedback_action" sequence="33"/>
+</odoo>

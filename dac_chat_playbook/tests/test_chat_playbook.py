@@ -223,9 +223,9 @@ class TestChatAnalysis(ChatFixtures):
                 text = payload['messages'][-1]['content'][0]['text']
                 calls.append(('label_conversations', used_model.name, text))
                 return self.openai_reply('label_conversations', self.fake_labels(text), usage=(1000, 200))
-            if tool_names == ['review_rules']:  # Agent rà soát quy tắc
-                calls.append(('review_rules', used_model.name, payload['messages'][-1]['content'][0]['text']))
-                return self.openai_reply('review_rules', {'summary': 'Không có quy tắc trùng.'}, usage=(300, 50))
+            if tool_names == ['optimize_rules']:  # Agent tối ưu quy tắc
+                calls.append(('optimize_rules', used_model.name, payload['messages'][-1]['content'][0]['text']))
+                return self.openai_reply('optimize_rules', {'summary': 'Không có quy tắc trùng.', 'rules': []}, usage=(300, 50))
             payloads.append(payload)
             rounds = sum(1 for m in payload['messages'] if m.get('role') == 'assistant')
             if rounds == 0:
@@ -248,8 +248,10 @@ class TestChatAnalysis(ChatFixtures):
              patch.object(type(self.env['dac.ai.model']), '_note', lambda *a, **k: None):
             self.run_until_done(analysis)
         self.assertEqual(analysis.state, 'done', analysis.error_message)
-        self.assertEqual([c[0] for c in calls], ['label_conversations', 'label_conversations', 'review_rules', 'write_chatbot_prompt'])
-        self.assertIn('Hỏi kích thước sớm', calls[2][2], 'Agent rà soát đọc cả quy tắc AI vừa đề xuất')
+        self.assertEqual([c[0] for c in calls], ['label_conversations', 'label_conversations', 'optimize_rules', 'write_chatbot_prompt'])
+        self.assertIn('Hỏi kích thước sớm', calls[2][2], 'Agent tối ưu đọc cả quy tắc AI vừa đề xuất')
+        self.assertIn('ĐỊNH HƯỚNG CỦA QUẢN LÝ', calls[2][2])
+        self.assertIn('nghỉ trưa', calls[3][2], 'Agent viết prompt đọc định hướng của quản lý')
         self.assertIn('Không có quy tắc trùng', analysis.rules_review_summary)
         self.assertTrue(all(c[1] == 'model-chi-dinh' for c in calls), 'chỉ dùng model được chỉ định')
         self.assertEqual(analysis.candidate_count, 20, 'bỏ hội thoại dưới 4 tin')
@@ -322,7 +324,7 @@ class TestChatAnalysis(ChatFixtures):
         prompt.action_activate()
         self.assertEqual((old.state, prompt.state, greeting.state), ('archived', 'active', 'active'), 'mỗi bộ một bản đang dùng')
         self.assertEqual(self.env['dac.chat.prompt']._active('greeting'), greeting)
-        self.assertEqual(first.state, 'approved')
+        self.assertEqual(first.state, 'proposed', 'kích hoạt prompt không tự duyệt quy tắc đi kèm')
         # Nhật ký tiến độ
         self.assertEqual(analysis.progress_pct, 100)
         self.assertIn('Xong lô 1/2', analysis.progress_log)
@@ -665,32 +667,133 @@ class TestRuleReviewAndDemo(TransactionCase):
     def rule(self, name, state='proposed', **vals):
         return self.env['dac.chat.rule'].create(dict({'name': name, 'content': name, 'category': 'greeting', 'state': state, 'source': 'ai'}, **vals))
 
-    def test_review_merges_rejects_and_flags_conflicts_without_touching_approved(self):
+    def test_optimize_merges_auto_applies_safe_groups_and_waits_for_safety_rules(self):
         Rule = self.env['dac.chat.rule']
-        keep = self.rule('Chào khách ngay', 'approved')
-        dup = self.rule('Chào lại khách sớm')
-        c1, c2 = self.rule('Hỏi kích thước trước', category='info'), self.rule('Xin kích thước lượt đầu', category='info')
-        clash = self.rule('Báo giá sơ bộ khi khách hỏi', category='consult')
-        rules = keep | dup | c1 | c2 | clash
-        data = {'summary': 'Có trùng.',
-                'merges': [{'rule_ids': [c1.id, c2.id], 'title': 'Hỏi kích thước ngay lượt đầu', 'rule': 'Lượt đầu xin kích thước, giá 500.000đ',
-                            'category': 'info', 'priority': 'must', 'reason': 'Cùng ý'},
-                           {'rule_ids': [keep.id], 'title': 'Chỉ một', 'rule': 'x', 'category': 'info', 'priority': 'must'}],
-                'duplicates': [{'rule_id': dup.id, 'duplicate_of': keep.id, 'reason': 'Bao trọn ý'},
-                               {'rule_id': keep.id, 'duplicate_of': dup.id}],
-                'conflicts': [{'rule_ids': [keep.id, clash.id], 'reason': 'Chatbot không được báo giá'}]}
-        result = Rule._apply_review(rules, data, 'model', {'in': 100, 'out': 20})
-        self.assertEqual((result['merged'], result['rejected'], result['conflicts']), (1, 3, 1))
-        merged = c1.merged_into_id
-        self.assertTrue(merged and merged == c2.merged_into_id)
-        self.assertEqual((c1.state, c2.state, merged.state, merged.priority), ('rejected', 'rejected', 'proposed', 'must'))
-        self.assertNotIn('500.000', merged.content, 'quy tắc gộp không được chứa giá')
-        self.assertIn('Gộp từ', merged.review_note)
-        self.assertEqual((dup.state, dup.merged_into_id), ('rejected', keep))
-        self.assertEqual(keep.state, 'approved', 'không tự sửa quy tắc đã duyệt')
-        self.assertIn('Mâu thuẫn', keep.review_note)
-        self.assertIn('Mâu thuẫn', clash.review_note)
+        a1 = self.rule('Tin dài 26 ký tự', 'approved', category='style')
+        a2 = self.rule('Tin dưới 80 ký tự', 'approved', category='style')
+        f1 = self.rule('Không báo giá', 'approved', category='forbidden', source='system')
+        h1 = self.rule('Hỏi giá thì hẹn nhân viên', 'approved', category='handoff')
+        a3 = self.rule('Thứ tự hỏi', 'approved', category='info')
+        p1 = self.rule('Xin SĐT lượt 3', category='info')
+        keep = self.rule('Chào ngay', 'approved')
+        a4 = self.rule('Gửi ảnh mẫu', 'approved', category='consult')
+        f2 = self.rule('Không nhận cọc', 'approved', category='forbidden')
+        untouched = self.rule('Xưng em', 'approved', category='style')
+        rules = a1 | a2 | f1 | h1 | a3 | p1 | keep | a4 | f2 | untouched
+        data = {'summary': 'Gọn hơn.', 'rules': [
+            {'source_ids': [a1.id, a2.id], 'title': 'Tin ngắn', 'rule': 'Mỗi tin 25–60 ký tự, tối đa 80. Giá 500.000đ', 'category': 'style',
+             'priority': 'should', 'reason': 'Cùng chủ đề'},
+            {'source_ids': [f1.id, h1.id], 'title': 'Không báo giá, hẹn nhân viên', 'rule': 'Không đưa số; xin thông tin rồi chuyển.',
+             'category': 'forbidden', 'priority': 'must'},
+            {'source_ids': [a3.id, p1.id], 'title': 'Thứ tự hỏi gọn', 'rule': 'Sản phẩm, kích thước, file, số lượng.', 'category': 'info',
+             'priority': 'should'},
+            {'source_ids': [keep.id], 'title': 'Chào ngay', 'rule': 'Chào ngay', 'category': 'greeting', 'priority': 'should'},
+            {'source_ids': [a1.id], 'title': 'Trùng lần hai', 'rule': 'x', 'category': 'style', 'priority': 'should'},
+            {'source_ids': [999999], 'title': 'Bịa', 'rule': 'Không có gốc', 'category': 'style', 'priority': 'should'},
+        ], 'dropped': [{'rule_id': a4.id, 'reason': 'Chatbot chưa gửi được ảnh'}, {'rule_id': f2.id, 'reason': 'thử bỏ quy tắc an toàn'}]}
+        result = Rule._apply_optimize(rules, data, 'model', {'in': 100, 'out': 20})
+        log = result['log']
+        style = a1.merged_into_id
+        self.assertEqual((style.state, style.source, a1.state, a2.state, a2.merged_into_id), ('approved', 'optimized', 'rejected', 'rejected', style),
+                         'nhóm thường, toàn quy tắc đã duyệt → áp dụng ngay')
+        self.assertNotIn('500.000', style.content)
+        safety = f1.merged_into_id
+        self.assertEqual((safety.state, f1.state, h1.state), ('proposed', 'approved', 'approved'),
+                         'nhóm an toàn: quy tắc cũ vẫn dùng tới khi quản lý duyệt quy tắc mới')
+        info = a3.merged_into_id
+        self.assertEqual((info.state, a3.state, p1.state, p1.merged_into_id), ('proposed', 'approved', 'rejected', info))
+        self.assertEqual((keep.state, keep.merged_into_id.id), ('approved', False), 'quy tắc giữ nguyên câu chữ thì không đụng tới')
+        self.assertEqual((a4.state, f2.state, untouched.state), ('rejected', 'approved', 'approved'),
+                         'bỏ quy tắc thường; không tự bỏ quy tắc Cấm; id AI không nhắc thì giữ')
+        self.assertEqual(len(log.created_ids), 3, 'không tạo quy tắc bịa hoặc dùng lại id đã gộp')
+        self.assertEqual((log.state, log.before_count, log.after_count), ('done', 10, 6))
         self.assertIn('100 token vào / 20 token ra', result['message'])
+        # Prompt dùng quy tắc mới thay cho quy tắc cũ đang chờ thay
+        self.assertTrue(log.can_undo)
+        safety.action_approve()
+        self.assertEqual((f1.state, h1.state), ('rejected', 'rejected'), 'duyệt quy tắc mới → quy tắc cũ thôi dùng')
+        info.action_reject()
+        self.assertEqual((a3.state, a3.merged_into_id.id), ('approved', False), 'bỏ quy tắc mới → quy tắc cũ dùng tiếp')
+
+    def test_optimize_undo_restores_rules(self):
+        Rule = self.env['dac.chat.rule']
+        a1, a2 = self.rule('Tin ngắn A', 'approved', category='style'), self.rule('Tin ngắn B', 'approved', category='style')
+        a3 = self.rule('Gửi ảnh', 'approved', category='consult')
+        result = Rule._apply_optimize(a1 | a2 | a3, {'summary': 'x', 'rules': [
+            {'source_ids': [a1.id, a2.id], 'title': 'Tin ngắn', 'rule': 'Ngắn', 'category': 'style', 'priority': 'should'}],
+            'dropped': [{'rule_id': a3.id, 'reason': 'không gửi được'}]})
+        new = result['log'].created_ids
+        self.assertEqual(new.state, 'approved')
+        result['log'].action_undo()
+        self.assertEqual([r.state for r in (a1, a2, a3)], ['approved'] * 3)
+        self.assertFalse(a1.merged_into_id)
+        self.assertFalse(new.active)
+        self.assertEqual(result['log'].state, 'undone')
+        with self.assertRaises(UserError):
+            result['log'].action_undo()
+
+    def test_optimize_button_runs_in_background(self):
+        self.rule('A', 'approved')
+        self.rule('B')
+        action = self.env['dac.chat.rule'].action_ai_review()
+        log = self.env['dac.chat.rule.optimize'].browse(action['params']['next']['res_id'])
+        self.assertEqual(log.state, 'queued', 'bấm nút chỉ xếp lượt, AI chạy trong cron')
+        seen = []
+
+        def fake(rule_model, analysis=None, log=None):
+            seen.append(log)
+            log.write({'state': 'done', 'summary': 'ok'})
+            return {'message': 'ok', 'usage': {}, 'log': log}
+
+        with patch.object(type(self.env['dac.chat.rule']), '_ai_optimize', fake), \
+             patch.object(self.env.cr, 'commit'), patch.object(self.env.cr, 'rollback'):
+            self.env['dac.chat.analysis']._cron_process()
+        self.assertEqual((seen, log.state), ([log], 'done'))
+        failing = self.env['dac.chat.rule.optimize'].create({'state': 'queued'})
+        with patch.object(type(self.env['dac.chat.rule']), '_ai_optimize', side_effect=UserError('HTTP 500')), \
+             patch.object(self.env.cr, 'commit'), patch.object(self.env.cr, 'rollback'), \
+             mute_logger('odoo.addons.dac_chat_playbook.models.chat_rule'):
+            self.env['dac.chat.rule.optimize']._cron_run()
+        self.assertEqual(failing.state, 'failed')
+        self.assertIn('HTTP 500', failing.error_message)
+
+    def test_channel_context_and_phone_rule(self):
+        from odoo.addons.dac_chat_playbook.models.chat_prompt import channel_key
+        self.assertEqual([channel_key(v) for v in ('Zalo', 'Facebook', 'facebook messenger', '', None)],
+                         ['zalo', 'facebook', 'facebook', 'zalo', 'zalo'])
+        prompt = self.env['dac.chat.prompt'].create({'name': 'Kênh', 'mode': 'info', 'state': 'draft',
+                                                     'system_prompt': 'Kênh: {{channel}}', 'info_fields_json': '[]'})
+        zalo = prompt._runtime_prompt(datetime(2026, 11, 10, 3, 0), 'Chị Lan', 'Zalo')
+        facebook = prompt._runtime_prompt(datetime(2026, 11, 10, 3, 0), 'Chị Lan', 'facebook')
+        self.assertIn('Kênh: Zalo', zalo)
+        self.assertIn('KHÔNG xin số điện thoại', zalo)
+        self.assertIn('Kênh: Facebook Messenger', facebook)
+        self.assertIn('có thể xin số Zalo', facebook)
+        self.assertNotIn('KHÔNG xin số điện thoại', facebook)
+
+    def test_assemble_keeps_each_mode_in_scope(self):
+        Prompt = self.env['dac.chat.prompt']
+        data = {'persona': 'Trợ lý DAC.', 'flow_greeting': 'Chỉ chào.', 'flow_info': 'Xin thông tin.', 'flow_consult': 'Tư vấn.',
+                'after_hours_greeting': 'Ngoài giờ: chỉ hỏi khách cần gì.', 'after_hours': 'Ngoài giờ: xin kích thước.',
+                'consult_guide': 'Alu bền ngoài trời.', 'style_rules': ['Tin ngắn'],
+                'info_fields': [{'key': 'size', 'label': 'Kích thước', 'required': True},
+                                {'key': 'phone', 'label': 'SĐT', 'required': True, 'ask_example': 'Cho em xin số'}],
+                'examples': [{'situation': 'Khách chào', 'customer': 'alo', 'bot': ['Dạ em chào anh/chị ạ'], 'modes': ['greeting', 'info', 'consult']},
+                             {'situation': 'Hỏi giá', 'customer': 'giá sao', 'bot': ['Cho em xin kích thước'], 'modes': ['info', 'consult']},
+                             {'situation': 'Ngoài giờ', 'customer': 'alo', 'bot': ['Bạn phụ trách phản hồi vào {{next_working_time}} ạ']}]}
+        greeting, info, consult = (Prompt._assemble(data, m) for m in ('greeting', 'info', 'consult'))
+        self.assertIn('Ngoài giờ: chỉ hỏi khách cần gì.', greeting)
+        self.assertNotIn('xin kích thước', greeting)
+        self.assertNotIn('Hỏi giá', greeting, 'đoạn mẫu của bộ khác không vào bộ Chào hỏi')
+        self.assertIn('Hỏi giá', info)
+        self.assertIn('{{next_working_time}}', greeting, 'câu mẫu giữ biến để code điền mốc thật')
+        self.assertNotIn('thứ 2', greeting)
+        self.assertNotIn('Alu bền', info, 'bộ Hỏi thông tin không tư vấn')
+        self.assertIn('Alu bền', consult)
+        self.assertIn('Kênh khách nhắn: {{channel}}', info)
+        fields = Prompt._info_fields(data, 'info')
+        self.assertEqual([(f['key'], f['required']) for f in fields], [('size', True), ('phone', False)])
+        self.assertIn('Zalo thì KHÔNG xin', info)
 
     def test_demo_reply_returns_prompt_request_tokens_and_context(self):
         Prompt = self.env['dac.chat.prompt']
@@ -765,7 +868,7 @@ class TestTaskSettings(TransactionCase):
     # ── Dòng thiết lập ───────────────────────────────────────────────────────
     def test_every_task_has_exactly_one_row_and_choices_survive_refresh(self):
         rows = self.Task._ensure_all()
-        self.assertEqual(rows.mapped('code'), ['read', 'coordinate', 'review', 'write_prompt', 'bot_greeting', 'bot_info', 'bot_consult'])
+        self.assertEqual(rows.mapped('code'), ['read', 'coordinate', 'review', 'write_prompt', 'improve_prompt', 'bot_greeting', 'bot_info', 'bot_consult'])
         self.assertEqual(self.Task._ensure_all(), rows, 'gọi lại không tạo thêm dòng')
         row = rows.filtered(lambda t: t.code == 'read')
         row.write({'thinking': 'low', 'name': 'Tên cũ'})
@@ -860,8 +963,8 @@ class TestTaskSettings(TransactionCase):
         Rule = self.env['dac.chat.rule']
         Rule.create([{'name': 'Chào ngay', 'content': 'Chào ngay', 'category': 'greeting', 'state': 'proposed', 'source': 'ai'},
                      {'name': 'Chào sớm', 'content': 'Chào sớm', 'category': 'greeting', 'state': 'proposed', 'source': 'ai'}])
-        with self.fake_request('review_rules', {'summary': 'Không trùng', 'merges': [], 'duplicates': [], 'conflicts': []}), self.no_note():
-            result = Rule._ai_review()
+        with self.fake_request('optimize_rules', {'summary': 'Không trùng', 'rules': []}), self.no_note():
+            result = Rule._ai_optimize()
         self.assertEqual((self.sent[0]['model'], self.sent[0]['reasoning_effort']), ('ra-soat', 'xhigh'))
         self.assertIn('120 token vào / 8 token ra', result['message'])
 
@@ -994,3 +1097,354 @@ class TestRunResilience(ChatFixtures):
         draft = self.analysis()
         with self.assertRaises(UserError):
             draft.action_resume()
+
+
+GREET = 'odoo.addons.dac_chat_playbook.models.chat_greeting'
+
+
+@tagged('post_install', '-at_install', 'dac_chat_playbook')
+class TestGreeting(TransactionCase):
+    """Chào khách mới: soạn → người duyệt (Zalo) duyệt/góp ý → kiểm tra lại → gửi Pancake."""
+
+    def setUp(self):
+        super().setUp()
+        self.env['dac.ai.connection'].search([]).write({'active': False})
+        self.now = datetime.now().replace(microsecond=0)
+        self.page = self.env['dac.pancake.page'].create({'name': 'Page chào', 'page_fm_id': 'pzl_greet_page'})
+        zalo = self.env['dac.zalo.config']._config()
+        zalo.write({'active': True, 'assistant_uid': 'acc-1', 'bridge_url': 'http://zalo-bridge:3000', 'bridge_token': 'x' * 40})
+        self.channel = self.env['dac.zalo.channel'].create({'name': 'Dương Tuấn Kiệt', 'thread_id': 'u-kiet', 'thread_type': 'user'})
+        self.config = self.env['dac.chat.config']._get()
+        self.config.write({'greeting_active': True, 'greeting_approver_channel_id': self.channel.id})
+        self.config.greeting_activated_at = self.now - timedelta(hours=1)
+        self.prompt = self.env['dac.chat.prompt'].create({'name': 'Chào', 'mode': 'greeting', 'state': 'draft',
+                                                          'system_prompt': 'Trợ lý DAC.', 'info_fields_json': '[]'})
+        self.seq = 0
+        self.replies = []  # (note) mỗi lần soạn
+        self.sent = []
+        self.answer = {'messages': ['Dạ em chào chị ạ', 'Chị đang cần làm gì ạ?'], 'handoff': False, 'handoff_reason': '',
+                       'returning_customer': False, 'returning_reason': '', 'usage': {'in': 100, 'out': 20}}
+
+    # ── dữ liệu ──────────────────────────────────────────────────────────────
+    def conversation(self, name='Chị Lan', start=None):
+        start = start or self.now - timedelta(minutes=5)
+        self.seq += 1
+        return self.env['dac.pancake.conversation'].create({
+            'conversation_fm_id': 'pzl_u_greet_%s' % self.seq, 'page_id': self.page.id, 'customer_name': name, 'platform': 'Zalo',
+            'inserted_at_fm': start, 'updated_at_fm': start})
+
+    def message(self, conversation, at, who, text):
+        self.seq += 1
+        sender = {'id': 'cus_%s' % conversation.id, 'name': conversation.customer_name}
+        if who == 'staff':
+            sender = {'id': 'pzl_greet_page', 'name': 'Duy An', 'admin_id': 'a1', 'admin_name': 'Tieu Bang'}
+        raw = {'id': 'gm%s' % self.seq, 'type': 'INBOX', 'page_id': 'pzl_greet_page', 'from': sender, 'attachments': []}
+        return self.env['dac.pancake.message'].create({
+            'message_fm_id': raw['id'], 'conversation_id': conversation.id, 'content_html': '<div>%s</div>' % text, 'type_content': 'text',
+            'inserted_at': at, 'raw_json': json.dumps(raw), 'sender_name': sender['name']})
+
+    def wait(self, conversation, since, kind='new'):
+        return self.env['dac.pancake.remind.wait'].create({'conversation_id': conversation.id, 'since': since, 'customer_kind': kind})
+
+    def patches(self):
+        test = self
+
+        def fake_reply(prompt, history, now, customer_name='', channel='zalo', note=''):
+            test.replies.append({'note': note, 'history': history, 'channel': channel})
+            return dict(test.answer, messages=list(test.answer['messages']))
+
+        def fake_send(conversation, text):
+            test.sent.append((conversation.id, text))
+            return {'success': True}
+
+        stack = [patch.object(type(self.env['dac.chat.prompt']), '_reply', fake_reply),
+                 patch(GREET + '.pancake_send', fake_send),
+                 patch(GREET + '.shutil.which', lambda name: None),
+                 patch(GREET + '.time.sleep', lambda s: None),
+                 patch.object(type(self.env['dac.pancake.conversation']), '_fetch_messages', lambda self: None)]
+        from contextlib import ExitStack
+        exit_stack = ExitStack()
+        for item in stack:
+            exit_stack.enter_context(item)
+        return exit_stack
+
+    def kiet(self, text, message_id=None):
+        self.seq += 1
+        return self.env['dac.zalo.message']._ingest('acc-1', [{'thread_id': 'u-kiet', 'message_id': message_id or 'z%s' % self.seq,
+                                                               'text': text, 'direction': 'in'}])
+
+    def queued(self):
+        return self.env['dac.zalo.channel.message'].search([('channel_id', '=', self.channel.id)], order='id')
+
+    def new_greeting(self, name='Chị Lan'):
+        conv = self.conversation(name)
+        self.message(conv, self.now - timedelta(minutes=5), 'customer', 'Shop ơi làm bảng hiệu')
+        self.wait(conv, self.now - timedelta(minutes=5))
+        self.env['dac.chat.greeting']._cron_run()
+        return self.env['dac.chat.greeting'].search([('conversation_id', '=', conv.id)]), conv
+
+    # ── test ─────────────────────────────────────────────────────────────────
+    def test_new_customer_is_drafted_sent_to_approver_then_sent_after_approval(self):
+        with self.patches():
+            greeting, conv = self.new_greeting()
+            self.assertEqual((greeting.state, greeting.version), ('waiting', 1))
+            self.assertEqual(self.replies[0]['channel'], 'zalo')
+            ask = self.queued()
+            self.assertEqual(len(ask), 1)
+            self.assertIn('G%s' % greeting.id, ask.text)
+            self.assertIn('1. Dạ em chào chị ạ', ask.text)
+            self.assertIn('"duyệt"', ask.text)
+            self.env['dac.chat.greeting']._cron_run()
+            self.assertEqual(self.env['dac.chat.greeting'].search_count([('conversation_id', '=', conv.id)]), 1, 'không soạn trùng')
+            self.kiet('Duyệt nha', 'zz1')
+            self.kiet('Duyệt nha', 'zz1')  # bridge gửi lại lô cũ
+        self.assertEqual(greeting.state, 'sent')
+        self.assertEqual([t for _c, t in self.sent], ['Dạ em chào chị ạ', 'Chị đang cần làm gì ạ?'], 'gửi đúng 1 lần, đủ 2 tin')
+        self.assertEqual(greeting.reply_ids.mapped('action'), ['approve'])
+        self.assertIn('✅', self.queued()[-1].text)
+
+    def test_returning_customer_is_not_greeted(self):
+        with self.patches():
+            old = self.conversation('Anh Cũ')
+            self.message(old, self.now - timedelta(days=3), 'customer', 'hôm trước hỏi decal')
+            self.message(old, self.now - timedelta(minutes=5), 'customer', 'em ơi chị gửi file nè')
+            self.wait(old, self.now - timedelta(minutes=5))
+            ongoing = self.conversation('Chị Đang Trao Đổi')
+            self.message(ongoing, self.now - timedelta(minutes=4), 'customer', 'ok em')
+            self.wait(ongoing, self.now - timedelta(minutes=4), kind='ongoing')
+            self.answer['returning_customer'], self.answer['returning_reason'] = True, 'khách nhắc file đơn hôm qua'
+            ai = self.conversation('Khách AI')
+            self.message(ai, self.now - timedelta(minutes=3), 'customer', 'như hôm qua nha em')
+            self.wait(ai, self.now - timedelta(minutes=3))
+            self.env['dac.chat.greeting']._cron_run()
+        greetings = self.env['dac.chat.greeting'].search([('conversation_id', 'in', (old | ongoing | ai).ids)])
+        self.assertEqual(set(greetings.mapped('state')), {'returning'})
+        by_conv = {g.conversation_id: g.returning_reason for g in greetings}
+        self.assertIn('hội thoại đã có tin từ', by_conv[old])
+        self.assertIn('đang trao đổi', by_conv[ongoing])
+        self.assertIn('AI', by_conv[ai])
+        self.assertFalse(self.queued(), 'khách đã liên hệ: không gửi người duyệt')
+        self.assertFalse(self.sent)
+
+    def test_feedback_is_saved_and_reply_redrafted(self):
+        with self.patches():
+            greeting, _conv = self.new_greeting()
+            self.answer['messages'] = ['Dạ em chào chị ạ', 'Chị cần làm gì ạ?']
+            self.kiet('nhắn dài quá, tách 2 tin ngắn')
+        self.assertEqual((greeting.state, greeting.version), ('waiting', 2))
+        self.assertIn('nhắn dài quá', self.replies[-1]['note'])
+        feedback = self.env['dac.chat.feedback'].search([('greeting_id', '=', greeting.id)])
+        self.assertEqual(feedback.mode, 'greeting')
+        self.assertEqual(len(self.queued()), 2, 'gửi bản soạn lại cho người duyệt')
+        self.assertIn('Đã ghi nhận góp ý', self.queued()[-1].text)
+        runtime = self.prompt._runtime_prompt(self.now)
+        self.assertIn('GÓP Ý CỦA NGƯỜI DUYỆT', runtime)
+        self.assertIn('tách 2 tin ngắn', runtime)
+        self.assertFalse(self.sent)
+
+    def test_recheck_before_send_staff_or_customer_changes(self):
+        with self.patches():
+            greeting, conv = self.new_greeting()
+            self.message(conv, self.now - timedelta(minutes=1), 'staff', 'Dạ chị cần làm bảng hiệu kích thước nhiêu ạ')
+            self.kiet('ok')
+            self.assertEqual(greeting.state, 'staff_replied', 'nhân viên đã nhắn → bot không gửi')
+            other, conv2 = self.new_greeting('Anh Hai')
+            self.message(conv2, self.now - timedelta(minutes=1), 'customer', 'làm 2 cái nha')
+            self.kiet('duyệt G%s' % other.id)
+            self.assertEqual((other.state, other.version), ('waiting', 2), 'khách nhắn thêm → soạn lại, xin duyệt lại')
+            self.assertIn('Khách vừa nhắn thêm', self.queued()[-1].text)
+            self.kiet('[Tin nhắn chat.sticker]')
+            self.assertEqual(other.state, 'waiting', 'sticker không phải duyệt')
+            self.kiet('bỏ')
+            self.assertEqual(other.state, 'cancelled')
+        self.assertFalse(self.sent)
+
+    def test_disabled_or_old_waits_do_nothing_and_other_dms_pass_through(self):
+        with self.patches():
+            self.config.greeting_active = False
+            greeting, _conv = self.new_greeting()
+            self.assertFalse(greeting, 'tắt thì không soạn')
+            self.config.write({'greeting_active': True})
+            self.assertGreater(self.config.greeting_activated_at, self.now - timedelta(minutes=1), 'bật lại → chỉ chào khách nhắn sau mốc bật')
+            greeting, _conv = self.new_greeting('Khách Trước Khi Bật')
+            self.assertFalse(greeting, 'khách nhắn trước lúc bật thì không chào')
+        events = [{'thread_id': 'u-khac', 'message_id': 'x1', 'text': 'alo', 'direction': 'in'},
+                  {'thread_id': 'u-kiet', 'message_id': 'x2', 'text': 'duyệt', 'direction': 'in'}]
+        rest = self.env['dac.chat.greeting']._ingest_approver('acc-1', events)
+        self.assertEqual([e['message_id'] for e in rest], ['x1'], 'tin người khác vẫn đi luồng trợ lý Zalo')
+        self.assertEqual(self.env['dac.chat.greeting']._ingest_approver('acc-khac', events), events)
+
+    def test_pancake_send_request_shape(self):
+        from odoo.addons.dac_chat_playbook.models.chat_greeting import pancake_send
+        from odoo.addons.dac_pancake_remind.models.pancake_api import PancakeError
+        conv = self.conversation()
+        seen = {}
+
+        class Response:
+            status_code = 200
+
+            def __init__(self, data):
+                self.data = data
+
+            def json(self):
+                return self.data
+
+        def fake_post(url, params=None, json=None, headers=None, timeout=None):
+            seen.update(url=url, params=params, json=json, timeout=timeout)
+            return Response({'success': True, 'id': 'msg1'})
+
+        with patch(GREET + '.requests.post', fake_post), \
+             patch.object(type(self.page), '_token', lambda page: 'TOKEN'):
+            pancake_send(conv, 'Dạ em chào chị ạ')
+        self.assertEqual(seen['url'], 'https://pages.fm/api/public_api/v1/pages/pzl_greet_page/conversations/%s/messages' % conv.conversation_fm_id)
+        self.assertEqual(seen['params'], {'page_access_token': 'TOKEN'})
+        self.assertEqual(seen['json'], {'action': 'reply_inbox', 'message': 'Dạ em chào chị ạ'})
+        with patch(GREET + '.requests.post', lambda *a, **k: Response({'success': False, 'message': 'bad token=TOKEN'})), \
+             patch.object(type(self.page), '_token', lambda page: 'TOKEN'), self.assertRaises(PancakeError):
+            pancake_send(conv, 'x')
+
+    def test_test_page_send_and_greeting_use_inactive_page(self):
+        self.config.write({'test_page_fm_id': 'pzl_test_page_9', 'test_page_token': 'tok-test', 'test_message': 'Tin thử hệ thống'})
+        rows = [{'id': 'pzl_u_test_conv', 'page_id': 'pzl_test_page_9', 'from': {'id': 'pzl_u_1', 'name': 'Anh Test'},
+                 'updated_at': '2026-11-23T03:00:00', 'inserted_at': '2026-11-20T03:00:00'}]
+        Page = type(self.env['dac.pancake.page'])
+        test = self
+
+        def fake_fetch(conversation):
+            if test.sent:  # tin bot vừa gửi hiện trên Pancake như tin của page
+                test.message(conversation, test.now, 'staff', 'Tin thử hệ thống')
+
+        with self.patches(), patch.object(Page, '_list_conversations', lambda page, since, until, max_pages=0: rows), \
+             patch.object(Page, '_resolve_ids', staticmethod(lambda entered, token: (entered, False))), \
+             patch.object(type(self.env['dac.pancake.conversation']), '_fetch_messages', fake_fetch):
+            self.config.action_test_send()
+            page = self.env['dac.pancake.page'].with_context(active_test=False).search([('page_fm_id', '=', 'pzl_test_page_9')])
+            self.assertEqual((page.active, page.history_enabled), (False, False), 'page thử không bị luồng nhắc/lấy tin quét')
+            self.assertEqual([t for _c, t in self.sent], ['Tin thử hệ thống'])
+            self.assertIn('Gửi OK', self.config.test_result)
+            self.assertIn('tin NHÂN VIÊN', self.config.test_result)
+            conv = self.env['dac.pancake.conversation'].search([('conversation_fm_id', '=', 'pzl_u_test_conv')])
+            self.message(conv, self.now - timedelta(days=2), 'customer', 'tin cũ của hội thoại thử')
+            self.config.action_test_greeting()
+            greeting = self.env['dac.chat.greeting'].search([('conversation_id', '=', conv.id)])
+            self.assertEqual((greeting.is_test, greeting.state), (True, 'waiting'), 'thử nghiệm: luôn coi là khách mới')
+            self.assertIn('THỬ NGHIỆM', self.queued()[-1].text)
+
+    def test_test_page_uses_new_token_of_existing_page(self):
+        real = self.env['dac.pancake.page'].create({'name': 'Facebook thật', 'page_fm_id': '9990001112223'})
+        real.sudo().page_access_token = 'old-token'
+        self.config.write({'test_page_fm_id': 'https://pancake.vn/9990001112223', 'test_page_token': 'new-token'})
+        Page = type(self.env['dac.pancake.page'])
+        rows = [{'id': '9990001112223_99', 'page_id': '9990001112223', 'from': {'id': '99', 'name': 'Khách FB'}}]
+        used = []
+
+        def listing(page, since, until, max_pages=0):
+            used.append(page.sudo().page_access_token)
+            return rows
+
+        with self.patches(), patch.object(Page, '_list_conversations', listing), \
+             patch.object(Page, '_resolve_ids', staticmethod(lambda entered, token: ('9990001112223', False))):
+            self.config.action_test_send()
+        self.assertEqual(used, ['new-token'], 'dùng token vừa nhập, không dùng token cũ đã hết hạn')
+        self.assertEqual((real.sudo().page_access_token, real.active), ('new-token', True), 'page đang chạy nhận token mới, vẫn hoạt động')
+
+    def test_never_reveal_bot_identity(self):
+        Prompt = self.env['dac.chat.prompt']
+        result = Prompt._guard({'messages': ['Dạ em chào chị ạ, em là trợ lý của Duy An nha', 'Chị đang cần làm gì ạ?',
+                                             'Bên em có ai hỗ trợ chị liền ạ']})
+        self.assertEqual(result['messages'], ['Chị đang cần làm gì ạ?', 'Bên em có ai hỗ trợ chị liền ạ'], 'chữ "ai" thường không bị chặn')
+        self.assertEqual(len(result['identity_blocked']), 1)
+        self.assertEqual(Prompt._guard({'messages': ['Đây là tin AI tự soạn', 'Em là chatbot ạ']})['identity_blocked'],
+                         ['Đây là tin AI tự soạn', 'Em là chatbot ạ'])
+        self.assertFalse(result['handoff'], 'chặn câu lộ AI không phải lý do chuyển nhân viên')
+        self.assertIn('KHÔNG tự giới thiệu', self.prompt._runtime_prompt(self.now))
+        calls = []
+
+        def fake_reply(prompt, history, now, customer_name='', channel='zalo', note=''):
+            calls.append(note)
+            if len(calls) == 1:
+                return {'messages': ['Chị cần gì ạ?'], 'identity_blocked': ['Em là trợ lý của Duy An'], 'handoff': False,
+                        'returning_customer': False, 'usage': {'in': 10, 'out': 2}}
+            return {'messages': ['Dạ em chào chị ạ', 'Chị cần làm gì ạ?'], 'identity_blocked': [], 'handoff': False,
+                    'returning_customer': False, 'usage': {'in': 10, 'out': 3}}
+
+        with self.patches(), patch.object(type(Prompt), '_reply', fake_reply):
+            greeting, _conv = self.new_greeting()
+        self.assertEqual(len(calls), 2, 'bị chặn vì lộ AI → soạn lại một lần')
+        self.assertIn('bị chặn vì tự giới thiệu', calls[1])
+        self.assertEqual(greeting._messages(), ['Dạ em chào chị ạ', 'Chị cần làm gì ạ?'])
+        self.assertEqual((greeting.tokens_in, greeting.tokens_out), (20, 5))
+
+    def test_late_feedback_is_saved_and_previewed(self):
+        with self.patches():
+            greeting, conv = self.new_greeting()
+            self.message(conv, self.now - timedelta(minutes=1), 'staff', 'Dạ chị cần gì ạ')
+            self.env['dac.chat.greeting']._cron_run()
+            self.assertEqual(greeting.state, 'staff_replied')
+            self.answer['messages'] = ['Dạ em chào chị ạ', 'Chị đang cần làm gì ạ?']
+            self.kiet('Chưa duyệt, không cần giới thiệu em là trợ lý, chào tự nhiên')
+        feedback = self.env['dac.chat.feedback'].search([('greeting_id', '=', greeting.id)])
+        self.assertTrue(feedback, 'góp ý tới muộn vẫn được lưu')
+        self.assertEqual(greeting.state, 'staff_replied', 'không mở lại lời chào đã đóng')
+        last = self.queued()[-1].text
+        self.assertIn('Đã ghi nhận góp ý', last)
+        self.assertIn('Bản soạn lại theo góp ý', last)
+        self.assertIn('1. Dạ em chào chị ạ', last)
+        self.assertNotIn('Dạ chị cần gì ạ', [t for _r, t in self.replies[-1]['history']], 'bản xem lại dùng đoạn chat lúc soạn bản gốc')
+        self.assertFalse(self.sent)
+
+
+@tagged('post_install', '-at_install', 'dac_chat_playbook')
+class TestTraining(TransactionCase):
+    """Huấn luyện & kiểm thử: góp ý từng câu bot → Agent tối ưu prompt → bản nháp mới."""
+
+    def setUp(self):
+        super().setUp()
+        self.env['dac.ai.connection'].search([]).write({'active': False})
+        self.Prompt = self.env['dac.chat.prompt']
+        self.prompt = self.Prompt.create({'name': 'Gốc', 'mode': 'info', 'state': 'draft', 'info_fields_json': '[]',
+                                          'system_prompt': '# Vai trò\nTrợ lý DAC xưng em.\n# Bối cảnh\n- Bây giờ: {{now}}\n- Kênh: {{channel}}\n' + 'x' * 300})
+
+    def test_feedback_then_agent_rewrites_into_new_draft(self):
+        data = self.Prompt.demo_feedback_add(self.prompt.id, 'Đừng hỏi số điện thoại khi khách nhắn Zalo', 'làm bảng hiệu', 'Chị cho em xin SĐT nha')
+        self.assertEqual((data['pending'], data['items'][0]['bot']), (1, 'Chị cho em xin SĐT nha'))
+        self.assertIn('góp ý: Đừng hỏi số điện thoại', self.prompt._runtime_prompt(datetime(2026, 11, 10, 3, 0)), 'chưa tối ưu: chèn vào prompt')
+        other = self.Prompt.demo_feedback_add(self.prompt.id, 'tạm bỏ', '', '')['items'][0]
+        self.assertEqual(self.Prompt.demo_feedback_toggle(other['id'], self.prompt.id)['pending'], 1, 'tắt góp ý → không tính')
+        job = self.Prompt.demo_optimize(self.prompt.id)
+        new = self.Prompt.browse(job['id'])
+        self.assertEqual((new.state, new.parent_id, new.mode), ('queued', self.prompt, 'info'))
+        seen = {}
+
+        def fake_call(env, model, fallback, system, text, schema, name, description, timeout):
+            seen.update(text=text, effort=env.context.get('dac_ai_effort'), timeout=timeout)
+            return ({'system_prompt': '# Vai trò\nXưng em, không xin SĐT khách Zalo.\n# Bối cảnh\n- Bây giờ: {{now}}\n- Kênh: {{channel}}\n' + 'y' * 300,
+                     'changes': ['Bỏ xin SĐT với khách Zalo (góp ý 1)']}, 'model-x')
+
+        with patch('odoo.addons.dac_chat_playbook.models.chat_prompt.ai_call', fake_call), \
+             patch.object(self.env.cr, 'commit'), patch.object(self.env.cr, 'rollback'):
+            self.Prompt._cron_optimize()
+        self.assertIn('Chị cho em xin SĐT nha', seen['text'])
+        self.assertEqual(seen['effort'], 'max', 'cải tiến dùng thinking tối đa (dòng tác vụ "Cải tiến prompt từ góp ý")')
+        self.assertEqual(self.env['dac.chat.task']._get('improve_prompt').thinking, 'max')
+        self.assertIn('thinking max', new.generated_by)
+        self.assertNotIn('tạm bỏ', seen['text'])
+        self.assertEqual(new.state, 'draft')
+        self.assertIn('không xin SĐT', new.system_prompt)
+        self.assertIn('Bỏ xin SĐT', new.optimize_note)
+        self.assertEqual(self.prompt.state, 'draft', 'bản cũ giữ nguyên')
+        self.assertNotIn('góp ý: Đừng hỏi', new._runtime_prompt(datetime(2026, 11, 10, 3, 0)), 'góp ý đã viết vào bản mới thì không chèn lặp')
+        self.assertIn('góp ý: Đừng hỏi', self.prompt._runtime_prompt(datetime(2026, 11, 10, 3, 0)))
+        self.assertEqual(self.Prompt.demo_feedback(new.id)['pending'], 0)
+        with self.assertRaises(UserError):
+            self.Prompt.demo_optimize(new.id)
+
+    def test_invalid_rewrite_fails_without_touching_parent(self):
+        self.Prompt.demo_feedback_add(self.prompt.id, 'Ngắn hơn', 'a', 'b')
+        new = self.Prompt.browse(self.Prompt.demo_optimize(self.prompt.id)['id'])
+        with patch('odoo.addons.dac_chat_playbook.models.chat_prompt.ai_call', lambda *a, **k: ({'system_prompt': 'quá ngắn', 'changes': []}, 'm')), \
+             patch.object(self.env.cr, 'commit'), patch.object(self.env.cr, 'rollback'):
+            self.Prompt._cron_optimize()
+        self.assertEqual(new.state, 'failed')
+        self.assertIn('không hợp lệ', new.error_message)
+        self.assertEqual(self.Prompt.demo_prompt_state(new.id)['state'], 'failed')

@@ -2,7 +2,7 @@
 <odoo>
     <!-- ── Trang Tổng quan ──────────────────────────────────────────────── -->
     <record id="chat_demo_action" model="ir.actions.client">
-        <field name="name">Demo chatbot</field>
+        <field name="name">Huấn luyện &amp; kiểm thử</field>
         <field name="tag">dac_chat_demo</field>
     </record>
 
@@ -38,6 +38,44 @@
                             <field name="last_weekly_run_id" invisible="not last_weekly_run_id"/>
                         </group>
                     </group>
+                    <group string="Chào khách mới (Pancake, duyệt qua Zalo)">
+                        <group>
+                            <field name="greeting_active" widget="boolean_toggle"/>
+                            <field name="greeting_approver_channel_id" options="{'no_create': True}" required="greeting_active"/>
+                            <field name="greeting_activated_at" invisible="not greeting_active"/>
+                        </group>
+                        <group>
+                            <div colspan="2" class="text-muted">
+                                Khách mới nhắn Pancake → bot soạn lời chào (bộ Chào hỏi đang dùng, chưa có thì bản nháp mới nhất) → gửi người
+                                duyệt ảnh hội thoại + câu định gửi qua Zalo. Người duyệt nhắn "duyệt" thì gửi khách, "bỏ" thì thôi, nhắn góp ý thì
+                                bot lưu góp ý và soạn lại. Khách đã liên hệ trước đó: không chào. Trước khi gửi bot kiểm tra lại: nhân viên đã
+                                nhắn thì không gửi, khách nhắn thêm thì soạn lại.
+                            </div>
+                            <button name="action_open_greetings" type="object" string="Xem lời chào" class="btn-link" colspan="2"/>
+                        </group>
+                    </group>
+                    <group string="Page thử (kiểm tra gửi tin trước khi bật cho khách thật)">
+                        <group>
+                            <field name="test_page_fm_id" placeholder="pzl_… hoặc link Pancake của page thử"/>
+                            <field name="test_page_token" password="True" groups="base.group_system"/>
+                            <field name="test_conversation_fm_id" placeholder="Bỏ trống = hội thoại mới nhất"/>
+                            <field name="test_message"/>
+                        </group>
+                        <group>
+                            <div colspan="2" class="text-muted">
+                                Page thử được lưu riêng (không hoạt động): luồng nhắc khách và lấy tin không quét page này. Lưu trước khi bấm nút.
+                            </div>
+                            <button name="action_test_send" type="object" string="Gửi tin thử" class="btn-secondary" colspan="2"
+                                    confirm="Gửi tin thử vào hội thoại thử của page thử (hội thoại nhập ở trên, hoặc hội thoại mới nhất). Tiếp tục?"/>
+                            <button name="action_test_greeting" type="object" string="Chạy thử chào khách (qua người duyệt)" class="btn-secondary" colspan="2"
+                                    confirm="Bot soạn lời chào cho hội thoại thử và gửi người duyệt qua Zalo; chỉ gửi vào hội thoại thử khi người duyệt trả lời &quot;duyệt&quot;. Tiếp tục?"/>
+                            <field name="test_result" colspan="2" nolabel="1" invisible="not test_result"/>
+                        </group>
+                    </group>
+                    <group string="Định hướng của quản lý cho Agent">
+                        <field name="agent_guidance" nolabel="1" colspan="2"
+                               placeholder="Mỗi dòng một quyết định: giờ làm, có xin SĐT không, chatbot làm được gì…"/>
+                    </group>
                     <group>
                         <group string="Chọn hội thoại cho AI đọc">
                             <field name="days_back"/>
@@ -54,7 +92,7 @@
                         </group>
                     </group>
                     <group>
-                        <group string="Giá tham khảo (màn hình Demo chatbot)">
+                        <group string="Giá tham khảo (màn hình Huấn luyện &amp; kiểm thử)">
                             <field name="price_in"/>
                             <field name="price_out"/>
                             <field name="usd_rate"/>

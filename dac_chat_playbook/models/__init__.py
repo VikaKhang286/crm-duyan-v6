@@ -7,3 +7,4 @@ from . import chat_task
 from . import ai_connection_effort
 from . import chat_config
 from . import chat_dashboard
+from . import chat_greeting

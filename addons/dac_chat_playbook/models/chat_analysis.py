@@ -235,7 +235,7 @@ class ChatAnalysis(models.Model):
     ai_summary = fields.Text(string='AI nhận xét', readonly=True, copy=False)
     ai_reduced = fields.Boolean(readonly=True, copy=False)
     rules_reviewed = fields.Boolean(readonly=True, copy=False)
-    rules_review_summary = fields.Text(string='AI rà soát quy tắc', readonly=True, copy=False)
+    rules_review_summary = fields.Text(string='AI tối ưu quy tắc', readonly=True, copy=False)
     prompt_id = fields.Many2one('dac.chat.prompt', string='System prompt tạo ra', readonly=True, copy=False, ondelete='set null')
     prompt_ids = fields.One2many('dac.chat.prompt', 'analysis_id', string='Các bộ system prompt', readonly=True)
     ai_used_models = fields.Char(string='Model đã dùng', readonly=True, copy=False)
@@ -325,7 +325,7 @@ class ChatAnalysis(models.Model):
             if analysis.state != 'done' or not analysis.ai_reduced:
                 raise UserError('Chỉ viết lại được cho đợt đã chạy xong phần AI.')
         for analysis in self:
-            analysis.write(dict(analysis._progress('Viết lại system prompt: Agent rà soát quy tắc rồi viết prompt…'), state='ai', prompt_id=False,
+            analysis.write(dict(analysis._progress('Viết lại system prompt: Agent tối ưu quy tắc rồi viết prompt…'), state='ai', prompt_id=False,
                                 finished_at=False, rules_reviewed=False))
         # sudo(): chỉ admin có quyền trên ir.cron; quản lý bấm nút chỉ hẹn cron của addon này chạy sớm
         self.env.ref('dac_chat_playbook.cron_process_analysis').sudo()._trigger()
@@ -352,6 +352,9 @@ class ChatAnalysis(models.Model):
                     self.env.cr.commit()
             if time.monotonic() - started >= CRON_BUDGET:
                 break
+        # Lượt "AI tối ưu bộ quy tắc" bấm từ màn hình (chạy nền vì AI mất vài phút)
+        self.env['dac.chat.rule.optimize']._cron_run()
+        self.env['dac.chat.prompt']._cron_optimize()  # "AI tối ưu prompt từ góp ý" (màn hình Huấn luyện & kiểm thử)
         if self.sudo().search_count([('state', 'in', ('queued', 'ai'))]):
             self.env.ref('dac_chat_playbook.cron_process_analysis').sudo()._trigger()
 
@@ -778,14 +781,17 @@ class ChatAnalysis(models.Model):
                 Line.create(dict(vals, analysis_id=self.id, name=row.get('staff') or review.get('staff_name')))
 
     def _review_rules(self):
-        """Agent rà soát: gộp quy tắc trùng, bỏ quy tắc thừa trước khi viết system prompt. Lỗi AI thì bỏ qua bước này (không chặn đợt)."""
+        """Agent tối ưu bộ quy tắc (gộp trùng, giải quyết mâu thuẫn, bỏ thừa) trước khi viết system prompt.
+        Lỗi AI thì bỏ qua bước này (không chặn đợt)."""
         try:
-            result = self.env['dac.chat.rule']._ai_review(self)
+            result = self.env['dac.chat.rule']._ai_optimize(self)
             usage = result.get('usage') or {}
             summary = result['message']
         except UserError as error:
-            usage, summary = {}, 'Bỏ qua bước rà soát (AI lỗi: %s).' % str(error)[:200]
-        self.write(dict(self._progress('Agent rà soát quy tắc: %s Agent đang viết system prompt…' % summary[:300]),
+            self.env['dac.chat.rule.optimize'].search([('analysis_id', '=', self.id), ('state', '=', 'queued')]).write(
+                {'state': 'failed', 'error_message': str(error)[:500]})
+            usage, summary = {}, 'Bỏ qua bước tối ưu quy tắc (AI lỗi: %s).' % str(error)[:200]
+        self.write(dict(self._progress('Agent tối ưu quy tắc: %s Agent đang viết system prompt…' % summary[:400]),
                         rules_reviewed=True, rules_review_summary=summary,
                         tokens_in=self.tokens_in + usage.get('in', 0), tokens_out=self.tokens_out + usage.get('out', 0)))
 

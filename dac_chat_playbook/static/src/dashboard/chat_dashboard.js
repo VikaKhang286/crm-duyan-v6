@@ -102,7 +102,7 @@ export class ChatDashboard extends Component {
         this.state.reviewing = true;
         try {
             const result = await this.orm.call("dac.chat.rule", "action_ai_review", [[]]);
-            this.notification.add(result?.params?.message || "Đã rà soát.", { title: "AI đã rà soát quy tắc", type: "success", sticky: true });
+            this.notification.add(result?.params?.message || "Đã xếp lượt chạy nền.", { title: "AI đang tối ưu bộ quy tắc", type: "info" });
             await this.load(true);
         } finally {
             this.state.reviewing = false;

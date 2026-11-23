@@ -6,6 +6,14 @@ from odoo.exceptions import UserError
 
 from .chat_analysis import READ_MODES
 
+DEFAULT_GUIDANCE = """- Giờ làm việc: thứ 2 – thứ 7, 8:00–12:00 và 13:30–17:30 (nhân viên nghỉ trưa 12:00–13:30); Chủ nhật nghỉ.
+- Khách nhắn qua Zalo: KHÔNG xin số điện thoại/Zalo (đã liên lạc được trên Zalo). Khách nhắn Facebook: có thể xin, không bắt buộc.
+- Chatbot chỉ gửi được tin chữ: chưa gửi ảnh mẫu, file hay gọi điện được.
+- Không hứa mốc giờ cố định (vd "trong 30 phút", "trước 11 giờ"); chỉ dùng mốc làm việc kế tiếp do hệ thống điền.
+- Bộ quy tắc càng gọn càng tốt: mỗi ý một quy tắc, không trùng, không mâu thuẫn.
+- Khách không được biết đang nhắn với AI/chatbot: không tự giới thiệu "em là trợ lý…", không nhắc AI/bot; chào hỏi tự nhiên như nhân viên."""
+IDENTITY_GUIDANCE = '- Khách không được biết đang nhắn với AI/chatbot: không tự giới thiệu "em là trợ lý…", không nhắc AI/bot; chào hỏi tự nhiên như nhân viên.'
+
 DEPTHS = [
     ('quick', 'Nhanh: AI đọc 60 hội thoại'),
     ('standard', 'Chuẩn: AI đọc 150 hội thoại'),
@@ -44,9 +52,18 @@ class ChatConfig(models.Model):
         help='Mỗi thứ 2 lúc 6:00 tự tạo một đợt cho 7 ngày qua theo thiết lập này, chỉ đọc hội thoại chưa đọc. '
              'Bản system prompt mới luôn là bản nháp, cần người kích hoạt.')
     price_in = fields.Float(string='Giá token vào (USD / 1 triệu)', default=0.10, digits=(8, 3),
-        help='Chỉ để ước tính chi phí trong màn hình Demo chatbot. Mặc định: giá Claude Haiku 5.5 của Anthropic.')
+        help='Chỉ để ước tính chi phí trong màn hình Huấn luyện & kiểm thử. Mặc định: giá Claude Haiku 5.5 của Anthropic.')
     price_out = fields.Float(string='Giá token ra (USD / 1 triệu)', default=0.50, digits=(8, 3))
     usd_rate = fields.Float(string='Tỉ giá USD → VNĐ', default=26000, digits=(10, 0))
+    agent_guidance = fields.Text(string='Định hướng của quản lý cho Agent', default=lambda self: DEFAULT_GUIDANCE,
+        help='Agent tối ưu quy tắc và Agent viết system prompt đọc phần này, ưu tiên cao nhất khi quy tắc mâu thuẫn. '
+             'Ghi các quyết định của quản lý: giờ làm, có xin SĐT không, chatbot làm được gì.')
+    greeting_active = fields.Boolean(string='Bật chào khách mới', default=False,
+        help='Bot soạn lời chào cho khách mới nhắn Pancake và gửi người duyệt qua Zalo; chỉ gửi khách khi người duyệt trả lời "duyệt".')
+    greeting_activated_at = fields.Datetime(string='Bật lúc', readonly=True,
+        help='Chỉ chào khách nhắn sau mốc này (không chào tồn đọng cũ).')
+    greeting_approver_channel_id = fields.Many2one('dac.zalo.channel', string='Người duyệt (Zalo)', ondelete='set null',
+        domain="[('thread_type', '=', 'user')]", help='Chat riêng Zalo của người duyệt lời chào (Trợ lý Zalo → Hội thoại).')
     last_weekly_run_id = fields.Many2one('dac.chat.analysis', string='Đợt tự động gần nhất', readonly=True, ondelete='set null')
     ai_ready = fields.Boolean(string='Có kết nối AI dùng được', compute='_compute_ai_ready')
 
@@ -55,6 +72,14 @@ class ChatConfig(models.Model):
         ('positive_check', 'CHECK(days_back > 0 AND batch_size > 0 AND conversation_limit >= 0)',
          'Số ngày và số hội thoại mỗi lần gọi phải lớn hơn 0.'),
     ]
+
+    def write(self, vals):
+        if vals.get('greeting_active') and not all(self.mapped('greeting_active')):
+            vals = dict(vals, greeting_activated_at=fields.Datetime.now())
+        return super().write(vals)
+
+    def action_open_greetings(self):
+        return self.env['ir.actions.actions']._for_xml_id('dac_chat_playbook.chat_greeting_action')
 
     def _compute_ai_ready(self):
         ready = self.env['dac.ai.connection']._ready() or self.env['dac.chat.task']._any_model()
@@ -196,3 +221,4 @@ class ChatRunWizard(models.TransientModel):
         analysis.action_run()
         return {'type': 'ir.actions.act_window', 'res_model': 'dac.chat.analysis', 'res_id': analysis.id, 'view_mode': 'form',
                 'target': 'current'}
+

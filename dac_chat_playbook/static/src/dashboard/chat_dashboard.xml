@@ -17,7 +17,7 @@
                         <i class="fa fa-play me-1"/>Chạy phân tích mới
                     </button>
                     <button type="button" class="btn btn-outline-primary" t-on-click="openDemo">
-                        <i class="fa fa-comments me-1"/>Demo chatbot
+                        <i class="fa fa-graduation-cap me-1"/>Huấn luyện &amp; kiểm thử
                     </button>
                     <button type="button" class="btn btn-outline-secondary" t-on-click="openSettings">
                         <i class="fa fa-cog me-1"/>Thiết lập
@@ -211,9 +211,9 @@
                             <h2><i class="fa fa-list-ol me-2"/>Quy tắc chờ duyệt <span class="badge text-bg-warning ms-1" t-if="d.rules.proposed" t-esc="d.rules.proposed"/></h2>
                             <span class="d-flex gap-1 align-items-center">
                                 <button type="button" class="btn btn-sm btn-outline-secondary" t-on-click="reviewRules" t-att-disabled="state.reviewing"
-                                        title="AI gộp quy tắc trùng, bỏ quy tắc thừa, chỉ ra mâu thuẫn">
+                                        title="AI viết lại toàn bộ quy tắc thành bộ gọn: gộp trùng, giải quyết mâu thuẫn, bỏ thừa (chạy nền, hoàn tác được)">
                                     <i class="fa me-1" t-att-class="state.reviewing ? 'fa-circle-o-notch fa-spin' : 'fa-magic'"/>
-                                    <t t-if="state.reviewing">AI đang rà soát…</t><t t-else="">AI rà soát trùng lặp</t>
+                                    <t t-if="state.reviewing">Đang xếp lượt…</t><t t-else="">AI tối ưu bộ quy tắc</t>
                                 </button>
                                 <button type="button" class="btn btn-sm btn-link" t-on-click="openRules">Tất cả (<t t-esc="d.rules.approved"/> đang dùng) <i class="fa fa-angle-right"/></button>
                             </span>

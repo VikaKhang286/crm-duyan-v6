@@ -21,3 +21,11 @@ access_chat_task_system,Chat task admin,model_dac_chat_task,base.group_system,1,
 access_chat_task_manager,Chat task manager,model_dac_chat_task,dac_erp.group_dac_erp_manager,1,1,0,0
 access_chat_knowledge_system,Chat knowledge admin,model_dac_chat_knowledge,base.group_system,1,1,1,1
 access_chat_knowledge_manager,Chat knowledge manager,model_dac_chat_knowledge,dac_erp.group_dac_erp_manager,1,1,1,1
+access_chat_rule_optimize_system,Chat rule optimize admin,model_dac_chat_rule_optimize,base.group_system,1,1,1,1
+access_chat_rule_optimize_manager,Chat rule optimize manager,model_dac_chat_rule_optimize,dac_erp.group_dac_erp_manager,1,1,1,0
+access_dac_chat_greeting_system,dac_chat_greeting admin,model_dac_chat_greeting,base.group_system,1,1,1,1
+access_dac_chat_greeting_manager,dac_chat_greeting manager,model_dac_chat_greeting,dac_erp.group_dac_erp_manager,1,1,0,0
+access_dac_chat_greeting_reply_system,dac_chat_greeting_reply admin,model_dac_chat_greeting_reply,base.group_system,1,1,1,1
+access_dac_chat_greeting_reply_manager,dac_chat_greeting_reply manager,model_dac_chat_greeting_reply,dac_erp.group_dac_erp_manager,1,0,0,0
+access_dac_chat_feedback_system,dac_chat_feedback admin,model_dac_chat_feedback,base.group_system,1,1,1,1
+access_dac_chat_feedback_manager,dac_chat_feedback manager,model_dac_chat_feedback,dac_erp.group_dac_erp_manager,1,1,1,1

@@ -7,8 +7,8 @@
         <field name="arch" type="xml">
             <list string="Quy tắc chat" decoration-muted="state == 'rejected'" decoration-success="state == 'approved'">
                 <header>
-                    <button name="action_ai_review" type="object" string="AI rà soát trùng lặp" class="btn-primary" display="always"
-                            confirm="AI sẽ đọc toàn bộ quy tắc đã duyệt và chờ duyệt: gộp quy tắc trùng, bỏ quy tắc thừa (chỉ với quy tắc chờ duyệt), chỉ ra mâu thuẫn. Mất khoảng 1–2 phút. Tiếp tục?"/>
+                    <button name="action_ai_review" type="object" string="AI tối ưu bộ quy tắc" class="btn-primary" display="always"
+                            confirm="AI sẽ viết lại toàn bộ quy tắc đã duyệt và chờ duyệt thành một bộ gọn: gộp quy tắc trùng, giải quyết mâu thuẫn theo Định hướng của quản lý (ở Thiết lập), bỏ quy tắc thừa. Quy tắc nhóm Cấm và Chuyển nhân viên chỉ được thay khi bạn duyệt. Chạy nền 2–5 phút, hoàn tác được. Tiếp tục?"/>
                 </header>
                 <field name="sequence" widget="handle"/>
                 <field name="category"/>
@@ -58,7 +58,7 @@
                     <group string="Bằng chứng / lý do">
                         <field name="evidence" nolabel="1" colspan="2"/>
                     </group>
-                    <group string="AI rà soát" invisible="not review_note and not merged_into_id">
+                    <group string="AI tối ưu" invisible="not review_note and not merged_into_id">
                         <field name="review_note" nolabel="1" colspan="2"/>
                         <field name="merged_into_id" invisible="not merged_into_id"/>
                     </group>
@@ -236,6 +236,7 @@
                     <group>
                         <field name="prompt_id" readonly="1"/>
                         <field name="customer_name"/>
+                        <field name="channel"/>
                     </group>
                     <group>
                         <field name="at"/>
@@ -582,14 +583,91 @@
         </field>
     </record>
 
+
+    <!-- ── Lịch sử AI tối ưu quy tắc ─────────────────────────────────────── -->
+    <record id="chat_rule_optimize_view_list" model="ir.ui.view">
+        <field name="name">dac.chat.rule.optimize.list</field>
+        <field name="model">dac.chat.rule.optimize</field>
+        <field name="arch" type="xml">
+            <list string="Lịch sử tối ưu quy tắc" create="0" decoration-muted="state == 'undone'" decoration-danger="state == 'failed'">
+                <field name="name"/>
+                <field name="analysis_id" optional="show"/>
+                <field name="before_count"/>
+                <field name="after_count"/>
+                <field name="summary"/>
+                <field name="state" widget="badge" decoration-success="state == 'done'" decoration-info="state == 'queued'"
+                       decoration-danger="state == 'failed'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="chat_rule_optimize_view_form" model="ir.ui.view">
+        <field name="name">dac.chat.rule.optimize.form</field>
+        <field name="model">dac.chat.rule.optimize</field>
+        <field name="arch" type="xml">
+            <form string="Lượt tối ưu quy tắc" create="0" edit="0">
+                <header>
+                    <button name="action_open_rules" type="object" string="Xem quy tắc" class="btn-primary" invisible="state != 'done'"/>
+                    <button name="action_undo" type="object" string="Hoàn tác lượt này" invisible="not can_undo"
+                            confirm="Trả mọi quy tắc về như trước lượt tối ưu này và ẩn các quy tắc mới do lượt này tạo. Tiếp tục?"/>
+                    <field name="state" widget="statusbar" statusbar_visible="queued,done"/>
+                </header>
+                <sheet>
+                    <div class="oe_title"><h1><field name="name"/></h1></div>
+                    <div class="alert alert-info" role="status" invisible="state != 'queued'">
+                        AI đang tối ưu ở chế độ nền (2–5 phút). Tải lại trang để xem kết quả.
+                    </div>
+                    <field name="can_undo" invisible="1"/>
+                    <group>
+                        <group>
+                            <field name="before_count"/>
+                            <field name="after_count"/>
+                            <field name="analysis_id" invisible="not analysis_id"/>
+                        </group>
+                        <group>
+                            <field name="model_label"/>
+                            <field name="tokens_in"/>
+                            <field name="tokens_out"/>
+                        </group>
+                    </group>
+                    <group string="Kết quả">
+                        <field name="summary" nolabel="1" colspan="2"/>
+                    </group>
+                    <group string="Lỗi" invisible="not error_message">
+                        <field name="error_message" nolabel="1" colspan="2"/>
+                    </group>
+                    <group string="Quy tắc mới do lượt này tạo">
+                        <field name="created_ids" nolabel="1" colspan="2">
+                            <list>
+                                <field name="category"/>
+                                <field name="name"/>
+                                <field name="content"/>
+                                <field name="priority" widget="badge"/>
+                                <field name="state" widget="badge" decoration-success="state == 'approved'" decoration-warning="state == 'proposed'"/>
+                            </list>
+                        </field>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="chat_rule_optimize_action" model="ir.actions.act_window">
+        <field name="name">Lịch sử tối ưu quy tắc</field>
+        <field name="res_model">dac.chat.rule.optimize</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html"><p>Chưa có lượt tối ưu nào. Bấm "AI tối ưu bộ quy tắc" ở danh sách Quy tắc chat, hoặc chạy một đợt phân tích.</p></field>
+    </record>
+
     <menuitem id="menu_chat_playbook" name="Phân tích chat &amp; chatbot" parent="dac_pancake_remind.menu_section_pancake" sequence="50"
               groups="dac_erp.group_dac_erp_manager,base.group_system"/>
     <menuitem id="menu_chat_dashboard" name="Tổng quan" parent="menu_chat_playbook" action="chat_dashboard_action" sequence="1"/>
     <menuitem id="menu_chat_analysis" name="Phân tích tin nhắn" parent="menu_chat_playbook" action="chat_analysis_action" sequence="10"/>
     <menuitem id="menu_chat_insight" name="Nhãn hội thoại (AI)" parent="menu_chat_playbook" action="chat_insight_action" sequence="15"/>
     <menuitem id="menu_chat_rule" name="Quy tắc chat (playbook)" parent="menu_chat_playbook" action="chat_rule_action" sequence="20"/>
+    <menuitem id="menu_chat_rule_optimize" name="Lịch sử tối ưu quy tắc" parent="menu_chat_playbook" action="chat_rule_optimize_action" sequence="21"/>
     <menuitem id="menu_chat_prompt" name="System prompt chatbot" parent="menu_chat_playbook" action="chat_prompt_action" sequence="25"/>
     <menuitem id="menu_chat_knowledge" name="Kiến thức doanh nghiệp" parent="menu_chat_playbook" action="chat_knowledge_action" sequence="27"/>
-    <menuitem id="menu_chat_demo" name="Demo chatbot" parent="menu_chat_playbook" action="chat_demo_action" sequence="30"/>
+    <menuitem id="menu_chat_demo" name="Huấn luyện &amp; kiểm thử" parent="menu_chat_playbook" action="chat_demo_action" sequence="30"/>
     <menuitem id="menu_chat_config" name="Thiết lập" parent="menu_chat_playbook" action="chat_config_open_action" sequence="90"/>
 </odoo>

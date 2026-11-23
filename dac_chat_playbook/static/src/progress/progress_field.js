@@ -61,7 +61,7 @@ export class ChatProgressField extends Component {
             make("stats", "1. Thống kê toàn bộ tin", st === "ai" || st === "done", st === "queued"),
             make("read", `2. AI đọc & gán nhãn (${done}/${total} lô)`, hasAi && done >= total && (st === "ai" || st === "done"),
                 st === "ai" && done < total),
-            make("coord", `3. Agent điều phối (vòng ${d.coord_rounds || 0}/${COORD_ROUNDS}) + rà soát quy tắc`, hasAi && (d.ai_reduced || st === "done"),
+            make("coord", `3. Agent điều phối (vòng ${d.coord_rounds || 0}/${COORD_ROUNDS}) + tối ưu quy tắc`, hasAi && (d.ai_reduced || st === "done"),
                 st === "ai" && hasAi && done >= total && !d.ai_reduced),
             make("prompt", "4. Viết 3 bộ system prompt", hasAi && st === "done", st === "ai" && d.ai_reduced),
         ];

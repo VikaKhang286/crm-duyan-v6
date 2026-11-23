@@ -44,6 +44,9 @@ TASKS = [
     ('write_prompt', 'Viết system prompt',
      'Agent viết 3 bộ prompt (Chào hỏi / Hỏi thông tin / Tư vấn) từ kết quả phân tích, quy tắc và kiến thức doanh nghiệp.',
      '3. Prompt', 'Cao: chạy hiếm, chất lượng quan trọng.'),
+    ('improve_prompt', 'Cải tiến prompt từ góp ý',
+     'Màn hình Huấn luyện & kiểm thử: Agent viết lại system prompt theo góp ý của admin cho từng lượt trả lời.',
+     '3. Prompt', 'Tối đa: chạy khi admin bấm "Cải tiến", chất lượng quan trọng hơn tốc độ.'),
     ('bot_greeting', 'Chatbot trả lời — Chào hỏi',
      'Trả lời khách mới nhắn lần đầu: chào, xin thông tin cơ bản, hẹn mốc làm việc. Khách đang chờ nên cần nhanh.',
      '4. Chatbot', 'Thấp hoặc tắt: ưu tiên tốc độ và chi phí.'),
@@ -54,6 +57,8 @@ TASKS = [
      'Tư vấn sơ bộ theo kiến thức doanh nghiệp, không báo giá, chuyển nhân viên khi cần.',
      '4. Chatbot', 'Vừa: cần bám đúng kiến thức và quy tắc.'),
 ]
+# Giá trị mặc định khi tạo dòng lần đầu (không ghi đè lựa chọn của quản lý): model tìm theo tên, mức thinking
+TASK_DEFAULTS = {'improve_prompt': {'model_like': 'claude-haiku', 'thinking': 'max'}}
 TASK_BY_CODE = {code: (name, desc, stage, hint) for code, name, desc, stage, hint in TASKS}
 
 TaskAI = namedtuple('TaskAI', 'env model fallback effort')
@@ -104,6 +109,13 @@ class ChatTask(models.Model):
                 if any(row[key] != value for key, value in values.items()):
                     row.write(values)
             else:
+                defaults = TASK_DEFAULTS.get(code, {})
+                if defaults.get('thinking'):
+                    values['thinking'] = defaults['thinking']
+                if defaults.get('model_like'):
+                    model = self.env['dac.ai.model'].sudo().search([('name', 'ilike', defaults['model_like']), ('selected', '=', True),
+                                                                    ('connection_id.active', '=', True)], limit=1)
+                    values['ai_model_id'] = model.id or False
                 rows[code] = self.sudo().create(dict(values, code=code))
         return self.sudo().search([])
 

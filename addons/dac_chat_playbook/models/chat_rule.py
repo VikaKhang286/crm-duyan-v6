@@ -30,30 +30,40 @@ def _clean(text):
     return MONEY_RE.sub('[giá]', text)
 
 
-REVIEW_TASK = """Bạn là AGENT RÀ SOÁT QUY TẮC cho chatbot chào khách của DAC. Đọc danh sách quy tắc dưới đây và:
-- merges: gộp các quy tắc cùng ý (dù khác chữ) thành MỘT quy tắc rõ ràng, đầy đủ ý nhất; liệt kê đủ rule_ids được gộp.
-- duplicates: quy tắc CHỜ DUYỆT đã được một quy tắc khác (thường là quy tắc ĐÃ DUYỆT) bao trọn ý → duplicate_of là id quy tắc giữ lại.
-- conflicts: các quy tắc mâu thuẫn nhau (làm theo cái này là trái cái kia).
-Không gộp các quy tắc chỉ liên quan một phần. Không viết lại quy tắc an toàn đã duyệt. Mỗi quy tắc chỉ xuất hiện ở MỘT mục.
-Quy tắc gộp phải giữ đúng phạm vi chatbot (không báo giá, không cam kết, không nhận cọc)."""
+PROTECTED = ('forbidden', 'handoff')  # quy tắc code chèn nguyên văn vào prompt: AI tối ưu không tự sửa/bỏ, chỉ đề xuất
 
-REVIEW_SCHEMA = {
+OPTIMIZE_TASK = """Bạn là AGENT TỐI ƯU BỘ QUY TẮC cho chatbot chào khách của DAC. Dưới đây là TOÀN BỘ quy tắc ĐÃ DUYỆT và CHỜ DUYỆT.
+Hãy viết lại thành MỘT BỘ QUY TẮC GỌN, không trùng, không mâu thuẫn, để Agent viết system prompt và chatbot làm theo được:
+- Gộp mọi quy tắc cùng ý hoặc cùng một chủ đề hẹp (vd: các quy tắc về độ dài tin; các quy tắc khi khách hỏi giá; các quy tắc ngoài
+  giờ) thành MỘT quy tắc đầy đủ ý nhất.
+- Mâu thuẫn: ĐỊNH HƯỚNG CỦA QUẢN LÝ ưu tiên cao nhất, rồi quy tắc ĐÃ DUYỆT, rồi quy tắc chờ duyệt. Ghi lý do chọn.
+- dropped: quy tắc chatbot không làm được (vd: gửi ảnh, gọi điện), trái định hướng của quản lý, hoặc đã nằm trọn trong quy tắc khác.
+- Mục tiêu: tổng cộng khoảng 12–18 quy tắc, mỗi nhóm 1–4 quy tắc; mỗi quy tắc 1–3 câu, cụ thể, làm theo được; câu mẫu ngắn, đúng giọng
+  nhân viên DAC (xưng em, gọi anh/chị).
+- Nhóm "Không được làm" và "Chuyển nhân viên": giữ ĐỦ mọi ràng buộc của các quy tắc gốc (được gộp câu chữ, không được bớt ý).
+- Không đưa giá, số tiền, mốc giờ cố định (vd "trong 30 phút", "trước 11 giờ") vào quy tắc hay câu mẫu; hẹn khách thì nói "mốc làm việc
+  kế tiếp" (code tự điền).
+- MỖI id đầu vào phải xuất hiện ĐÚNG MỘT LẦN: trong source_ids của một quy tắc ở rules, hoặc trong dropped. Quy tắc gốc đã ổn thì vẫn
+  đưa vào rules với source_ids chỉ gồm id đó và giữ nguyên câu chữ."""
+
+OPTIMIZE_SCHEMA = {
     'type': 'object',
     'properties': {
-        'summary': {'type': 'string', 'description': '1–3 câu nhận xét bộ quy tắc.'},
-        'merges': {'type': 'array', 'items': {'type': 'object', 'properties': {
-            'rule_ids': {'type': 'array', 'items': {'type': 'integer'}},
+        'summary': {'type': 'string', 'description': '1–3 câu: đã gộp/bỏ gì, giải quyết mâu thuẫn nào.'},
+        'rules': {'type': 'array', 'items': {'type': 'object', 'properties': {
+            'source_ids': {'type': 'array', 'items': {'type': 'integer'}},
             'title': {'type': 'string'}, 'rule': {'type': 'string'}, 'example': {'type': 'string'},
             'category': {'type': 'string', 'enum': CATEGORY_ORDER}, 'priority': {'type': 'string', 'enum': ['must', 'should', 'may']},
-            'reason': {'type': 'string'}}, 'required': ['rule_ids', 'title', 'rule', 'category', 'priority']}},
-        'duplicates': {'type': 'array', 'items': {'type': 'object', 'properties': {
-            'rule_id': {'type': 'integer'}, 'duplicate_of': {'type': 'integer'}, 'reason': {'type': 'string'}},
-            'required': ['rule_id', 'duplicate_of']}},
-        'conflicts': {'type': 'array', 'items': {'type': 'object', 'properties': {
-            'rule_ids': {'type': 'array', 'items': {'type': 'integer'}}, 'reason': {'type': 'string'}}, 'required': ['rule_ids', 'reason']}},
+            'reason': {'type': 'string'}}, 'required': ['source_ids', 'title', 'rule', 'category', 'priority']}},
+        'dropped': {'type': 'array', 'items': {'type': 'object', 'properties': {
+            'rule_id': {'type': 'integer'}, 'reason': {'type': 'string'}}, 'required': ['rule_id', 'reason']}},
     },
-    'required': ['summary'],
+    'required': ['summary', 'rules'],
 }
+
+
+def _same(a, b):
+    return ' '.join(str(a or '').lower().split()) == ' '.join(str(b or '').lower().split())
 
 
 class ChatRule(models.Model):
@@ -70,15 +80,17 @@ class ChatRule(models.Model):
     priority = fields.Selection(PRIORITIES, string='Mức', required=True, default='should')
     state = fields.Selection([('proposed', 'Đề xuất'), ('approved', 'Đã duyệt'), ('rejected', 'Bỏ')], string='Trạng thái',
         default='proposed', required=True, index=True, copy=False)
-    source = fields.Selection([('system', 'Mặc định an toàn'), ('stats', 'Từ thống kê'), ('ai', 'AI đề xuất'), ('manual', 'Nhập tay')],
+    source = fields.Selection([('system', 'Mặc định an toàn'), ('stats', 'Từ thống kê'), ('ai', 'AI đề xuất'), ('optimized', 'AI tối ưu'),
+                               ('manual', 'Nhập tay')],
         string='Nguồn', default='manual', required=True, readonly=True)
     analysis_id = fields.Many2one('dac.chat.analysis', string='Đợt phân tích', ondelete='set null', index=True, readonly=True)
     approved_by_id = fields.Many2one('res.users', string='Người duyệt', readonly=True, copy=False)
     approved_at = fields.Datetime(string='Duyệt lúc', readonly=True, copy=False)
     active = fields.Boolean(default=True)
-    review_note = fields.Text(string='Ghi chú rà soát (AI)', readonly=True, copy=False,
-        help='Kết quả lượt AI rà soát trùng lặp / mâu thuẫn gần nhất.')
-    merged_into_id = fields.Many2one('dac.chat.rule', string='Đã gộp vào', readonly=True, copy=False, ondelete='set null')
+    review_note = fields.Text(string='Ghi chú tối ưu (AI)', readonly=True, copy=False,
+        help='Kết quả lượt AI tối ưu bộ quy tắc gần nhất.')
+    merged_into_id = fields.Many2one('dac.chat.rule', string='Thay bằng', readonly=True, copy=False, ondelete='set null',
+        help='Quy tắc mới (AI tối ưu) thay cho quy tắc này. Quy tắc đã duyệt thuộc nhóm an toàn chỉ được thay khi quản lý duyệt quy tắc mới.')
     # Cột sắp xếp (đã duyệt lên đầu, theo thứ tự nhóm, bắt buộc trước)
     state_order = fields.Integer(compute='_compute_order', store=True)
     category_order = fields.Integer(compute='_compute_order', store=True)
@@ -95,9 +107,14 @@ class ChatRule(models.Model):
 
     def action_approve(self):
         self.write({'state': 'approved', 'approved_by_id': self.env.user.id, 'approved_at': fields.Datetime.now()})
+        # Quy tắc cũ đang chờ được thay bằng quy tắc vừa duyệt → thôi dùng
+        for old in self.search([('merged_into_id', 'in', self.ids), ('state', '=', 'approved')]):
+            old.write({'state': 'rejected', 'review_note': 'Đã thay bằng #%s "%s".' % (old.merged_into_id.id, old.merged_into_id.name)})
 
     def action_reject(self):
         self.write({'state': 'rejected', 'approved_by_id': False, 'approved_at': False})
+        # Bỏ quy tắc AI tối ưu → các quy tắc cũ nó định thay vẫn dùng như trước
+        self.search([('merged_into_id', 'in', self.ids), ('state', '=', 'approved')]).write({'merged_into_id': False, 'review_note': False})
 
     def action_reset(self):
         self.write({'state': 'proposed', 'approved_by_id': False, 'approved_at': False})
@@ -142,88 +159,118 @@ class ChatRule(models.Model):
             })
         return self.create(vals_list)
 
-    # ── Agent rà soát quy tắc ────────────────────────────────────────────────
+    # ── Agent tối ưu bộ quy tắc ─────────────────────────────────────────────
     def action_ai_review(self):
-        """Nút "AI rà soát trùng lặp": rà toàn bộ quy tắc đã duyệt + chờ duyệt (không phụ thuộc dòng đang chọn)."""
-        result = self.env['dac.chat.rule']._ai_review()
+        """Nút "AI tối ưu bộ quy tắc": xếp một lượt chạy nền (AI mất vài phút, quá giới hạn thời gian của trang web)."""
+        log = self.env['dac.chat.rule.optimize'].create({'state': 'queued'})
+        self.env.ref('dac_chat_playbook.cron_process_analysis').sudo()._trigger()  # sudo(): quản lý không có quyền ir.cron
         return {'type': 'ir.actions.client', 'tag': 'display_notification', 'params': {
-            'title': 'AI đã rà soát quy tắc', 'type': 'success', 'sticky': True, 'message': result['message'],
-            'next': {'type': 'ir.actions.client', 'tag': 'soft_reload'}}}
+            'title': 'AI đang tối ưu bộ quy tắc', 'type': 'info', 'sticky': False,
+            'message': 'Chạy nền khoảng 2–5 phút, không cần giữ trang. Kết quả và nút hoàn tác ở "Lịch sử tối ưu quy tắc".',
+            'next': {'type': 'ir.actions.act_window', 'res_model': log._name, 'res_id': log.id, 'views': [(False, 'form')],
+                     'target': 'current'}}}
 
     @api.model
-    def _ai_review(self, analysis=None):
-        """Một lượt AI rà toàn bộ quy tắc đã duyệt + chờ duyệt: gộp quy tắc trùng, bỏ quy tắc thừa, chỉ ra mâu thuẫn.
-        Chỉ đổi quy tắc CHỜ DUYỆT; quy tắc đã duyệt không tự sửa (chỉ ghi gợi ý). Trả dict(message, merged, rejected, conflicts, usage)."""
+    def _active_rules(self):
+        return self.search([('state', 'in', ('approved', 'proposed'))])
+
+    @api.model
+    def _ai_optimize(self, analysis=None, log=None):
+        """Một lượt AI viết lại toàn bộ quy tắc đã duyệt + chờ duyệt thành bộ gọn. Áp dụng ngay (có lưu để hoàn tác).
+        Trả dict(message, usage, log)."""
         from .ai_agent import vision_call
         from .chat_analysis import AI_SYSTEM
-        rules = self.search([('state', 'in', ('approved', 'proposed'))])
+        Log = self.env['dac.chat.rule.optimize']
+        log = log or Log.create({'state': 'queued', 'analysis_id': analysis.id if analysis else False})
+        rules = self._active_rules()
         if len(rules) < 2:
-            return {'message': 'Chưa đủ quy tắc để rà soát.', 'merged': 0, 'rejected': 0, 'conflicts': 0, 'usage': {}}
+            log.write({'state': 'done', 'summary': 'Chưa đủ quy tắc để tối ưu.', 'before_count': len(rules), 'after_count': len(rules)})
+            return {'message': log.summary, 'usage': {}, 'log': log}
         labels = dict(CATEGORIES)
         lines = '\n'.join('[id %s] [%s] [%s] [%s] %s: %s%s' % (
             r.id, 'ĐÃ DUYỆT' if r.state == 'approved' else 'chờ duyệt', labels[r.category], r.priority, r.name, r.content,
             (' | Câu mẫu: %s' % r.example) if r.example else '') for r in rules)
-        text = REVIEW_TASK + '\n\nDANH SÁCH QUY TẮC:\n' + lines
         config = self.env['dac.chat.config']._get()
+        text = '%s\n\nĐỊNH HƯỚNG CỦA QUẢN LÝ (ưu tiên cao nhất):\n%s\n\nDANH SÁCH QUY TẮC (%s):\n%s' % (
+            OPTIMIZE_TASK, (config.agent_guidance or '').strip() or '(không có)', len(rules), lines)
         model = (analysis.ai_model_id if analysis else False) or config.ai_model_id
         fallback = analysis.ai_fallback if analysis else config.ai_fallback
         ai = self.env['dac.chat.task']._resolve('review', model, fallback)
-        data, label, _sent, usage = vision_call(ai.env, ai.model, ai.fallback, AI_SYSTEM, text, [], REVIEW_SCHEMA, 'review_rules',
-                                                'Rà soát trùng lặp và mâu thuẫn.', (10, 120))
-        return self._apply_review(rules, data, label, usage)
+        data, label, _sent, usage = vision_call(ai.env, ai.model, ai.fallback, AI_SYSTEM, text, [], OPTIMIZE_SCHEMA, 'optimize_rules',
+                                                'Tối ưu bộ quy tắc.', (10, 300))
+        return self._apply_optimize(rules, data, label, usage, log)
 
     @api.model
-    def _apply_review(self, rules, data, label='', usage=None):
+    def _apply_optimize(self, rules, data, label='', usage=None, log=None):
+        """Áp dụng kết quả AI. An toàn:
+        - Quy tắc mới thay cho toàn quy tắc đã duyệt (ngoài nhóm Cấm/Chuyển nhân viên) → duyệt ngay, quy tắc cũ thôi dùng.
+        - Có dính quy tắc chờ duyệt, hoặc thuộc nhóm Cấm/Chuyển nhân viên → quy tắc mới chờ duyệt; quy tắc đã duyệt cũ VẪN dùng
+          cho tới khi quản lý duyệt quy tắc mới (action_approve tự thay).
+        - Không tự bỏ quy tắc đã duyệt thuộc nhóm Cấm/Chuyển nhân viên. Id AI không nhắc tới thì giữ nguyên.
+        Mọi thay đổi được lưu ở log để hoàn tác."""
+        log = log or self.env['dac.chat.rule.optimize'].create({'state': 'queued'})
         by_id = {r.id: r for r in rules}
         valid = dict(CATEGORIES)
-        merged = rejected = 0
-        for item in data.get('merges') or []:
+        seen, changes = set(), []
+        created = self.browse()
+        auto = waiting = dropped = 0
+
+        def remember(rule):
+            changes.append({'id': rule.id, 'state': rule.state, 'merged_into_id': rule.merged_into_id.id or False,
+                            'review_note': rule.review_note or False, 'approved_by_id': rule.approved_by_id.id or False,
+                            'approved_at': fields.Datetime.to_string(rule.approved_at) if rule.approved_at else False})
+
+        for item in data.get('rules') or []:
             if not isinstance(item, dict) or not item.get('title') or not item.get('rule'):
                 continue
-            members = [by_id[i] for i in item.get('rule_ids') or [] if isinstance(i, int) and i in by_id]
-            proposed = [r for r in members if r.state == 'proposed']
-            approved = [r for r in members if r.state == 'approved']
-            if len(members) < 2 or not proposed:
-                continue
-            note = 'Gộp từ: %s. %s' % (', '.join('#%s %s' % (r.id, r.name) for r in members), _clean(item.get('reason')))
-            if approved:
-                note += ' Quy tắc đang dùng %s trùng ý: duyệt quy tắc gộp này rồi bỏ quy tắc cũ.' % ', '.join('#%s' % r.id for r in approved)
+            members = [by_id[i] for i in item.get('source_ids') or [] if isinstance(i, int) and i in by_id and i not in seen]
+            if not members:
+                continue  # AI không được tự thêm quy tắc không có gốc
+            seen.update(m.id for m in members)
+            title, content = _clean(item['title'])[:200], _clean(item['rule'])
+            if len(members) == 1 and _same(members[0].name, title) and _same(members[0].content, content):
+                continue  # giữ nguyên
+            category = item.get('category') if item.get('category') in valid else members[0].category
+            safe = category not in PROTECTED and all(m.state == 'approved' and m.category not in PROTECTED for m in members)
             new = self.create({
-                'name': _clean(item['title'])[:200], 'content': _clean(item['rule']), 'example': _clean(item.get('example')) or False,
-                'evidence': '\n'.join(filter(None, (r.evidence for r in members))) or False,
-                'category': item.get('category') if item.get('category') in valid else members[0].category,
-                'priority': item.get('priority') if item.get('priority') in ('must', 'should', 'may') else 'should',
-                'source': 'ai', 'state': 'proposed', 'analysis_id': members[0].analysis_id.id, 'review_note': note,
+                'name': title, 'content': content, 'example': _clean(item.get('example')) or False,
+                'evidence': ('\n'.join(filter(None, (m.evidence for m in members))) or '')[:3000] or False,
+                'category': category,
+                'priority': item.get('priority') if item.get('priority') in ('must', 'should', 'may') else members[0].priority,
+                'source': 'optimized', 'state': 'approved' if safe else 'proposed',
+                'analysis_id': (log.analysis_id or members[0].analysis_id).id,
+                'review_note': 'AI tối ưu, thay cho: %s. %s' % (', '.join('#%s %s' % (m.id, m.name) for m in members),
+                                                                _clean(item.get('reason'))),
             })
-            for rule in proposed:
-                rule.write({'state': 'rejected', 'merged_into_id': new.id, 'review_note': 'Đã gộp vào #%s "%s".' % (new.id, new.name)})
-                rejected += 1
-            merged += 1
-        for item in data.get('duplicates') or []:
-            if not isinstance(item, dict):
+            created |= new
+            auto += safe
+            waiting += not safe
+            for member in members:
+                remember(member)
+                if safe or member.state == 'proposed':
+                    member.write({'state': 'rejected', 'merged_into_id': new.id, 'review_note': 'Đã thay bằng #%s "%s" (AI tối ưu).' % (new.id, new.name)})
+                else:
+                    member.write({'merged_into_id': new.id, 'review_note': 'Vẫn đang dùng; sẽ thay bằng #%s "%s" khi quản lý duyệt quy tắc đó.' % (new.id, new.name)})
+        for item in data.get('dropped') or []:
+            rule = by_id.get((item or {}).get('rule_id')) if isinstance(item, dict) else None
+            if not rule or rule.id in seen or (rule.state == 'approved' and rule.category in PROTECTED):
                 continue
-            rule, keep = by_id.get(item.get('rule_id')), by_id.get(item.get('duplicate_of'))
-            if not rule or not keep or rule == keep or rule.state != 'proposed' or rule.merged_into_id:
-                continue
-            rule.write({'state': 'rejected', 'merged_into_id': keep.id,
-                        'review_note': 'Trùng với #%s "%s". %s' % (keep.id, keep.name, _clean(item.get('reason')))})
-            rejected += 1
-        conflicts = 0
-        for item in data.get('conflicts') or []:
-            members = [by_id[i] for i in (item or {}).get('rule_ids') or [] if isinstance(i, int) and i in by_id]
-            if len(members) < 2:
-                continue
-            conflicts += 1
-            for rule in members:
-                others = ', '.join('#%s' % r.id for r in members if r != rule)
-                rule.review_note = ((rule.review_note or '') + '\nMâu thuẫn với %s: %s' % (others, _clean(item.get('reason')))).strip()
+            seen.add(rule.id)
+            remember(rule)
+            rule.write({'state': 'rejected', 'review_note': 'AI tối ưu bỏ: %s' % (_clean(item.get('reason')) or 'thừa')})
+            dropped += 1
+        # Số quy tắc còn hiệu lực sau lượt này (quy tắc đã duyệt đang chờ được thay không tính)
+        after = len([r for r in rules if r.state in ('approved', 'proposed') and not (r.state == 'approved' and r.merged_into_id)]) + len(created)
         usage = usage or {}
-        message = 'Gộp %s nhóm quy tắc trùng, bỏ %s quy tắc thừa, %s chỗ mâu thuẫn cần xem. %s' % (
-            merged, rejected, conflicts, _clean(data.get('summary'))[:400])
+        message = 'Từ %s quy tắc còn %s: %s quy tắc mới áp dụng ngay, %s quy tắc mới chờ duyệt (nhóm an toàn hoặc từ đề xuất), bỏ %s. %s' % (
+            len(rules), after, auto, waiting, dropped, _clean(data.get('summary'))[:500])
         if usage.get('out'):
             message += ' (%s token vào / %s token ra)' % (usage.get('in', 0), usage['out'])
-        _logger.info('Rà soát quy tắc bằng %s: %s', label, message)
-        return {'message': message.strip(), 'merged': merged, 'rejected': rejected, 'conflicts': conflicts, 'usage': usage}
+        log.write({'state': 'done', 'summary': message.strip(), 'before_count': len(rules), 'after_count': after,
+                   'created_ids': [(6, 0, created.ids)], 'changes_json': json.dumps(changes), 'model_label': label,
+                   'tokens_in': usage.get('in', 0), 'tokens_out': usage.get('out', 0), 'error_message': False})
+        _logger.info('Tối ưu quy tắc bằng %s: %s', label, message)
+        return {'message': message.strip(), 'usage': usage, 'log': log}
 
     @api.model
     def _propose_from_stats(self, analysis, report):
@@ -288,3 +335,69 @@ class PlaybookPreview(models.TransientModel):
 
     text = fields.Text(string='Bản hướng dẫn (chỉ gồm quy tắc đã duyệt)', readonly=True,
                        default=lambda self: self.env['dac.chat.rule']._playbook_text() or 'Chưa có quy tắc nào được duyệt.')
+
+
+class ChatRuleOptimize(models.Model):
+    """Mỗi lượt AI tối ưu bộ quy tắc: kết quả + dữ liệu để hoàn tác."""
+    _name = 'dac.chat.rule.optimize'
+    _description = 'Lượt AI tối ưu quy tắc chat'
+    _order = 'id desc'
+
+    name = fields.Char(string='Lượt', compute='_compute_name')
+    state = fields.Selection([('queued', 'AI đang tối ưu'), ('done', 'Đã áp dụng'), ('undone', 'Đã hoàn tác'), ('failed', 'Lỗi')],
+                             string='Trạng thái', default='queued', required=True, readonly=True)
+    analysis_id = fields.Many2one('dac.chat.analysis', string='Đợt phân tích', readonly=True, ondelete='set null')
+    summary = fields.Text(string='Kết quả', readonly=True)
+    before_count = fields.Integer(string='Trước', readonly=True)
+    after_count = fields.Integer(string='Sau', readonly=True)
+    created_ids = fields.Many2many('dac.chat.rule', 'dac_chat_rule_optimize_rel', 'optimize_id', 'rule_id', string='Quy tắc mới',
+                                   readonly=True, context={'active_test': False})
+    changes_json = fields.Text(readonly=True)
+    model_label = fields.Char(string='Model', readonly=True)
+    tokens_in = fields.Integer(string='Token vào', readonly=True)
+    tokens_out = fields.Integer(string='Token ra', readonly=True)
+    error_message = fields.Text(string='Lỗi', readonly=True)
+    can_undo = fields.Boolean(compute='_compute_can_undo')
+
+    def _compute_name(self):
+        for log in self:
+            moment = fields.Datetime.context_timestamp(log.with_context(tz='Asia/Ho_Chi_Minh'), log.create_date or fields.Datetime.now())
+            log.name = 'Tối ưu %s' % moment.strftime('%d/%m/%Y %H:%M')
+
+    def _compute_can_undo(self):
+        for log in self:
+            log.can_undo = log._undoable()
+
+    def _undoable(self):
+        self.ensure_one()
+        return self.state == 'done' and self == self.search([('state', '=', 'done')], limit=1) and bool(self.changes_json or self.created_ids)
+
+    @api.model
+    def _cron_run(self):
+        """Chạy các lượt đang chờ (bấm nút). Không raise."""
+        for log in self.sudo().search([('state', '=', 'queued')], order='id'):
+            try:
+                self.env['dac.chat.rule'].sudo()._ai_optimize(log.analysis_id or None, log)
+                self.env.cr.commit()
+            except Exception as error:  # noqa: BLE001 — cron không được raise
+                self.env.cr.rollback()
+                _logger.exception('Tối ưu quy tắc %s lỗi', log.id)
+                log.write({'state': 'failed', 'error_message': str(error)[:500]})
+                self.env.cr.commit()
+
+    def action_undo(self):
+        """Trả mọi quy tắc về như trước lượt này; quy tắc mới do lượt này tạo thì ẩn đi. Chỉ hoàn tác được lượt gần nhất."""
+        self.ensure_one()
+        if not self._undoable():
+            raise UserError('Chỉ hoàn tác được lượt tối ưu gần nhất đã áp dụng.')
+        Rule = self.env['dac.chat.rule']
+        for change in json.loads(self.changes_json or '[]'):
+            rule = Rule.browse(change['id']).exists()
+            if rule:
+                rule.write({key: change.get(key) or False for key in ('state', 'merged_into_id', 'review_note', 'approved_by_id', 'approved_at')})
+        self.created_ids.write({'state': 'rejected', 'active': False})
+        self.write({'state': 'undone'})
+        return {'type': 'ir.actions.client', 'tag': 'soft_reload'}
+
+    def action_open_rules(self):
+        return self.env['ir.actions.actions']._for_xml_id('dac_chat_playbook.chat_rule_action')
