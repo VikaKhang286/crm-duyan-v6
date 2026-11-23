@@ -4,7 +4,7 @@
     'category': '1. Duy An ERP',
     'author': 'Huỳnh Quốc An',
     'sequence': 10,
-    'summary': 'Hệ thống chấm công DAC: Dashboard nhân viên/quản lý, xin nghỉ phép, điều chỉnh chấm công',
+    'summary': 'Hệ thống chấm công DAC: Dashboard nhân viên/quản lý, lịch nghỉ lễ, xin nghỉ phép, điều chỉnh chấm công',
     'description': '',
     'depends': ['base', 'web', 'hr', 'hr_attendance', 'hr_work_entry_contract', 'dac_erp'],
     'installable': True,
@@ -28,6 +28,7 @@
     ],
     'assets': {
         'web.assets_backend': [
+            'dac_attendance/static/src/js/holiday_date_range.js',
             # Existing
             'dac_attendance/static/src/js/attendance_systray.js',
             'dac_attendance/static/src/js/attendance_camera_dialog.js',

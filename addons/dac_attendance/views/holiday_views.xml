@@ -5,7 +5,8 @@
         <field name="model">dac.holiday</field>
         <field name="arch" type="xml">
             <list editable="top">
-                <field name="date"/>
+                <field name="date" widget="holiday_daterange" options="{'end_date_field': 'date_to'}"/>
+                <field name="date_to" column_invisible="True"/>
                 <field name="name"/>
                 <field name="company_id" groups="base.group_multi_company"/>
             </list>

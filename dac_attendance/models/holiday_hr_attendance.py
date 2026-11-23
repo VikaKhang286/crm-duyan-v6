@@ -13,10 +13,10 @@ class HrAttendance(models.Model):
     def _refresh_holiday_attendances(self, workdays):
         if not workdays:
             return
-        dates = self.env['dac.holiday'].sudo().search([
-            ('company_id', 'in', list({company for company, _day, _employee in workdays})),
-            ('date', 'in', list({day for _company, day, _employee in workdays})),
-        ])._company_dates()
+        days = {day for _company, day, _employee in workdays}
+        companies = self.env['res.company'].browse({company for company, _day, _employee in workdays})
+        holidays = self.env['dac.holiday'].sudo()._in_period(companies, min(days), max(days))
+        dates = {(holiday.company_id.id, day) for holiday in holidays for day in holiday._days(min(days), max(days))}
         by_day = defaultdict(set)
         for company_id, day, employee_id in workdays:
             if (company_id, day) in dates:

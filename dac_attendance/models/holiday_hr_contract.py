@@ -24,20 +24,21 @@ class HrContract(models.Model):
             for calendar, group in contracts.grouped(
                 lambda contract: contract.resource_calendar_id or contract.company_id.resource_calendar_id).items():
                 employees = group.employee_id
-                intervals = holiday._unworked_intervals(employees, calendar)
-                for employee in employees:
-                    xmlid = ('hr_work_entry_contract.work_entry_type_legal_leave'
-                             if employee.dac_employment_type == 'full_time'
-                             else 'hr_work_entry_contract.work_entry_type_unpaid_leave')
-                    for start, stop, _attendance in intervals.get(employee.id, ()):
-                        if start < end_dt and stop > start_dt:
-                            holiday_leaves += leaves.new({
-                                'resource_id': employee.resource_id.id,
-                                'calendar_id': calendar.id,
-                                'date_from': start.astimezone(pytz.utc).replace(tzinfo=None),
-                                'date_to': stop.astimezone(pytz.utc).replace(tzinfo=None),
-                                'work_entry_type_id': self.env.ref(xmlid).id,
-                            })
+                for day in holiday._days(start_dt.date() - timedelta(days=1), end_dt.date() + timedelta(days=1)):
+                    intervals = holiday._unworked_intervals(employees, calendar, day)
+                    for employee in employees:
+                        xmlid = ('hr_work_entry_contract.work_entry_type_legal_leave'
+                                 if employee.dac_employment_type == 'full_time'
+                                 else 'hr_work_entry_contract.work_entry_type_unpaid_leave')
+                        for start, stop, _attendance in intervals.get(employee.id, ()):
+                            if start < end_dt and stop > start_dt:
+                                holiday_leaves += leaves.new({
+                                    'resource_id': employee.resource_id.id,
+                                    'calendar_id': calendar.id,
+                                    'date_from': start.astimezone(pytz.utc).replace(tzinfo=None),
+                                    'date_to': stop.astimezone(pytz.utc).replace(tzinfo=None),
+                                    'work_entry_type_id': self.env.ref(xmlid).id,
+                                })
         return holiday_leaves | leaves
 
     def _get_valid_leave_intervals(self, attendances, interval):
@@ -51,7 +52,8 @@ class HrContract(models.Model):
             self.company_id, start.astimezone(tz).date(), stop.astimezone(tz).date())
         if not holidays:
             return intervals
-        dac_days = Intervals([(*local_day_bounds(holiday.date, tz), holiday) for holiday in holidays])
+        dac_days = Intervals([(*local_day_bounds(day, tz), holiday) for holiday in holidays
+                              for day in holiday._days(start.astimezone(tz).date(), stop.astimezone(tz).date())])
         return list(Intervals(intervals) - dac_days)
 
     def _get_contract_work_entries_values(self, date_start, date_stop):

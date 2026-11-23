@@ -5,7 +5,7 @@ import pytz
 
 from odoo import api, fields, models
 from odoo.addons.resource.models.utils import Intervals
-from odoo.exceptions import AccessError
+from odoo.exceptions import AccessError, ValidationError
 
 
 def local_day_bounds(day, tz):
@@ -21,6 +21,7 @@ class DacHoliday(models.Model):
 
     name = fields.Char(string='Tên ngày lễ', required=True)
     date = fields.Date(string='Ngày nghỉ', required=True, default=fields.Date.context_today)
+    date_to = fields.Date(string='Đến ngày', help='Để trống nếu chỉ nghỉ một ngày.')
     company_id = fields.Many2one('res.company', string='Công ty', required=True,
                                  default=lambda self: self.env.company)
 
@@ -32,17 +33,40 @@ class DacHoliday(models.Model):
         if not self.env.su and self.company_id - self.env.companies:
             raise AccessError('Ngày lễ phải thuộc công ty đang được chọn.')
 
+    @api.constrains('date', 'date_to', 'company_id')
+    def _check_date_range(self):
+        for holiday in self:
+            end = holiday.date_to or holiday.date
+            if end < holiday.date:
+                raise ValidationError('Ngày kết thúc phải từ ngày bắt đầu trở đi.')
+            overlap = self.search_count([
+                ('id', '!=', holiday.id), ('company_id', '=', holiday.company_id.id),
+                ('date', '<=', end), '|', ('date_to', '>=', holiday.date),
+                '&', ('date_to', '=', False), ('date', '>=', holiday.date),
+            ])
+            if overlap:
+                raise ValidationError('Khoảng ngày nghỉ trùng với ngày nghỉ lễ khác của công ty.')
+
+    def _days(self, date_from=None, date_to=None):
+        self.ensure_one()
+        day = max(self.date, date_from) if date_from else self.date
+        end = min(self.date_to or self.date, date_to) if date_to else (self.date_to or self.date)
+        while day <= end:
+            yield day
+            day += timedelta(days=1)
+
     @api.model
     def _in_period(self, companies, date_from, date_to):
-        return self.search([('company_id', 'in', companies.ids), ('date', '>=', date_from),
-                            ('date', '<=', date_to)])
+        return self.search([('company_id', 'in', companies.ids), ('date', '<=', date_to),
+                            '|', ('date_to', '>=', date_from),
+                            '&', ('date_to', '=', False), ('date', '>=', date_from)])
 
-    def _unworked_intervals(self, employees, calendar):
+    def _unworked_intervals(self, employees, calendar, day=None):
         self.ensure_one()
         if not calendar or not employees:
             return {}
         tz = pytz.timezone(calendar.tz)
-        start, stop = local_day_bounds(self.date, tz)
+        start, stop = local_day_bounds(day or self.date, tz)
         start_utc = start.astimezone(pytz.utc).replace(tzinfo=None)
         stop_utc = stop.astimezone(pytz.utc).replace(tzinfo=None)
         records = self.env['hr.attendance'].search([
@@ -71,30 +95,31 @@ class DacHoliday(models.Model):
             ('employee_id', 'in', full_time.ids), ('state', 'in', ['open', 'close']),
         ]).grouped('employee_id')
         for holiday in self:
-            by_calendar = defaultdict(list)
-            for employee in full_time.filtered(lambda e: e.company_id == holiday.company_id):
-                if employee.departure_date and employee.departure_date < holiday.date:
-                    continue
-                history = contracts.get(employee)
-                if history:
-                    current = history.filtered(lambda c: c.date_start <= holiday.date and
-                                               (not c.date_end or holiday.date <= c.date_end))
-                    if not current:
+            for day in holiday._days():
+                by_calendar = defaultdict(list)
+                for employee in full_time.filtered(lambda e: e.company_id == holiday.company_id):
+                    if employee.departure_date and employee.departure_date < day:
                         continue
-                    calendar = current[:1].resource_calendar_id
-                else:
-                    if not employee.active and not employee.departure_date:
-                        continue
-                    calendar = employee.resource_calendar_id
-                by_calendar[calendar or holiday.company_id.resource_calendar_id].append(employee.id)
-            for calendar, ids in by_calendar.items():
-                for employee_id, gaps in holiday._unworked_intervals(employees.browse(ids), calendar).items():
-                    paid[employee_id] += sum((end - start).total_seconds() / 3600
-                                             for start, end, _attendance in gaps)
+                    history = contracts.get(employee)
+                    if history:
+                        current = history.filtered(lambda c: c.date_start <= day and
+                                                   (not c.date_end or day <= c.date_end))
+                        if not current:
+                            continue
+                        calendar = current[:1].resource_calendar_id
+                    else:
+                        if not employee.active and not employee.departure_date:
+                            continue
+                        calendar = employee.resource_calendar_id
+                    by_calendar[calendar or holiday.company_id.resource_calendar_id].append(employee.id)
+                for calendar, ids in by_calendar.items():
+                    for employee_id, gaps in holiday._unworked_intervals(employees.browse(ids), calendar, day).items():
+                        paid[employee_id] += sum((end - start).total_seconds() / 3600
+                                                 for start, end, _attendance in gaps)
         return paid
 
     def _company_dates(self):
-        return {(holiday.company_id.id, holiday.date) for holiday in self}
+        return {(holiday.company_id.id, day) for holiday in self for day in holiday._days()}
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -103,7 +128,7 @@ class DacHoliday(models.Model):
         return holidays
 
     def write(self, vals):
-        if not {'date', 'company_id'}.intersection(vals):
+        if not {'date', 'date_to', 'company_id'}.intersection(vals):
             return super().write(vals)
         previous = self._company_dates()
         result = super().write(vals)
@@ -122,4 +147,5 @@ class AttendanceDashboard(models.AbstractModel):
 
     def _get_company_holidays(self, companies, date_from, date_to):
         holidays = self.env['dac.holiday']._in_period(companies, date_from, date_to)
-        return {(holiday.company_id.id, holiday.date): holiday.name for holiday in holidays}
+        return {(holiday.company_id.id, day): holiday.name
+                for holiday in holidays for day in holiday._days(date_from, date_to)}
