@@ -84,7 +84,7 @@ export class ManagerDashboard extends Component {
             is_late: false,
         }));
         if (this.state.activeTab === "all") {
-            return [...present, ...absent];
+            return [...present, ...absent, ...(this.state.data.holiday_list || [])];
         }
         if (this.state.activeTab === "late") {
             return this.lateList;
@@ -133,7 +133,7 @@ export class ManagerDashboard extends Component {
 
     get totalEmployees() {
         const stats = this.state.data.today_stats || EMPTY_DATA.today_stats;
-        return stats.present + stats.absent;
+        return stats.present + stats.absent + (stats.holiday || 0);
     }
 
     get presentRate() {

@@ -6,3 +6,7 @@ from . import attendance_report
 from . import dac_attendance_leave
 from . import dac_attendance_amendment
 from . import dac_attendance_dashboard
+from . import holiday
+from . import holiday_hr_employee
+from . import holiday_hr_contract
+from . import holiday_hr_attendance

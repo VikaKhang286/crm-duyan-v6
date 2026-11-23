@@ -32,6 +32,10 @@ class DacAttendanceDashboard(models.AbstractModel):
             return d.strftime('%d/%m/%Y')
         return str(d)
 
+    def _get_company_holidays(self, companies, date_from, date_to):
+        """Holiday names keyed by company ID and local date."""
+        return {}
+
     def _format_duration(self, hours):
         """Render decimal working hours as the compact label used in the dashboard."""
         minutes = max(0, round((hours or 0) * 60))
@@ -102,10 +106,17 @@ class DacAttendanceDashboard(models.AbstractModel):
                 leave_dates.add(d)
                 d += timedelta(days=1)
 
+        holidays = self._get_company_holidays(employee.company_id, month_start, month_end)
+        today_status['holiday_name'] = holidays.get((employee.company_id.id, today))
         month_calendar = []
         d = month_start
         while d <= month_end:
-            if d > today:
+            holiday_name = holidays.get((employee.company_id.id, d))
+            if holiday_name and d not in att_by_date:
+                status = 'holiday'
+            elif holiday_name:
+                status = 'late' if att_by_date[d].is_late else 'on_time'
+            elif d > today:
                 status = 'future'
             elif d.weekday() >= 6:
                 status = 'weekend'
@@ -120,6 +131,7 @@ class DacAttendanceDashboard(models.AbstractModel):
                 'day': d.day,
                 'weekday': d.weekday(),
                 'status': status,
+                'holiday_name': holiday_name,
             })
             d += timedelta(days=1)
 
@@ -214,18 +226,27 @@ class DacAttendanceDashboard(models.AbstractModel):
 
         # Điền ngày vắng mặt trong tháng vào history (chỉ ngày làm việc không có attendance)
         history_dates = {att.check_in_date for att in history_atts}
+        holiday_history_hours = (
+            8.0
+            if getattr(employee.sudo(), 'dac_employment_type', 'full_time') == 'full_time'
+            else 0.0
+        )
         for cal_day in reversed(month_calendar):
             d_obj = date.fromisoformat(cal_day['date'])
-            if cal_day['status'] == 'absent' and d_obj not in history_dates and d_obj <= today:
+            if cal_day['status'] in ('absent', 'holiday') and d_obj not in history_dates and d_obj <= today:
                 history.append({
                     'date': self._format_date(d_obj),
                     'check_in': '',
                     'check_out': '',
-                    'worked_hours': 0,
+                    'worked_hours': (
+                        holiday_history_hours
+                        if cal_day['status'] == 'holiday' else 0.0
+                    ),
                     'is_late': False,
                     'late_minutes': 0,
                     'is_early_leave': False,
-                    'status': 'absent',
+                    'status': cal_day['status'],
+                    'holiday_name': cal_day['holiday_name'],
                 })
             elif cal_day['status'] == 'leave' and d_obj not in history_dates:
                 leave_match = next(
@@ -276,6 +297,9 @@ class DacAttendanceDashboard(models.AbstractModel):
         from datetime import datetime
 
         all_employees = self.env['hr.employee'].search([('active', '=', True)])
+        week_start = today - timedelta(days=today.weekday())
+        holidays = self._get_company_holidays(
+            all_employees.company_id, week_start, week_start + timedelta(days=6))
 
         today_atts = self.env['hr.attendance'].search([
             ('check_in_date', '=', today),
@@ -284,6 +308,8 @@ class DacAttendanceDashboard(models.AbstractModel):
         checked_in_ids = {a.employee_id.id for a in today_atts}
         late_ids = {a.employee_id.id for a in today_atts if a.is_late}
         absent_ids = {e.id for e in all_employees if e.id not in checked_in_ids}
+        holiday_ids = {e.id for e in all_employees if e.id in absent_ids and (e.company_id.id, today) in holidays}
+        absent_ids -= holiday_ids
         approved_leave_employee_ids = set(self.env['dac.attendance.leave'].search([
             ('state', '=', 'approved'),
             ('date_from', '<=', today),
@@ -340,7 +366,7 @@ class DacAttendanceDashboard(models.AbstractModel):
             })
         present_list = sorted(present_list, key=lambda x: x['name'])
 
-        absent_list = [
+        away_list = [
             {
                 'employee_id': e.id,
                 'name': e.name,
@@ -349,9 +375,12 @@ class DacAttendanceDashboard(models.AbstractModel):
                 'check_out': '',
                 'worked_time': '—',
                 'verification': '—',
+                'holiday_name': holidays.get((e.company_id.id, today)),
             }
-            for e in all_employees if e.id in absent_ids
+            for e in all_employees if e.id in absent_ids or e.id in holiday_ids
         ]
+        absent_list = [row for row in away_list if not row['holiday_name']]
+        holiday_list = [row for row in away_list if row['holiday_name']]
 
         # Pending approvals
         pending_leaves = self.env['dac.attendance.leave'].search(
@@ -393,22 +422,23 @@ class DacAttendanceDashboard(models.AbstractModel):
         # Attendance rate for each working day in the current week.  We use
         # check_in_date (the local business date stored by the attendance
         # extension) so the dashboard is stable around the UTC midnight edge.
-        week_start = today - timedelta(days=today.weekday())
         workday_names = ('Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7')
-        total_employees = len(all_employees)
         weekly_attendance = []
         for offset, day_name in enumerate(workday_names):
             workday = week_start + timedelta(days=offset)
             is_future = workday > today
-            if is_future:
+            expected = all_employees.filtered(lambda e: (e.company_id.id, workday) not in holidays)
+            is_holiday = bool(all_employees and not expected)
+            if is_future or is_holiday:
                 present_count = 0
                 rate = None
             else:
                 workday_atts = self.env['hr.attendance'].search([
                     ('check_in_date', '=', workday),
                 ])
-                present_count = len({att.employee_id.id for att in workday_atts})
-                rate = round((present_count / total_employees) * 100) if total_employees else 0
+                present_count = len(workday_atts.employee_id.filtered(
+                    lambda e: (e.company_id.id, workday) not in holidays))
+                rate = round(present_count / len(expected) * 100) if expected else 0
             weekly_attendance.append({
                 'label': day_name,
                 'date': self._format_date(workday),
@@ -416,12 +446,14 @@ class DacAttendanceDashboard(models.AbstractModel):
                 'rate': rate,
                 'is_today': workday == today,
                 'is_future': is_future,
+                'is_holiday': is_holiday,
             })
 
         return {
             'today_stats': {
                 'present': len(present_list),
                 'absent': len(absent_list),
+                'holiday': len(holiday_list),
                 'on_leave': len(on_leave_ids),
                 'unexplained_absent': len(absent_ids - on_leave_ids),
                 'late': len(late_ids),
@@ -431,6 +463,7 @@ class DacAttendanceDashboard(models.AbstractModel):
             },
             'present_list': present_list,
             'absent_list': absent_list,
+            'holiday_list': holiday_list,
             'weekly_attendance': weekly_attendance,
             'pending_approvals': {
                 'leaves': leaves_data,

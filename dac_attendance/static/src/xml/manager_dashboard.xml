@@ -52,7 +52,7 @@
                          t-on-click="() => this.state.activeTab = 'absent'">
                         <div class="o_dac_kpi_top"><div class="o_dac_kpi_label">Vắng</div><span class="o_dac_kpi_icon"><i class="fa fa-user-times"/></span></div>
                         <div class="o_dac_kpi_number" t-esc="state.data.today_stats.absent"/>
-                        <div class="o_dac_kpi_meta"><t t-esc="state.data.today_stats.on_leave"/> có phép · <t t-esc="state.data.today_stats.unexplained_absent"/> chưa rõ</div>
+                        <div class="o_dac_kpi_meta"><t t-esc="state.data.today_stats.on_leave"/> có phép · <t t-esc="state.data.today_stats.unexplained_absent"/> chưa rõ<t t-if="state.data.today_stats.holiday"> · <t t-esc="state.data.today_stats.holiday"/> nghỉ lễ</t></div>
                     </div>
                     <div class="o_dac_kpi_card o_dac_kpi_card--pending"
                          t-on-click="() => this.state.approvalTab = 'leaves'">
@@ -77,7 +77,8 @@
                                     <div class="o_dac_weekday_bar">
                                         <span t-attf-class="{{ day.is_future ? 'o_dac_weekday_bar--future' : (day.rate > 90 ? 'o_dac_weekday_bar--green' : (day.rate >= 60 ? 'o_dac_weekday_bar--blue' : (day.rate >= 40 ? 'o_dac_weekday_bar--yellow' : 'o_dac_weekday_bar--red'))) }}" t-att-style="'width: ' + (day.rate || 0) + '%'"/>
                                     </div>
-                                    <strong t-if="!day.is_future"><t t-esc="day.rate"/>%</strong>
+                                    <strong t-if="day.is_holiday">Nghỉ lễ</strong>
+                                    <strong t-elif="!day.is_future"><t t-esc="day.rate"/>%</strong>
                                     <strong t-else="">—</strong>
                                 </div>
                             </t>
@@ -126,13 +127,14 @@
                         <t t-if="!employeeList.length"><p class="text-muted text-center py-4">Chưa có dữ liệu nhân viên phù hợp.</p></t>
                         <t t-foreach="employeeList" t-as="emp" t-key="emp.employee_id">
                             <div class="o_dac_employee_table_row">
-                                <span class="o_dac_employee_name"><i t-attf-class="fa {{ emp.is_absent ? 'fa-user-times text-danger' : (emp.is_late ? 'fa-clock-o text-warning' : 'fa-check-circle text-success') }}"/> <t t-esc="emp.name"/></span>
+                                <span class="o_dac_employee_name"><i t-attf-class="fa {{ emp.holiday_name ? 'fa-calendar' : (emp.is_absent ? 'fa-user-times text-danger' : (emp.is_late ? 'fa-clock-o text-warning' : 'fa-check-circle text-success')) }}"/> <t t-esc="emp.name"/></span>
                                 <span t-esc="emp.department"/>
                                 <span><t t-esc="emp.check_in || '—'"/></span>
                                 <span><t t-esc="emp.check_out || '—'"/></span>
                                 <span t-esc="emp.worked_time"/>
                                 <span class="o_dac_employee_verification" t-esc="emp.verification"/>
-                                <span t-attf-class="o_dac_status_pill {{ emp.is_absent ? 'o_dac_status_pill--absent' : (emp.is_late ? 'o_dac_status_pill--late' : '') }}"><t t-esc="emp.is_absent ? 'Vắng' : (emp.is_late ? 'Đi muộn' : 'Có mặt')"/></span>
+                                <span t-if="emp.holiday_name" class="o_dac_status_pill" t-att-title="emp.holiday_name">Nghỉ lễ</span>
+                                <span t-else="" t-attf-class="o_dac_status_pill {{ emp.is_absent ? 'o_dac_status_pill--absent' : (emp.is_late ? 'o_dac_status_pill--late' : '') }}"><t t-esc="emp.is_absent ? 'Vắng' : (emp.is_late ? 'Đi muộn' : 'Có mặt')"/></span>
                             </div>
                         </t>
                     </div>

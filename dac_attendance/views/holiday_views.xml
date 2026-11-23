@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="holiday_list" model="ir.ui.view">
+        <field name="name">dac.holiday.list</field>
+        <field name="model">dac.holiday</field>
+        <field name="arch" type="xml">
+            <list editable="top">
+                <field name="date"/>
+                <field name="name"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+            </list>
+        </field>
+    </record>
+    <record id="action_holidays" model="ir.actions.act_window">
+        <field name="name">Điều chỉnh ngày nghỉ lễ</field>
+        <field name="res_model">dac.holiday</field>
+        <field name="view_mode">list</field>
+    </record>
+    <menuitem id="menu_holidays" name="Điều chỉnh ngày nghỉ lễ"
+              parent="menu_dac_attendance_config" sequence="20"
+              action="action_holidays" groups="hr_attendance.group_hr_attendance_manager"/>
+</odoo>

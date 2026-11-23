@@ -1,12 +1,12 @@
 {
     'name': 'DAC Attendance',
-    'version': '4.0',
+    'version': '4.2',
     'category': '1. Duy An ERP',
     'author': 'Huỳnh Quốc An',
     'sequence': 10,
     'summary': 'Hệ thống chấm công DAC: Dashboard nhân viên/quản lý, xin nghỉ phép, điều chỉnh chấm công',
     'description': '',
-    'depends': ['base', 'web', 'hr', 'hr_attendance', 'dac_erp'],
+    'depends': ['base', 'web', 'hr', 'hr_attendance', 'hr_work_entry_contract', 'dac_erp'],
     'installable': True,
     'auto_install': False,
     'application': False,
@@ -14,6 +14,7 @@
         'security/attendance_management_groups.xml',
         'security/ir.model.access.csv',
         'security/record_rules.xml',
+        'security/holiday_rules.xml',
         'views/employee_attendance_config_views.xml',
         'views/attendance_kiosk_views.xml',
         'views/dac_attendance_leave_views.xml',
@@ -22,6 +23,8 @@
         'data/no_role_home_action.xml',
         'data/attendance_cron.xml',
         'views/attendance_menu.xml',
+        'views/holiday_views.xml',
+        'views/holiday_employee_views.xml',
     ],
     'assets': {
         'web.assets_backend': [

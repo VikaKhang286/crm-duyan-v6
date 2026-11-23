@@ -9,3 +9,5 @@ access_dac_attendance_leave_manager,dac.attendance.leave.manager,model_dac_atten
 access_dac_attendance_amendment_user,dac.attendance.amendment.user,model_dac_attendance_amendment,base.group_user,1,1,1,0
 access_dac_attendance_amendment_manager,dac.attendance.amendment.manager,model_dac_attendance_amendment,hr_attendance.group_hr_attendance_manager,1,1,1,1
 access_dac_attendance_dashboard_user,dac.attendance.dashboard.user,model_dac_attendance_dashboard,base.group_user,1,0,0,0
+access_holiday_employee,Read public holidays,model_dac_holiday,base.group_user,1,0,0,0
+access_holiday_manager,Manage public holidays,model_dac_holiday,hr_attendance.group_hr_attendance_manager,1,1,1,1

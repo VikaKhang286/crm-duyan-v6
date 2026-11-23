@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="employee_type_list" model="ir.ui.view">
+        <field name="name">hr.employee.list.employment.type</field>
+        <field name="model">hr.employee</field>
+        <field name="arch" type="xml">
+            <list string="Loại nhân viên" create="false" delete="false">
+                <field name="name"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+                <field name="job_id" optional="hide"/>
+                <field name="dac_employment_type"/>
+                <field name="active" optional="hide"/>
+            </list>
+        </field>
+    </record>
+    <record id="employee_type_form" model="ir.ui.view">
+        <field name="name">hr.employee.form.employment.type</field>
+        <field name="model">hr.employee</field>
+        <field name="arch" type="xml">
+            <form string="Loại nhân viên">
+                <sheet>
+                    <group>
+                        <field name="name" readonly="1"/>
+                        <field name="company_id" readonly="1" groups="base.group_multi_company"/>
+                        <field name="job_id" readonly="1"/>
+                        <field name="dac_employment_type" widget="radio" options="{'horizontal': True}"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="employee_type_search" model="ir.ui.view">
+        <field name="name">hr.employee.search.employment.type</field>
+        <field name="model">hr.employee</field>
+        <field name="arch" type="xml">
+            <search string="Tìm kiếm loại nhân viên">
+                <field name="name"/>
+                <field name="company_id"/>
+                <field name="dac_employment_type"/>
+                <filter name="full_time" string="Full-time" domain="[('dac_employment_type', '=', 'full_time')]"/>
+                <filter name="part_time" string="Part-time" domain="[('dac_employment_type', '=', 'part_time')]"/>
+                <group expand="0" string="Nhóm theo">
+                    <filter name="group_by_company" string="Công ty" context="{'group_by': 'company_id'}"/>
+                    <filter name="group_by_type" string="Loại nhân viên" context="{'group_by': 'dac_employment_type'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+    <record id="action_employee_types" model="ir.actions.act_window">
+        <field name="name">Loại nhân viên</field>
+        <field name="res_model">hr.employee</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="employee_type_search"/>
+        <field name="context">{'active_test': True}</field>
+    </record>
+    <record id="action_employee_types_list" model="ir.actions.act_window.view">
+        <field name="sequence" eval="1"/>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="employee_type_list"/>
+        <field name="act_window_id" ref="action_employee_types"/>
+    </record>
+    <record id="action_employee_types_form" model="ir.actions.act_window.view">
+        <field name="sequence" eval="2"/>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="employee_type_form"/>
+        <field name="act_window_id" ref="action_employee_types"/>
+    </record>
+    <menuitem id="menu_employee_types" name="Loại nhân viên"
+              parent="menu_dac_attendance_config" sequence="15"
+              action="action_employee_types" groups="hr_attendance.group_hr_attendance_manager"/>
+</odoo>

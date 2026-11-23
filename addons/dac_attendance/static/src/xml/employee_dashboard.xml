@@ -35,6 +35,9 @@
                             <t t-if="state.data.today_status.checked_in">
                                 ĐANG LÀM VIỆC
                             </t>
+                            <t t-elif="state.data.today_status.holiday_name">
+                                Nghỉ lễ · <t t-esc="state.data.today_status.holiday_name"/>
+                            </t>
                             <t t-else="">
                                 CHƯA CHECK-IN
                             </t>
@@ -143,7 +146,10 @@
                             <div t-attf-class="o_dac_history_row o_dac_history_row--{{ row.status }}">
                                 <span class="o_dac_hist_date" t-esc="row.date"/>
                                 <span class="o_dac_hist_times">
-                                    <t t-if="row.status === 'leave'">
+                                    <t t-if="row.status === 'holiday'">
+                                        <span><i class="fa fa-calendar me-1"/>Nghỉ lễ · <t t-esc="row.holiday_name"/></span>
+                                    </t>
+                                    <t t-elif="row.status === 'leave'">
                                         <span class="o_dac_hist_leave_label">
                                             <i class="fa fa-calendar me-1"/>
                                             <t t-esc="row.leave_type || 'Nghỉ phép'"/>
@@ -161,7 +167,10 @@
                                     </t>
                                 </span>
                                 <span class="o_dac_hist_hours">
-                                    <t t-if="row.worked_hours > 0">
+                                    <t t-if="row.status === 'holiday'">
+                                        <t t-esc="row.worked_hours + 'h'"/>
+                                    </t>
+                                    <t t-elif="row.worked_hours > 0">
                                         <t t-esc="formatHours(row.worked_hours)"/>
                                     </t>
                                 </span>

@@ -29,6 +29,7 @@
             <span class="o_dac_legend_dot o_dac_legend_dot--late"/> Trễ
             <span class="o_dac_legend_dot o_dac_legend_dot--absent"/> Vắng
             <span class="o_dac_legend_dot o_dac_legend_dot--leave"/> Phép
+            <t t-if="hasHolidays"><span class="o_dac_legend_dot o_dac_legend_dot--holiday"/> Nghỉ lễ</t>
         </div>
     </div>
 </t>

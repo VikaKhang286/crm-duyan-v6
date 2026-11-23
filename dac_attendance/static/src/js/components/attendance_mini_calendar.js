@@ -26,7 +26,13 @@ export class AttendanceMiniCalendar extends Component {
             leave: "Nghỉ phép",
             weekend: "Cuối tuần",
             future: "",
+            holiday: "Nghỉ lễ",
         };
-        return labels[day.status] || "";
+        const status = labels[day.status] || "";
+        return day.holiday_name ? `${status} · ${day.holiday_name}` : status;
+    }
+
+    get hasHolidays() {
+        return this.props.days.some((day) => day.holiday_name);
     }
 }

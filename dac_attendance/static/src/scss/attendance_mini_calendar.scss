@@ -74,6 +74,11 @@
         color: #1d4ed8;
     }
 
+    &--holiday {
+        background: #ede9fe;
+        color: #5b21b6;
+    }
+
     &--weekend {
         color: #cbd5e1;
         background: transparent;
@@ -107,4 +112,5 @@
     &--late    { background: #fef3c7; border: 1.5px solid #fcd34d; }
     &--absent  { background: #fee2e2; border: 1.5px solid #fca5a5; }
     &--leave   { background: #dbeafe; border: 1.5px solid #93c5fd; }
+    &--holiday { background: #ede9fe; border: 1.5px solid #c4b5fd; }
 }
