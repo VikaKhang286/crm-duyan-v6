@@ -1417,7 +1417,7 @@ class TestTraining(TransactionCase):
         seen = {}
 
         def fake_call(env, model, fallback, system, text, schema, name, description, timeout):
-            seen.update(text=text, effort=env.context.get('dac_ai_effort'), timeout=timeout)
+            seen.update(text=text, effort=env.context.get('dac_ai_effort'), timeout=timeout, stream=env.context.get('dac_ai_stream'))
             return ({'system_prompt': '# Vai trò\nXưng em, không xin SĐT khách Zalo.\n# Bối cảnh\n- Bây giờ: {{now}}\n- Kênh: {{channel}}\n' + 'y' * 300,
                      'changes': ['Bỏ xin SĐT với khách Zalo (góp ý 1)']}, 'model-x')
 
@@ -1425,9 +1425,10 @@ class TestTraining(TransactionCase):
              patch.object(self.env.cr, 'commit'), patch.object(self.env.cr, 'rollback'):
             self.Prompt._cron_optimize()
         self.assertIn('Chị cho em xin SĐT nha', seen['text'])
-        self.assertEqual(seen['effort'], 'max', 'cải tiến dùng thinking tối đa (dòng tác vụ "Cải tiến prompt từ góp ý")')
-        self.assertEqual(self.env['dac.chat.task']._get('improve_prompt').thinking, 'max')
-        self.assertIn('thinking max', new.generated_by)
+        self.assertEqual(seen['effort'], 'high', 'cải tiến dùng thinking Cao (Tối đa làm Haiku suy nghĩ mãi không ra kết quả)')
+        self.assertEqual(self.env['dac.chat.task']._get('improve_prompt').thinking, 'high')
+        self.assertTrue(seen['stream'], 'gọi streaming để Cloudflare của 9router không cắt sau 100 giây')
+        self.assertIn('thinking high', new.generated_by)
         self.assertNotIn('tạm bỏ', seen['text'])
         self.assertEqual(new.state, 'draft')
         self.assertIn('không xin SĐT', new.system_prompt)
@@ -1448,3 +1449,17 @@ class TestTraining(TransactionCase):
         self.assertEqual(new.state, 'failed')
         self.assertIn('không hợp lệ', new.error_message)
         self.assertEqual(self.Prompt.demo_prompt_state(new.id)['state'], 'failed')
+
+
+    def test_merge_stream_rebuilds_tool_call_and_usage(self):
+        from odoo.addons.dac_chat_playbook.models.ai_connection_effort import merge_stream
+        lines = [b': ping', b'data: {"choices":[{"delta":{"reasoning_content":"nghi"}}]}',
+                 b'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"c1","function":{"name":"answer","arguments":"{\\"a\\": "}}]}}]}',
+                 b'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"1}"}}]}}]}',
+                 b'data: {"choices":[],"usage":{"prompt_tokens":10,"completion_tokens":5}}', b'data: [DONE]']
+        result = merge_stream(lines)
+        call = result['choices'][0]['message']['tool_calls'][0]
+        self.assertEqual((call['id'], call['function']['name'], json.loads(call['function']['arguments'])), ('c1', 'answer', {'a': 1}))
+        self.assertEqual(result['usage'], {'prompt_tokens': 10, 'completion_tokens': 5})
+        with self.assertRaises(UserError):
+            merge_stream([b'data: {"error": {"message": "overloaded"}}'])

@@ -522,8 +522,10 @@ class ChatPrompt(models.Model):
                                                   '\n'.join(f._line() for f in feedback) or '(không có)', parent.system_prompt)
         # Model + thinking ở dòng "Cải tiến prompt từ góp ý" (mặc định Haiku, thinking tối đa)
         ai = self.env['dac.chat.task']._resolve('improve_prompt', self.env['dac.chat.config']._get().ai_model_id, True)
-        data, label = ai_call(ai.env, ai.model, ai.fallback, AI_SYSTEM, text, OPTIMIZE_PROMPT_SCHEMA, 'rewrite_prompt',
-                              'Viết lại system prompt theo góp ý.', IMPROVE_TIMEOUT)
+        # Streaming: thinking tối đa lâu hơn 100 giây, gọi thường sẽ bị Cloudflare của 9router cắt (HTTP 524)
+        env = ai.env(context=dict(ai.env.context, dac_ai_stream=True))
+        data, label = ai_call(env, ai.model.with_context(dac_ai_stream=True), ai.fallback, AI_SYSTEM, text, OPTIMIZE_PROMPT_SCHEMA,
+                              'rewrite_prompt', 'Viết lại system prompt theo góp ý.', IMPROVE_TIMEOUT)
         label = '%s%s' % (label, ' · thinking %s' % ai.effort if ai.effort else '')
         new_text = (data.get('system_prompt') or '').strip()
         missing = [p for p in PLACEHOLDERS if p in parent.system_prompt and p not in new_text]

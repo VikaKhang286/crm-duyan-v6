@@ -46,7 +46,7 @@ TASKS = [
      '3. Prompt', 'Cao: chạy hiếm, chất lượng quan trọng.'),
     ('improve_prompt', 'Cải tiến prompt từ góp ý',
      'Màn hình Huấn luyện & kiểm thử: Agent viết lại system prompt theo góp ý của admin cho từng lượt trả lời.',
-     '3. Prompt', 'Tối đa: chạy khi admin bấm "Cải tiến", chất lượng quan trọng hơn tốc độ.'),
+     '3. Prompt', 'Cao (~30 giây). Rất cao ~1 phút. KHÔNG chọn Tối đa: Haiku suy nghĩ tới hết giới hạn token mà không ra kết quả.'),
     ('bot_greeting', 'Chatbot trả lời — Chào hỏi',
      'Trả lời khách mới nhắn lần đầu: chào, xin thông tin cơ bản, hẹn mốc làm việc. Khách đang chờ nên cần nhanh.',
      '4. Chatbot', 'Thấp hoặc tắt: ưu tiên tốc độ và chi phí.'),
@@ -58,7 +58,8 @@ TASKS = [
      '4. Chatbot', 'Vừa: cần bám đúng kiến thức và quy tắc.'),
 ]
 # Giá trị mặc định khi tạo dòng lần đầu (không ghi đè lựa chọn của quản lý): model tìm theo tên, mức thinking
-TASK_DEFAULTS = {'improve_prompt': {'model_like': 'claude-haiku', 'thinking': 'max'}}
+# Đo 23/11/2026 (Haiku qua 9router, cải tiến prompt ~4k token): max → suy nghĩ hết 32–64k token, không gọi tool; xhigh 59s; high 29s.
+TASK_DEFAULTS = {'improve_prompt': {'model_like': 'claude-haiku', 'thinking': 'high'}}
 TASK_BY_CODE = {code: (name, desc, stage, hint) for code, name, desc, stage, hint in TASKS}
 
 TaskAI = namedtuple('TaskAI', 'env model fallback effort')
@@ -93,6 +94,9 @@ class ChatTask(models.Model):
                 task.thinking_note = 'Không gửi tham số thinking.'
             elif kind == 'gemini':
                 task.thinking_note = 'Kết nối Gemini: bỏ qua mức thinking.'
+            elif task.thinking == 'max':
+                task.thinking_note = ('Gửi reasoning_effort=max. Cảnh báo: Claude Haiku qua 9router có thể suy nghĩ tới hết giới hạn token mà '
+                                      'không trả kết quả; nên dùng Cao hoặc Rất cao.')
             else:
                 task.thinking_note = 'Gửi reasoning_effort=%s (kết nối OpenAI/9router).' % task.thinking
 

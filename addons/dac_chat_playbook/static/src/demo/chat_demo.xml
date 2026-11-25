@@ -88,7 +88,7 @@
                     </div>
 
                     <div t-if="state.optimizing" class="dac_cd2_improve is-busy" role="status">
-                        <i class="fa fa-circle-o-notch fa-spin me-2"/>Đang cải tiến prompt (Haiku, thinking tối đa)… <t t-esc="state.optimizing.seconds"/>s
+                        <i class="fa fa-circle-o-notch fa-spin me-2"/>Đang cải tiến prompt… <t t-esc="state.optimizing.seconds"/>s <span class="text-muted ms-1">(thường khoảng 30 giây)</span>
                     </div>
                     <div t-elif="state.improved" class="dac_cd2_improve is-done" role="status">
                         <div class="dac_cd2_improve_head">
@@ -141,7 +141,7 @@
                                     <t t-else=""><i class="fa fa-magic me-1"/>Cải tiến từ <t t-esc="state.feedback.pending"/> góp ý</t>
                                 </button>
                                 <div class="text-muted small mt-1">
-                                    Haiku (thinking tối đa) viết lại system prompt của bản đang thử theo các góp ý đang bật, tạo một <b>bản nháp mới</b>
+                                    Agent (model và thinking ở dòng "Cải tiến prompt từ góp ý") viết lại system prompt của bản đang thử theo các góp ý đang bật, tạo một <b>bản nháp mới</b>
                                     (bản cũ giữ nguyên). Xong bấm <b>Thử nghiệm bản cải tiến</b> để gửi lại các tin khách vừa thử với bản mới.
                                 </div>
                             </div>
