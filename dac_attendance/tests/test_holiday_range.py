@@ -35,3 +35,16 @@ class TestHolidayRange(TransactionCase):
             Holiday.create({'name': 'Sai ngày', 'date': '2095-06-02', 'date_to': '2095-06-01'})
         single = Holiday.create({'name': 'Một ngày', 'date': '2095-06-03'})
         self.assertEqual(list(single._days()), [date(2095, 6, 3)])
+
+    def test_list_export_includes_full_holiday_range(self):
+        holiday = self.env['dac.holiday'].create({
+            'name': 'Nghỉ lễ nhiều ngày', 'date': '2095-08-31', 'date_to': '2095-09-02',
+        })
+        self.assertEqual(
+            holiday.export_data(['date', 'name'])['datas'],
+            [['31/08/2095 - 02/09/2095', 'Nghỉ lễ nhiều ngày']],
+        )
+        self.assertEqual(
+            holiday.export_data(['date', 'date_to'])['datas'],
+            [[date(2095, 8, 31), date(2095, 9, 2)]],
+        )

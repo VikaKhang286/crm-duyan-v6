@@ -19,9 +19,9 @@ class DacHoliday(models.Model):
     _description = 'Ngày nghỉ lễ'
     _order = 'date desc, name'
 
-    name = fields.Char(string='Tên ngày lễ', required=True)
-    date = fields.Date(string='Ngày nghỉ', required=True, default=fields.Date.context_today)
-    date_to = fields.Date(string='Đến ngày', help='Để trống nếu chỉ nghỉ một ngày.')
+    name = fields.Char(string='Tên', required=True)
+    date = fields.Date(string='Ngày bắt đầu', required=True, default=fields.Date.context_today)
+    date_to = fields.Date(string='Ngày kết thúc', help='Để trống nếu chỉ nghỉ một ngày.')
     company_id = fields.Many2one('res.company', string='Công ty', required=True,
                                  default=lambda self: self.env.company)
 
@@ -120,6 +120,27 @@ class DacHoliday(models.Model):
 
     def _company_dates(self):
         return {(holiday.company_id.id, day) for holiday in self for day in holiday._days()}
+
+    def export_data(self, fields_to_export):
+        """Show a complete period in the single date column of list exports.
+
+        When only the start-date column is selected, a multi-day holiday is
+        rendered as one readable range. Exports that include both start and
+        end dates keep the raw columns for import compatibility.
+        """
+        result = super().export_data(fields_to_export)
+        exported_names = [field[0] if isinstance(field, (list, tuple)) else field
+                          for field in fields_to_export]
+        if 'date' not in exported_names or 'date_to' in exported_names:
+            return result
+        date_index = exported_names.index('date')
+        for holiday, row in zip(self, result['datas']):
+            if holiday.date_to and holiday.date_to != holiday.date:
+                row[date_index] = '%s - %s' % (
+                    holiday.date.strftime('%d/%m/%Y'),
+                    holiday.date_to.strftime('%d/%m/%Y'),
+                )
+        return result
 
     @api.model_create_multi
     def create(self, vals_list):
