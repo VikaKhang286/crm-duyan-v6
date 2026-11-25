@@ -1,5 +1,6 @@
 from . import chat_insight
 from . import chat_knowledge
+from . import chat_gender
 from . import chat_analysis
 from . import chat_rule
 from . import chat_prompt

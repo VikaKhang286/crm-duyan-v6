@@ -71,6 +71,14 @@
     }
     .dac_cd2_improve_head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
     .dac_cd2_improve_note { white-space: pre-wrap; font-size: .76rem; margin: 6px 0 0; max-height: 120px; overflow-y: auto; }
+    .dac_cd2_samples { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+    .dac_cd2_sample { width: 100%; text-align: left; border: 1px solid var(--cd2-border); border-radius: 8px; padding: 7px 10px;
+        background: var(--cd2-card); display: flex; flex-direction: column; gap: 2px;
+        &:hover, &:focus-visible { border-color: var(--bs-primary, #714b67); }
+        &.is-active { border-color: var(--bs-primary, #714b67); background: var(--cd2-track); }
+    }
+    .dac_cd2_sample_head { display: flex; justify-content: space-between; gap: 8px; font-size: .82rem; span { color: var(--cd2-muted); font-size: .72rem; } }
+    .dac_cd2_sample_text { font-size: .8rem; color: var(--cd2-muted); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
     .dac_cd2_input { padding: 10px 14px; border-top: 1px solid var(--cd2-border);
         textarea { resize: none; }
     }

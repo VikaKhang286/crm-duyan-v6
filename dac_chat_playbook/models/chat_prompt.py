@@ -19,6 +19,7 @@ from odoo.addons.dac_push.models import working_time
 from . import chat_stats as cs
 from .ai_agent import ai_call, vision_call
 from .chat_analysis import AI_SYSTEM
+from .chat_gender import GENDERS, TITLES, gender_rule
 from .chat_rule import CATEGORIES
 
 GEN_TIMEOUT = (10, 100)
@@ -33,8 +34,27 @@ BLOCK_RE = re.compile(
 IDENTITY_RE = re.compile(r'chat\s?bot|\bbot\b|trợ lý|trí tuệ nhân tạo|trả lời tự động|tin nhắn tự động|hệ thống tự động|'
                          r'\bem là (?:nhân viên|người|bạn)\b|\bmình là (?:trợ lý|nhân viên|bot)', re.IGNORECASE)
 IDENTITY_AI_RE = re.compile(r'\bAI\b')
+# Không được nói "chưa chắc" về việc DAC có làm hay không (quản lý 25/11): chặn và soạn lại
+UNSURE_RE = re.compile(r'chưa chắc|không chắc|ko chắc|chưa rõ (?:bên em|có làm)|không biết (?:bên em|có làm)', re.IGNORECASE)
+UNSURE_RULE = ('Không bao giờ nói "chưa chắc", "không chắc" về việc bên em có làm được hay không: Duy An thiết kế, in ấn mọi chất liệu và '
+               'thi công trọn gói bảng hiệu, mặt dựng, cửa hàng. Khách đưa ít thông tin thì chào rồi hỏi thêm MỘT câu cụ thể '
+               '(dùng cho đâu, kích thước, số lượng, có mẫu chưa…) để tư vấn.')
 IDENTITY_RULE = ('Nhắn như một nhân viên thật của DAC: KHÔNG tự giới thiệu ("em là trợ lý/nhân viên…"), KHÔNG nói hay ám chỉ mình là AI, '
                  'chatbot, bot, trợ lý ảo hay hệ thống tự động; chào hỏi thật tự nhiên như người đang trực page.')
+# Tin hệ thống Zalo nằm lẫn như tin khách ("X đã đồng ý kết bạn. Hãy gửi lời chào…", "Bạn nhận được lời mời kết bạn")
+SYSTEM_TEXT_RE = re.compile(r'đã đồng ý kết bạn|hãy gửi lời chào để bắt đầu|bạn nhận được lời mời kết bạn', re.IGNORECASE)
+# Khách chỉ nhắn với MỘT người (quản lý 25/11): không nhắc người khác / chuyển bộ phận; trong giờ không hẹn "liên hệ sau"
+ONE_VOICE_RE = re.compile(r'bạn phụ trách|nhân viên (?:khác|phụ trách|tư vấn|kỹ thuật|bên em sẽ|sẽ)|chuyển (?:cho |qua |sang )?'
+                          r'(?:bạn|nhân viên|bộ phận|người)|bộ phận', re.IGNORECASE)
+LATER_RE = re.compile(r'liên hệ (?:lại|sau|sớm)|(?:báo|phản hồi|gọi) lại (?:sau|sớm)|sẽ liên hệ', re.IGNORECASE)
+ONE_VOICE_RULE = ('Khách chỉ đang nhắn với MỘT mình em: không nhắc "bạn phụ trách", nhân viên khác, bộ phận, không nói chuyển người. '
+                  'Các quy tắc "chuyển nhân viên" ở trên là việc NỘI BỘ: đặt handoff = true (hệ thống tự gọi nhân viên vào), còn với khách '
+                  'chỉ nhắn một câu giữ chuyện tự nhiên (vd "Dạ anh chờ em chút nha").')
+CONTINUE_RULE_IN = ('Đang TRONG giờ làm việc: không hẹn "liên hệ sau/sớm". Tiếp tục hỏi để hiểu nhu cầu như nhân viên giỏi (dùng cho đâu, '
+                    'kích thước hoặc chiều ngang mặt tiền, đã có file thiết kế chưa, số lượng…), mỗi lượt 1–2 câu, cho tới khi cần người thật.')
+CONTINUE_RULE_OUT = ('Đang NGOÀI giờ làm việc: vẫn hỏi các thông tin cần (đã có file thiết kế chưa, kích thước/chiều ngang mặt tiền, dùng cho '
+                     'đâu…), mỗi lượt 1–2 câu; khi đã hỏi đủ thì hẹn đúng mốc làm việc kế tiếp để gửi tư vấn/báo giá.')
+HOLD_TEXT = 'Dạ anh/chị chờ em chút nha.'
 PLACEHOLDERS = ('{{now}}', '{{work_status}}', '{{next_working_time}}', '{{customer_name}}', '{{channel}}')
 CHANNELS = [('zalo', 'Zalo'), ('facebook', 'Facebook Messenger')]
 CHANNEL_RULES = {
@@ -56,7 +76,7 @@ MODE_FLOW_KEY = {'greeting': 'flow_greeting', 'info': 'flow_info', 'consult': 'f
 MODE_FLOW_FALLBACK = {'info': ('flow_basic', 'flow'), 'consult': ('flow_full', 'flow')}  # tên cũ (trước bản 1.6)
 MODE_AFTER_HOURS_KEY = {'greeting': 'after_hours_greeting', 'info': 'after_hours', 'consult': 'after_hours'}
 MODE_HANDOFF = {
-    'greeting': 'đã chào và biết khách cần làm gì (bộ này KHÔNG xin thêm thông tin chi tiết)',
+    'greeting': 'câu hỏi bạn không trả lời chắc được, khách cần báo giá cụ thể, hoặc đã hỏi được nhu cầu chính (sản phẩm, kích thước/file)',
     'info': 'đã đủ các thông tin bắt buộc ở trên',
     'consult': 'đã đủ thông tin bắt buộc và đã trả lời/tư vấn sơ bộ xong, hoặc khách cần báo giá, chốt đơn',
 }
@@ -69,8 +89,10 @@ Yêu cầu:
 - persona: xưng hô, giọng nhắn như nhân viên thật đang trực page; độ dài và số tin mỗi lượt lấy từ số liệu nhân viên giỏi. Khách KHÔNG được
   biết đang nhắn với chatbot: không viết câu tự giới thiệu ("em là trợ lý…"), không nhắc AI/bot trong mọi câu mẫu.
 - Viết 3 BỘ quy trình cho 3 chế độ chatbot (cùng giọng, cùng persona). Mỗi bộ là một prompt RIÊNG, chatbot chỉ thấy bộ của nó:
-  · flow_greeting — CHÀO HỎI: chào ngay, hỏi một câu khách cần làm gì, báo bạn phụ trách sẽ liên hệ (trong giờ: sớm;
-    ngoài giờ: mốc {{next_working_time}}); KHÔNG hỏi kích thước/số lượng/file, không tư vấn, không xin thông tin chi tiết.
+  · flow_greeting — CHÀO HỎI: chào ngay và hỏi tiếp như nhân viên giỏi (số liệu: câu "có file thiết kế chưa", "kích thước ngang x
+    cao" có tỉ lệ khách nhắn tiếp cao nhất): khách chưa nói nhu cầu thì hỏi cần làm gì; đã nói thì hỏi ngay một câu cụ thể (dùng cho
+    đâu, kích thước/chiều ngang mặt tiền, có file chưa). Giữ cuộc trò chuyện, KHÔNG hẹn "liên hệ sau" trong giờ, không nhắc người khác;
+    ngoài giờ vẫn hỏi thông tin rồi hẹn mốc {{next_working_time}}. Không báo giá, không tư vấn sâu.
   · flow_info — HỎI THÔNG TIN: chào → hỏi nhu cầu → xin lần lượt các thông tin cần để báo giá (mỗi lượt 1–2 ý) → tóm tắt lại →
     báo bạn phụ trách sẽ báo giá. Trả lời ngắn câu hỏi cơ bản (địa chỉ, giờ làm, có làm sản phẩm X không) từ KIẾN THỨC DOANH NGHIỆP,
     không tư vấn chất liệu/kiểu làm.
@@ -203,6 +225,9 @@ class ChatPrompt(models.Model):
                                   'muc_dich': Insight._tool_label_stats(analysis, 'intent', scope=scope),
                                   'phu_hop_chatbot': Insight._tool_label_stats(analysis, 'bot_fit', scope=scope)}, ensure_ascii=False)[:8000]
         guidance = (self.env['dac.chat.config']._get().agent_guidance or '').strip() or '(không có)'
+        feedback = '\n'.join(self.env['dac.chat.feedback']._text_for_mode(m) for m, _l in MODES).strip()
+        if feedback:
+            guidance += '\n\nGÓP Ý CỦA NGƯỜI DUYỆT/ADMIN KHI THỬ CHATBOT (phải làm theo):\n' + feedback
         text = ('%s\n\nĐỊNH HƯỚNG CỦA QUẢN LÝ (ưu tiên cao nhất):\n%s\n\nSỐ LIỆU:\n%s\n\nKẾT LUẬN CỦA AGENT ĐIỀU PHỐI:\n%s\n\nPHẠM VI CHATBOT (Agent điều phối đề xuất):\n%s\n\n'
                 'PHÂN LOẠI HỘI THOẠI:\n%s\n\nKIẾN THỨC DOANH NGHIỆP (code tự chèn vào prompt; dùng để viết consult_guide và ví dụ đúng sự thật):\n%s\n\n'
                 'QUY TẮC (chọn để đưa vào):\n%s') % (
@@ -210,6 +235,8 @@ class ChatPrompt(models.Model):
             analysis.coord_bot_scope or '(không có)', labels_text, self.env['dac.chat.knowledge']._text_for_mode('consult') or '(chưa có)',
             rules_text or '(chưa có)')
         ai = self.env['dac.chat.task']._resolve('write_prompt', analysis.ai_model_id, analysis.ai_fallback)
+        # Streaming: viết 3 bộ prompt thường lâu hơn 100 giây, gọi thường bị Cloudflare của 9router cắt (HTTP 524)
+        ai = ai._replace(env=ai.env(context=dict(ai.env.context, dac_ai_stream=True)), model=ai.model.with_context(dac_ai_stream=True))
         data, label = ai_call(ai.env, ai.model, ai.fallback, AI_SYSTEM, text, GEN_SCHEMA,
                               'write_chatbot_prompt', 'Viết system prompt chatbot.', GEN_TIMEOUT)
         used_ids = {int(i) for i in data.get('used_rule_ids') or [] if str(i).isdigit()}
@@ -291,23 +318,34 @@ class ChatPrompt(models.Model):
             return []
         return [i for i in items if isinstance(i, dict) and KEY_RE.match(str(i.get('key') or ''))]
 
+    @api.model
+    def _holidays(self):
+        return self.env['dac.chat.config']._get()._holidays()
+
     def _context_values(self, now, customer_name, channel='zalo'):
-        _start, next_label = cs.next_working(now, working_time.WORK_DAYS, working_time.WORK_SHIFTS)
-        in_hours = cs.in_work_hours(now, working_time.WORK_DAYS, working_time.WORK_SHIFTS)
+        holiday = self._holidays().get(cs.local(now).date())
+        _start, next_label = cs.next_working(now, working_time.WORK_DAYS, working_time.WORK_SHIFTS, self._holidays())
+        in_hours = cs.in_work_hours(now, working_time.WORK_DAYS, working_time.WORK_SHIFTS, self._holidays())
         return {
             '{{now}}': cs.now_label(now),
-            '{{work_status}}': 'TRONG giờ làm việc (nhân viên đang làm, sẽ trả lời sớm)' if in_hours else
-                               'NGOÀI giờ làm việc (giờ làm: thứ 2–thứ 7, 8:00–12:00 và 13:30–17:30; Chủ nhật nghỉ)',
+            '{{work_status}}': 'TRONG giờ làm việc' if in_hours else
+                               'NGOÀI giờ làm việc%s (giờ làm: thứ 2–thứ 7, 8:00–12:00 và 13:30–17:30; Chủ nhật và ngày lễ nghỉ)' % (
+                                   ' — hôm nay nghỉ lễ: %s' % holiday if holiday else ''),
             '{{next_working_time}}': 'trong hôm nay' if in_hours else next_label,
             '{{customer_name}}': customer_name or 'chưa rõ (gọi "anh/chị")',
             '{{channel}}': dict(CHANNELS)[channel_key(channel)],
         }
 
-    def _runtime_prompt(self, now, customer_name='', channel='zalo'):
+    def _runtime_prompt(self, now, customer_name='', channel='zalo', gender=None):
+        """`gender`: (male|female|unknown, nguồn nhận diện) hoặc None = chưa rõ."""
         self.ensure_one()
         text = self.system_prompt or ''
         for key, value in self._context_values(now, customer_name, channel).items():
             text = text.replace(key, value)
+        title = TITLES.get((gender or ('unknown',))[0])
+        if title:
+            # Đã biết khách nam/nữ: thay "anh/chị" trong prompt (cả câu mẫu) để model không bám theo câu mẫu chung
+            text = re.sub(r'\b(A|a)nh/(?:C|c)hị\b', lambda m: title.capitalize() if m.group(1) == 'A' else title, text)
         guard = self.env['dac.chat.rule'].sudo().search([('state', '=', 'approved'), ('category', 'in', ('forbidden', 'handoff'))])
         guard_text = '\n'.join('- %s: %s' % (r.name, r.content.strip()) for r in guard)
         keys = ', '.join(i['key'] for i in self._info_list()) or '(không có)'
@@ -319,6 +357,11 @@ class ChatPrompt(models.Model):
             'tuyệt đối không bịa; thời gian, bảo hành chỉ là thông tin chung, không phải cam kết)\n%s\n\n'
             '# TUYỆT ĐỐI TUÂN THỦ (quy tắc đã duyệt, ưu tiên cao nhất, đè lên mọi phần khác)\n%s\n- %s\n'
             '- ' + IDENTITY_RULE + '\n'
+            '- ' + UNSURE_RULE + '\n'
+            '- ' + ONE_VOICE_RULE + '\n'
+            '- ' + (CONTINUE_RULE_IN if cs.in_work_hours(now, working_time.WORK_DAYS, working_time.WORK_SHIFTS, self._holidays()) else CONTINUE_RULE_OUT) + '\n'
+            '- ' + gender_rule(*(gender or ('unknown', ''))) + '\n'
+            '- Chỉ nói đã nhận ảnh/file khi đoạn chat có [Hình ảnh] hoặc [Tệp] của khách; [Sticker] chỉ là biểu tượng cảm xúc, không phải file.\n'
             '- Phạm vi của bạn chỉ là chào và lấy thông tin: không báo giá, không hứa thời gian, không chốt đơn, không gửi số tài khoản, '
             'không nhận cọc.\n'
             '- Không bịa thông tin về DAC. Không chắc thì nói sẽ chuyển bạn phụ trách.\n\n'
@@ -341,9 +384,12 @@ class ChatPrompt(models.Model):
             'returning_customer': {'type': 'boolean', 'description': 'true nếu tin của khách cho thấy họ ĐÃ liên hệ/đặt hàng với shop '
                                    'trước đó (gửi file/thông tin cho đơn cũ, nhắc lần trước, nhắc tên nhân viên, "như hôm qua"...).'},
             'returning_reason': {'type': 'string'},
+            'customer_gender': {'type': 'string', 'enum': ['male', 'female', 'unknown'],
+                                'description': 'Giới tính khách suy ra TỪ ĐOẠN CHAT (khách tự xưng hoặc nhắc cách gọi: anh, chị, cô, chú…); '
+                                               'unknown nếu đoạn chat không cho biết.'},
         }, 'required': ['messages', 'handoff']}
 
-    def _reply(self, history, now, customer_name='', channel='zalo', note=''):
+    def _reply(self, history, now, customer_name='', channel='zalo', note='', gender=None):
         """history: [(vai trò 'customer'|'bot'|'staff', nội dung)] cũ → mới. Trả dict(messages, collected, handoff, handoff_reason,
         blocked, model). Không gửi gì cho khách — nơi gọi quyết định gửi."""
         self.ensure_one()
@@ -352,13 +398,23 @@ class ChatPrompt(models.Model):
         user_text = 'Đoạn chat (cũ → mới), dòng cuối là tin mới nhất của khách:\n%s\n\nHãy trả lời khách.' % (lines or '(trống)')
         if note:
             user_text += '\n\n' + note
-        system = self._runtime_prompt(now, customer_name, channel)
+        system = self._runtime_prompt(now, customer_name, channel, gender)
         started = time.monotonic()
         # Model + thinking của bộ này (Chào hỏi / Hỏi thông tin / Tư vấn) chọn ở màn hình "Model & thinking theo tác vụ"
         ai = self.env['dac.chat.task']._resolve('bot_%s' % self.mode, self.bot_model_id, True, use_config_model=False)
         data, label, _sent, usage = vision_call(ai.env, ai.model, ai.fallback, system, user_text, [], self._reply_schema(),
                                                 'reply_customer', 'Trả lời khách.', REPLY_TIMEOUT)
-        result = self._guard(data, label)
+        in_hours = cs.in_work_hours(now, working_time.WORK_DAYS, working_time.WORK_SHIFTS, self._holidays())
+        result = self._guard(data, label, in_hours)
+        if result.get('identity_blocked'):
+            # Câu lộ là AI / tự giới thiệu / "chưa chắc" bị chặn: soạn lại một lần
+            retry = ('%s\n\nBản vừa rồi bị chặn: "%s". Viết lại như MỘT nhân viên thật đang trực page: không tự giới thiệu, không nhắc '
+                     'AI/bot, không nói "chưa chắc", không nhắc người/bộ phận khác%s; hỏi tiếp một câu cụ thể để hiểu nhu cầu.') % (
+                user_text, ' / '.join(result['identity_blocked']), ', không hẹn liên hệ sau' if in_hours else '')
+            data2, label, _sent, usage2 = vision_call(ai.env, ai.model, ai.fallback, system, retry, [], self._reply_schema(),
+                                                      'reply_customer', 'Trả lời khách.', REPLY_TIMEOUT)
+            result = dict(self._guard(data2, label, in_hours), first_blocked=result['identity_blocked'])
+            usage = {key: (usage or {}).get(key, 0) + (usage2 or {}).get(key, 0) for key in set(usage or {}) | set(usage2 or {})}
         result.update(usage=usage or {}, seconds=round(time.monotonic() - started, 1), system_prompt=system, user_text=user_text,
                       thinking=ai.effort or 'auto')
         return result
@@ -386,6 +442,7 @@ class ChatPrompt(models.Model):
             'default_prompt_id': default.id or False,
             'presets': self._demo_presets(),
             'channels': [{'key': key, 'label': label} for key, label in CHANNELS],
+            'genders': [{'key': key, 'label': label} for key, label in GENDERS],
             'pricing': {'in': config.price_in, 'out': config.price_out, 'rate': config.usd_rate},
         }
 
@@ -412,7 +469,7 @@ class ChatPrompt(models.Model):
         ]
 
     @api.model
-    def demo_reply(self, prompt_id, history, at=False, customer_name='', channel='zalo'):
+    def demo_reply(self, prompt_id, history, at=False, customer_name='', channel='zalo', gender='unknown'):
         """Một lượt chatbot trả lời trong màn hình demo (KHÔNG gửi gì cho khách).
         history: [[vai trò 'customer'|'bot'|'staff', nội dung], ...]; at: 'YYYY-MM-DD HH:MM:SS' (UTC) hoặc trống = bây giờ."""
         prompt = self.browse(int(prompt_id)).exists()
@@ -422,12 +479,54 @@ class ChatPrompt(models.Model):
         if not clean or clean[-1][0] != 'customer':
             raise UserError('Tin cuối phải là tin của khách.')
         moment = fields.Datetime.to_datetime(at) if at else fields.Datetime.now()
-        result = prompt._reply(clean[-40:], moment, customer_name or '', channel)
+        gender = gender if gender in ('male', 'female') else 'unknown'
+        result = prompt._reply(clean[-40:], moment, customer_name or '', channel, gender=(gender, 'chọn trong màn hình thử'))
         values = prompt._context_values(moment, customer_name or '', channel)
         result['context'] = {'now': values['{{now}}'], 'work_status': values['{{work_status}}'], 'next': values['{{next_working_time}}'],
-                             'channel': values['{{channel}}']}
+                             'channel': values['{{channel}}'], 'gender': dict(GENDERS)[gender]}
         result['prompt_chars'] = len(result['system_prompt'])
         return result
+
+    @api.model
+    def demo_samples(self, limit=60):
+        """Mẫu thử: lượt nhắn đầu tiên của khách mới thật (tối đa 4 tin liên tiếp trước khi shop trả lời), mới nhất trước."""
+        from odoo.addons.dac_pancake_remind.models.remind_wait import NOTES, classify
+        # sudo(): chỉ đọc tin khách để thử, không ghi; người dùng là quản lý
+        contacts = self.env['dac.new.contact'].sudo().search([('source', '=', 'pancake'), ('counts_as_new', '=', True),
+                                                              ('conversation_id', '!=', False),
+                                                              ('contact_at', '>=', fields.Datetime.now() - timedelta(days=90))],
+                                                             order='contact_at desc', limit=int(limit) * 2)
+        bots = self.env['dac.pancake.remind.wait']._bot_names()
+        Message = self.env['dac.pancake.message'].sudo()
+        out = []
+        for contact in contacts:
+            conversation = contact.conversation_id
+            rows = Message.search([('conversation_id', '=', conversation.id), ('inserted_at', '>=', contact.contact_at)],
+                                  order='inserted_at, id', limit=12)
+            texts = []
+            for message in rows:
+                kind = classify(message, bots)
+                if kind in ('staff', 'bot'):
+                    break
+                if kind != 'customer' or SYSTEM_TEXT_RE.search(cs.plain(message.content_html or '')):
+                    continue
+                raw = json.loads(message.raw_json or '{}') if message.raw_json else {}
+                kinds = sorted({a.get('type') for a in raw.get('attachments') or [] if isinstance(a, dict) and a.get('type')} - {'styled_message'})
+                labels = ' '.join(dict.fromkeys('[Hình ảnh]' if k == 'photo' else NOTES.get(k, '[Tệp]') for k in kinds))
+                text = ('%s %s' % (labels, cs.mask_phones(cs.plain(message.content_html or '')))).strip()
+                if text:
+                    texts.append(text[:500])
+                if len(texts) >= 4:
+                    break
+            if not any(t for t in texts if not t.startswith('[Sticker]') or len(t) > 9):
+                continue  # chỉ có sticker: không có gì để thử
+            out.append({'id': conversation.id, 'name': conversation.customer_name or 'Khách', 'messages': texts,
+                        'at': fields.Datetime.to_string(contact.contact_at), 'channel': channel_key(conversation.platform),
+                        'gender': conversation.customer_gender if conversation.gender_checked else 'unknown',
+                        'when': fields.Datetime.context_timestamp(self.with_context(tz='Asia/Ho_Chi_Minh'), contact.contact_at).strftime('%d/%m %H:%M')})
+            if len(out) >= int(limit):
+                break
+        return out
 
     @api.model
     def demo_sample(self):
@@ -539,23 +638,25 @@ class ChatPrompt(models.Model):
             {'applied_prompt_ids': [(4, self.id)]})
 
     @staticmethod
-    def _guard(data, label=''):
+    def _guard(data, label='', in_hours=False):
         """Chặn lần cuối: tin có giá/STK/cam kết thì không gửi, chuyển nhân viên."""
         messages = [str(m).strip() for m in data.get('messages') or [] if str(m).strip()][:3]
-        identity = [m for m in messages if IDENTITY_RE.search(m) or IDENTITY_AI_RE.search(m)]
+        identity = [m for m in messages if IDENTITY_RE.search(m) or IDENTITY_AI_RE.search(m) or UNSURE_RE.search(m)
+                    or ONE_VOICE_RE.search(m) or (in_hours and LATER_RE.search(m))]
         blocked = [m for m in messages if BLOCK_RE.search(m) and m not in identity]
         result = {'messages': [m for m in messages if m not in blocked and m not in identity], 'collected': data.get('collected') or {},
                   'handoff': bool(data.get('handoff')), 'handoff_reason': str(data.get('handoff_reason') or ''), 'blocked': blocked,
                   'returning_customer': bool(data.get('returning_customer')), 'returning_reason': str(data.get('returning_reason') or ''),
+                  'customer_gender': data.get('customer_gender') if data.get('customer_gender') in ('male', 'female') else 'unknown',
                   'model': label, 'identity_blocked': identity}
         result['blocked'] = blocked + identity
         if blocked:
             result['handoff'] = True
             result['handoff_reason'] = ('Đã chặn tin có giá/STK/cam kết. ' + result['handoff_reason']).strip()
             if not result['messages']:
-                result['messages'] = ['Dạ em chuyển bạn phụ trách hỗ trợ mình ngay ạ.']
+                result['messages'] = [HOLD_TEXT]
         elif identity and not result['messages']:
-            result['messages'] = ['Dạ em chào anh/chị ạ, anh/chị đang cần làm gì để em hỗ trợ ạ?']
+            result['messages'] = [HOLD_TEXT if result['handoff'] else 'Dạ em chào anh/chị ạ, anh/chị đang cần làm gì để em hỗ trợ ạ?']
         return result
 
     # ── Nút bấm ──────────────────────────────────────────────────────────────

@@ -33,9 +33,10 @@ export class ChatDemo extends Component {
         this.chatRef = useRef("chat");
         this.inputRef = useRef("input");
         this.state = useState({
-            options: null, promptId: false, at: false, preset: "now", customerName: "Chị Lan", channel: "zalo", input: "",
+            options: null, promptId: false, at: false, preset: "now", customerName: "Chị Lan", channel: "zalo", gender: "unknown", input: "",
             messages: [], last: null, sending: false, tab: "turn",
             feedback: { items: [], pending: 0 }, fbFor: null, fbText: "", optimizing: null, improved: null, replaying: false,
+            samples: null, sampleFilter: "", sampleId: null,
             totals: { turns: 0, in: 0, out: 0, seconds: 0 },
         });
         onWillStart(async () => {
@@ -190,6 +191,38 @@ export class ChatDemo extends Component {
     }
 
     /** Chuyển sang bản cải tiến và gửi lại đúng các tin khách của phiên vừa thử để so sánh. */
+    // ── Mẫu khách thật ──────────────────────────────────────────────────────
+    async loadSamples() {
+        if (!this.state.samples) {
+            this.state.samples = await this.orm.call("dac.chat.prompt", "demo_samples", []);
+        }
+    }
+
+    async openSamples() {
+        this.state.tab = "samples";
+        await this.loadSamples();
+    }
+
+    get filteredSamples() {
+        const q = (this.state.sampleFilter || "").toLowerCase().trim();
+        const list = this.state.samples || [];
+        return q ? list.filter((s) => (s.name + " " + s.messages.join(" ")).toLowerCase().includes(q)) : list;
+    }
+
+    async useSample(sample) {
+        if (this.state.sending) {
+            return;
+        }
+        this.reset();
+        this.state.sampleId = sample.id;
+        this.state.customerName = sample.name;
+        this.state.at = sample.at;
+        this.state.preset = "custom";
+        this.state.channel = sample.channel || "zalo";
+        this.state.gender = sample.gender || "unknown";
+        await this.sendTexts(sample.messages);
+    }
+
     async tryImproved() {
         const improved = this.state.improved;
         if (!improved) {
@@ -203,8 +236,7 @@ export class ChatDemo extends Component {
         this.state.replaying = true;
         try {
             for (const text of customers) {
-                this.state.input = text;
-                await this.send();
+                await this.sendTexts([text]);
             }
         } finally {
             this.state.replaying = false;
@@ -253,10 +285,18 @@ export class ChatDemo extends Component {
 
     async send() {
         const text = this.state.input.trim();
-        if (!text || this.state.sending || !this.state.promptId) {
+        if (!text) {
             return;
         }
-        this.state.messages.push({ role: "customer", text });
+        await this.sendTexts([text]);
+    }
+
+    /** Gửi một lượt khách (một hoặc nhiều tin liền nhau) rồi lấy câu bot trả lời. */
+    async sendTexts(texts) {
+        if (!texts.length || this.state.sending || !this.state.promptId) {
+            return;
+        }
+        texts.forEach((text) => this.state.messages.push({ role: "customer", text }));
         this.state.input = "";
         if (this.inputRef.el) {
             this.inputRef.el.value = ""; // giá trị ảo không đổi ("" → "") nên OWL không tự xoá ô nhập
@@ -267,7 +307,7 @@ export class ChatDemo extends Component {
             .filter((m) => (m.role === "customer" || m.role === "bot") && !m.blocked)
             .map((m) => [m.role, m.text]);
         try {
-            const result = await this.orm.call("dac.chat.prompt", "demo_reply", [this.state.promptId, history, this.state.at, this.state.customerName, this.state.channel]);
+            const result = await this.orm.call("dac.chat.prompt", "demo_reply", [this.state.promptId, history, this.state.at, this.state.customerName, this.state.channel, this.state.gender]);
             const usage = result.usage || {};
             const meta = { in: usage.in || 0, out: usage.out || 0, seconds: result.seconds, model: result.model };
             result.messages.forEach((m, i) => {

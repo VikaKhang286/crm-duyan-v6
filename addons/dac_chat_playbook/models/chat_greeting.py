@@ -23,15 +23,17 @@ from odoo.exceptions import UserError
 
 from odoo.addons.dac_pancake_remind.models import chat_image
 from odoo.addons.dac_pancake_remind.models.pancake_api import API_V1, PancakeError, platform_of, redact
-from odoo.addons.dac_pancake_remind.models.remind_wait import _picture, classify
+from odoo.addons.dac_pancake_remind.models import zalo_out
+from odoo.addons.dac_pancake_remind.models.remind_wait import CODES as REMIND_CODES, NOTES, _picture, classify
 
 from . import chat_stats as cs
-from .chat_prompt import channel_key
+from .chat_prompt import SYSTEM_TEXT_RE, channel_key
 
 _logger = logging.getLogger(__name__)
 
 LOOKBACK = timedelta(hours=2)   # chỉ chào khách nhắn trong 2 giờ gần đây (không chào tồn đọng cũ)
 EXPIRE = timedelta(hours=3)     # chờ duyệt quá lâu thì bỏ
+REMIND_MINUTES = (5, 15, 30, 60)  # nhắc người duyệt sau bấy nhiêu phút kể từ lần gửi xin duyệt gần nhất
 HISTORY = 30                    # số tin gần nhất đưa cho chatbot
 SEND_TIMEOUT = (10, 30)
 _TAIL = r'(?:\s+(?:nha|nhe|nhen|di|luon|em|a|ak|nhé|nhá))*'
@@ -42,6 +44,13 @@ STATES = [('waiting', 'Chờ duyệt'), ('sent', 'Đã gửi khách'), ('returni
           ('staff_replied', 'Nhân viên đã nhắn — không gửi'), ('cancelled', 'Người duyệt bỏ'), ('expired', 'Quá hạn duyệt'),
           ('failed', 'Lỗi')]
 ROLE_LABELS = {'customer': 'Khách', 'staff': 'Nhân viên', 'bot': 'Bot'}
+
+
+SESSION_GAP = timedelta(hours=24)  # khách nhắn tiếp trong khoảng này sau tin bot thì bot trả lời tiếp (cùng phiên)
+
+
+def _norm(text):
+    return ' '.join(cs.fold(text or '').split())
 
 
 def _fold(text):
@@ -96,6 +105,14 @@ class ChatGreeting(models.Model):
     error_message = fields.Char(string='Lỗi', readonly=True)
     tokens_in = fields.Integer(string='Token vào', readonly=True)
     tokens_out = fields.Integer(string='Token ra', readonly=True)
+    asked_at = fields.Datetime(string='Gửi xin duyệt lúc', readonly=True)
+    remind_count = fields.Integer(string='Số lần nhắc người duyệt', readonly=True)
+    gender_used = fields.Char(string='Xưng hô đã dùng', readonly=True)
+    session_id = fields.Many2one('dac.chat.greeting', string='Phiên (lượt đầu)', readonly=True, ondelete='set null', index=True,
+        help='Bot giữ cuộc trò chuyện nhiều lượt: các lượt sau trỏ về lượt chào đầu tiên.')
+    turn = fields.Integer(string='Lượt', default=1, readonly=True)
+    handoff_notified = fields.Boolean(string='Đã báo nhóm', readonly=True,
+        help='Bot đã báo nhóm Zalo để nhân viên vào nhắn tiếp; phiên bot kết thúc.')
 
     _sql_constraints = [('conversation_since_unique', 'unique(conversation_id, since)', 'Lượt khách nhắn này đã có lời chào.')]
 
@@ -146,7 +163,10 @@ class ChatGreeting(models.Model):
         for wait in waits:
             if self.search_count([('conversation_id', '=', wait.conversation_id.id), ('since', '=', wait.since)]):
                 continue
-            greeting = self.create({'conversation_id': wait.conversation_id.id, 'wait_id': wait.id, 'since': wait.since})
+            session = self._active_session(wait.conversation_id, wait.since)
+            greeting = self.create({'conversation_id': wait.conversation_id.id, 'wait_id': wait.id, 'since': wait.since,
+                                    'session_id': (session.session_id or session).id if session else False,
+                                    'turn': session.turn + 1 if session else 1})
             try:
                 with self.env.cr.savepoint():
                     greeting._start(wait.customer_kind)
@@ -154,9 +174,25 @@ class ChatGreeting(models.Model):
                 _logger.exception('Chào khách mới: không soạn được lời chào %s', greeting.id)
                 greeting.write({'state': 'failed', 'error_message': str(error)[:250]})
 
+    @api.model
+    def _active_session(self, conversation, since):
+        """Lượt bot gần nhất còn giữ cuộc trò chuyện: đã gửi khách, chưa báo nhóm, trong SESSION_GAP, chưa có nhân viên thật vào nhắn."""
+        last = self.search([('conversation_id', '=', conversation.id), ('since', '<', since)], order='since desc, id desc', limit=1)
+        root = last.session_id or last
+        if not last or last.state != 'sent' or last.handoff_notified or root.handoff_notified:
+            return self.browse()
+        if since - (last.sent_at or last.since) > SESSION_GAP:
+            return self.browse()
+        bots, bot_texts = last._bots(), last._bot_texts()
+        between = self.env['dac.pancake.message'].sudo().search([('conversation_id', '=', conversation.id),
+                                                                ('inserted_at', '>=', last.since), ('inserted_at', '<', since)])
+        if any(last._kind_of(m, bots, bot_texts) == 'staff' for m in between):
+            return self.browse()  # nhân viên thật đã vào: bot thôi
+        return last
+
     def _start(self, kind='new'):
         self.ensure_one()
-        reason = '' if self.is_test else self._returning_reason(kind)
+        reason = '' if (self.is_test or self.session_id) else self._returning_reason(kind)
         if reason:
             self.write({'state': 'returning', 'returning_reason': reason, 'last_message_id': self._latest_message().id})
             self._note('Khách đã liên hệ: %s. Không chào; luồng nhắc khách chưa được trả lời vẫn báo nhân viên.' % reason)
@@ -167,6 +203,17 @@ class ChatGreeting(models.Model):
     # ── Khách mới hay đã liên hệ ─────────────────────────────────────────────
     def _bots(self):
         return self.env['dac.pancake.remind.wait']._bot_names()
+
+    def _bot_texts(self):
+        """Nội dung các tin bot đã gửi trong hội thoại này (để không nhầm tin bot là nhân viên trả lời)."""
+        sent = self.search([('conversation_id', '=', self.conversation_id.id), ('state', '=', 'sent')])
+        return {_norm(text) for greeting in sent for text in greeting._messages()}
+
+    def _kind_of(self, message, bots, bot_texts):
+        kind = classify(message, bots)
+        if kind == 'staff' and bot_texts and _norm(cs.plain(message.content_html or '')) in bot_texts:
+            return 'bot'
+        return kind
 
     def _returning_reason(self, kind='new'):
         """Lý do coi là khách ĐÃ LIÊN HỆ ('' = khách mới)."""
@@ -205,18 +252,22 @@ class ChatGreeting(models.Model):
         if until:
             domain += ['|', ('inserted_at', '<', until.inserted_at), '&', ('inserted_at', '=', until.inserted_at), ('id', '<=', until.id)]
         recent = self.env['dac.pancake.message'].sudo().search(domain, order='inserted_at desc, id desc', limit=HISTORY * 2)
+        bot_texts = self._bot_texts()
         rows = []
         for message in recent:
-            kind = classify(message, bots)
+            kind = self._kind_of(message, bots, bot_texts)
             if not kind:
                 continue
             text = cs.plain(message.content_html or '')
+            if SYSTEM_TEXT_RE.search(text):
+                continue  # thông báo kết bạn của Zalo, không phải khách nhắn
             attachments = (json.loads(message.raw_json or '{}').get('attachments') or []) if message.raw_json else []
             kinds = {a.get('type') for a in attachments if isinstance(a, dict)}
-            if 'photo' in kinds:
-                text = ('[Hình ảnh] ' + text).strip()
-            elif kinds - {'styled_message', None}:
-                text = ('[Tệp/đính kèm] ' + text).strip()
+            # Nhãn đúng loại: sticker KHÔNG phải tệp (trước đây gắn chung "[Tệp/đính kèm]" nên bot tưởng khách đã gửi file)
+            labels = ['[Hình ảnh]' if kind == 'photo' else NOTES.get(kind, '[Tệp]') for kind in sorted(k for k in kinds if k)
+                      if kind != 'styled_message']
+            if labels:
+                text = ('%s %s' % (' '.join(dict.fromkeys(labels)), text)).strip()
             if text:
                 rows.append((kind, text))
             if len(rows) >= HISTORY:
@@ -252,19 +303,48 @@ class ChatGreeting(models.Model):
         self.write(dict(vals, version=self.version + 1, messages_json=json.dumps(result['messages'], ensure_ascii=False),
                         handoff_reason=(result.get('handoff_reason') or '')[:250] if result.get('handoff') else False, state='waiting'))
         self._note('Soạn bản %s%s: %s' % (self.version, ' theo góp ý' if feedback else '', ' / '.join(result['messages'])))
+        if self.handoff_reason:
+            self._notify_handoff()
+        return True
+
+    def _notify_handoff(self):
+        """Bot cần người thật: báo NGAY vào nhóm Zalo đã chọn, tag người phụ trách hội thoại (chưa có thì người được cài cho loại
+        thông báo nhắc khách). Mỗi phiên báo một lần; khách không thấy gì (bot chỉ nhắn câu giữ chuyện)."""
+        self.ensure_one()
+        root = self.session_id or self
+        channel = self.env['dac.chat.config']._get().greeting_handoff_channel_id
+        if not channel or root.handoff_notified:
+            return False
+        conversation = self.conversation_id.sudo()
+        staff = self.env['dac.pancake.staff']._of_conversation(conversation)
+        targets = zalo_out.targets_for(channel, staff, zalo_out.event_types(self.env, REMIND_CODES))
+        said = [text for role, text in self._history() if role == 'customer'][-3:]
+        out = zalo_out.Builder()
+        out.add('🙋 Cần nhân viên vào nhắn tiếp: khách %s (%s)\nLý do: %s\nKhách vừa nhắn: %s\n'
+                'Bot đang giữ chuyện, khách không biết đang được chuyển người.\n' % (
+                    conversation.customer_name or 'Khách', conversation.platform or 'Pancake', self.handoff_reason,
+                    ' / '.join(said) or '(không có)'))
+        if targets:
+            out.add('Nhờ ').tags(targets).add(' vào hỗ trợ.\n')
+        url = conversation._short_url() if conversation.external_url else ''
+        if url:
+            out.add(url)
+        text, mentions = out.result()
+        channel._queue(text.strip(), 'greet:%s:handoff' % root.id, mentions=mentions)
+        (root | self).write({'handoff_notified': True})
+        self._note('Đã báo nhóm "%s" để nhân viên vào nhắn tiếp (%s).' % (channel.name, self.handoff_reason))
         return True
 
     def _ask_bot(self, prompt, history, note=''):
         """Gọi chatbot; câu nào lộ là AI/tự giới thiệu bị chặn thì soạn lại một lần. Trả (kết quả, token đã dùng)."""
-        args = (history, fields.Datetime.now(), self.conversation_id.customer_name or '', channel_key(self.conversation_id.platform))
-        result = prompt._reply(*args, note=note)
+        conversation = self.conversation_id.sudo()
+        gender = conversation._gender()
+        args = (history, fields.Datetime.now(), conversation.customer_name or '', channel_key(conversation.platform))
+        result = prompt._reply(*args, note=note, gender=gender)  # câu bị chặn (lộ AI, "chưa chắc") được _reply soạn lại
         usage = dict(result.get('usage') or {})
-        if result.get('identity_blocked'):
-            retry = ('%s\n\nBản vừa rồi bị chặn vì tự giới thiệu hoặc nhắc AI/bot: "%s". Viết lại như nhân viên thật đang trực page, '
-                     'chào tự nhiên, không giới thiệu bản thân.' % (note, ' / '.join(result['identity_blocked']))).strip()
-            result = prompt._reply(*args, note=retry)
-            for key, value in (result.get('usage') or {}).items():
-                usage[key] = usage.get(key, 0) + value
+        if conversation._gender_from_chat(result.get('customer_gender')):
+            gender = conversation._gender()
+        self.gender_used = '%s (%s)' % ({'male': 'anh', 'female': 'chị'}.get(gender[0], 'anh/chị'), gender[1])
         return result, usage
 
     def _preview(self, feedback):
@@ -323,12 +403,16 @@ class ChatGreeting(models.Model):
         moment = fields.Datetime.context_timestamp(self.with_context(tz='Asia/Ho_Chi_Minh'), self.since)
         lines = ['🧪 THỬ NGHIỆM trên page thử, không phải khách thật.'] if self.is_test else []
         lines += [prefix] if prefix else []
-        lines += ['🆕 Khách mới nhắn %s: %s (%s)' % (self.conversation_id.platform or 'Pancake', self.conversation_id.customer_name or 'Khách',
-                                                     moment.strftime('%H:%M %d/%m')),
-                  'Lời chào bot định gửi — mã G%s, bản %s:' % (self.id, self.version)]
+        head = ('💬 Khách %s nhắn tiếp (lượt %s, %s)' % (self.conversation_id.customer_name or 'Khách', self.turn, moment.strftime('%H:%M %d/%m'))
+                if self.session_id else '🆕 Khách mới nhắn %s: %s (%s)' % (self.conversation_id.platform or 'Pancake',
+                                                                          self.conversation_id.customer_name or 'Khách', moment.strftime('%H:%M %d/%m')))
+        lines += [head, '%s bot định gửi — mã G%s, bản %s:' % ('Tin' if self.session_id else 'Lời chào', self.id, self.version)]
         lines += ['%s. %s' % (i, text) for i, text in enumerate(self._messages(), 1)]
+        if self.gender_used:
+            lines.append('Xưng hô: %s' % self.gender_used)
         if self.handoff_reason:
-            lines.append('Sau khi gửi: chuyển nhân viên (%s).' % self.handoff_reason)
+            lines.append('Cần người thật (%s): %s' % (self.handoff_reason, 'đã báo nhóm để nhân viên vào nhắn tiếp, bot dừng sau tin này.'
+                                                     if self.handoff_notified else 'chưa chọn nhóm báo nhân viên ở Thiết lập.'))
         others = self.search_count([('state', '=', 'waiting'), ('id', '!=', self.id)])
         lines.append('Trả lời "duyệt" để gửi, "bỏ" để không gửi, hoặc nhắn góp ý để bot soạn lại.%s' % (
             ' Đang có %s lời chào khác chờ duyệt: nhắn kèm mã, vd "duyệt G%s".' % (others, self.id) if others else ''))
@@ -336,7 +420,7 @@ class ChatGreeting(models.Model):
         if url:
             lines.append(url)
         message = channel._queue('\n'.join(lines), 'greet:%s:v%s' % (self.id, self.version), image=self._image() or None)
-        self.approval_message_ids = [(4, message.id)]
+        self.write({'approval_message_ids': [(4, message.id)], 'asked_at': fields.Datetime.now(), 'remind_count': 0})
 
     def _tell(self, text, key):
         channel = self._channel()
@@ -357,7 +441,8 @@ class ChatGreeting(models.Model):
             domain += ['|', ('inserted_at', '>', self.last_message_id.inserted_at),
                        '&', ('inserted_at', '=', self.last_message_id.inserted_at), ('id', '>', self.last_message_id.id)]
         newer = self.env['dac.pancake.message'].sudo().search(domain, order='inserted_at, id')
-        kinds = {classify(m, self._bots()) for m in newer}
+        bots, bot_texts = self._bots(), self._bot_texts()
+        kinds = {self._kind_of(m, bots, bot_texts) for m in newer}
         if 'staff' in kinds:
             return 'staff'
         return 'customer' if 'customer' in kinds else ''
@@ -386,10 +471,33 @@ class ChatGreeting(models.Model):
                         greeting.write({'state': 'expired'})
                         greeting._note('Quá %s giờ chưa duyệt: bỏ.' % int(EXPIRE.total_seconds() // 3600))
                         continue
-                    greeting._react_to_changes(greeting._changes())
+                    if not greeting._react_to_changes(greeting._changes()):
+                        greeting._remind(now)
             except Exception as error:  # noqa: BLE001
                 _logger.exception('Chào khách mới: kiểm tra %s lỗi', greeting.id)
                 greeting.write({'error_message': str(error)[:250]})
+
+    def _remind(self, now):
+        """Nhắc người duyệt (trả lời ngay tin xin duyệt) khi lời chào chờ quá REMIND_MINUTES."""
+        self.ensure_one()
+        if not self.asked_at or self.remind_count >= len(REMIND_MINUTES):
+            return False
+        if now - self.asked_at < timedelta(minutes=REMIND_MINUTES[self.remind_count]):
+            return False
+        channel = self._channel()
+        if not channel:
+            return False
+        waited = int((now - self.since).total_seconds() // 60)
+        text = ('⏰ Nhắc duyệt G%s: khách %s đã chờ %s phút, chưa ai trả lời. Nhắn "duyệt" để gửi lời chào ở trên, "bỏ" để không gửi, '
+                'hoặc góp ý để bot soạn lại.%s') % (self.id, self.conversation_id.customer_name or '', waited,
+                                                  ' (Nhiều lời chào đang chờ: nhắn kèm mã, vd "duyệt G%s".)' % self.id
+                                                  if self.search_count([('state', '=', 'waiting'), ('id', '!=', self.id)]) else '')
+        asked = self.approval_message_ids.sorted('id')[-1:]
+        reply_to = asked if asked and asked.state == 'sent' else None
+        channel._queue(text, 'greet:%s:v%s:remind%s' % (self.id, self.version, self.remind_count + 1), reply_to=reply_to)
+        self.remind_count += 1
+        self._note('Nhắc người duyệt lần %s (khách chờ %s phút).' % (self.remind_count, waited))
+        return True
 
     # ── Duyệt / bỏ / góp ý ──────────────────────────────────────────────────
     def action_approve(self):

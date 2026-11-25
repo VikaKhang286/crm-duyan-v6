@@ -2,6 +2,23 @@
 <odoo>
     <!-- Kiến thức doanh nghiệp lấy từ duyan.vn (đọc ngày 20/11/2026). noupdate: quản lý sửa trên giao diện, nâng cấp không ghi đè. -->
     <data noupdate="1">
+        <!-- 25/11/2026: năng lực do quản lý xác nhận + danh mục tóm tắt từ duyan.vn, dùng cho MỌI bộ (kể cả Chào hỏi) để bot không nói "chưa chắc" -->
+        <record id="kb_company_capabilities" model="dac.chat.knowledge">
+            <field name="name">Năng lực Duy An</field>
+            <field name="category">company</field>
+            <field name="scope">all</field>
+            <field name="sequence">0</field>
+            <field name="source_url">Quản lý xác nhận 25/11/2026; dự án theo https://duyan.vn/du-an-noi-bat/</field>
+            <field name="content">Duy An thiết kế và in ấn trên mọi chất liệu; thi công bảng hiệu, chữ nổi, hộp đèn, mặt dựng alu/lam gỗ/lam tôn, pano, billboard, logo tòa nhà; nhận thi công trọn gói cửa hàng, showroom, gian hàng. Đã làm cho VinFast (Long An, Quận 6, Quận 11, Đắk Nông), chuỗi Xe Đạp Giá Kho, nhà hàng Yu Shang Lou, Bệnh viện Hùng Vương, booth Cty United. Khách hỏi hạng mục quảng cáo, in ấn, bảng hiệu hay thi công nào thì coi là bên em làm được: hỏi thêm để tư vấn, không nói "chưa chắc".</field>
+        </record>
+        <record id="kb_catalog_brief" model="dac.chat.knowledge">
+            <field name="name">Danh mục tóm tắt</field>
+            <field name="category">product</field>
+            <field name="scope">all</field>
+            <field name="sequence">0</field>
+            <field name="source_url">https://duyan.vn/</field>
+            <field name="content">Bảng hiệu (chữ nổi mica/inox/alu/formex/tole/LED neon, bảng 2D bạt/formex/mica/alu), hộp đèn (mica in UV, alu, hiflex, hút nổi, siêu mỏng, LED, tranh điện), mặt dựng alu/lam, biển bảng (công ty, chỉ dẫn, chức danh, phòng ban, số nhà, menu); in kỹ thuật số và offset (decal, PP, backlit, băng rôn, backdrop, poster, catalogue, card visit, tờ rơi, menu, tem nhãn, bằng khen/giấy khen, lịch, bao lì xì, decal xe); POSM (standee, wobbler, hanger, hashtag, backdrop di động, booth, thẻ tên, móc khóa mica, quà tặng); thiết kế (logo, bảng hiệu, ấn phẩm); xin giấy phép biển hiệu/băng rôn, gia công cắt/khắc mica, sửa và tháo biển hiệu, giao hàng tận nơi.</field>
+        </record>
         <!-- Công ty -->
         <record id="kb_company_intro" model="dac.chat.knowledge">
             <field name="name">Giới thiệu</field>

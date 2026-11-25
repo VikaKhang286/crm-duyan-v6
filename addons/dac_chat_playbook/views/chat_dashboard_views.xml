@@ -42,6 +42,7 @@
                         <group>
                             <field name="greeting_active" widget="boolean_toggle"/>
                             <field name="greeting_approver_channel_id" options="{'no_create': True}" required="greeting_active"/>
+                            <field name="greeting_handoff_channel_id" options="{'no_create': True}"/>
                             <field name="greeting_activated_at" invisible="not greeting_active"/>
                         </group>
                         <group>
@@ -53,6 +54,10 @@
                             </div>
                             <button name="action_open_greetings" type="object" string="Xem lời chào" class="btn-link" colspan="2"/>
                         </group>
+                    </group>
+                    <group string="Ngày nghỉ lễ (chatbot coi là ngoài giờ)">
+                        <field name="holidays_text" nolabel="1" colspan="2"
+                               placeholder="dd/mm/yyyy Tên ngày lễ, hoặc dd/mm/yyyy-dd/mm/yyyy Tên — mỗi dòng một mục"/>
                     </group>
                     <group string="Page thử (kiểm tra gửi tin trước khi bật cho khách thật)">
                         <group>

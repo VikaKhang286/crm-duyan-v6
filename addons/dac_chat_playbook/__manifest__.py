@@ -1,6 +1,6 @@
 {
     'name': 'Phân tích chat & quy tắc chatbot',
-    'version': '18.0.1.12.2',
+    'version': '18.0.1.17.0',
     'category': '1. Duy An ERP',
     'summary': 'Model AI được chỉ định đọc lại tin nhắn Pancake, thống kê cách nhân viên nhắn và đề xuất quy tắc cho chatbot chào khách',
     'description': """

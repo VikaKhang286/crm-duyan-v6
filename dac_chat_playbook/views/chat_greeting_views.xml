@@ -38,6 +38,11 @@
                             <field name="platform"/>
                             <field name="external_url" widget="url"/>
                             <field name="returning_reason" invisible="not returning_reason"/>
+                            <field name="gender_used" invisible="not gender_used"/>
+                            <field name="remind_count"/>
+                            <field name="turn"/>
+                            <field name="session_id" invisible="not session_id"/>
+                            <field name="handoff_notified"/>
                         </group>
                         <group>
                             <field name="version"/>

@@ -1,5 +1,6 @@
 """Thiết lập chung (một dòng) và cửa sổ "Chạy phân tích" nhanh."""
-from datetime import timedelta
+import re
+from datetime import datetime, timedelta
 
 from odoo import api, fields, models
 from odoo.exceptions import UserError
@@ -12,7 +13,21 @@ DEFAULT_GUIDANCE = """- Giờ làm việc: thứ 2 – thứ 7, 8:00–12:00 và
 - Không hứa mốc giờ cố định (vd "trong 30 phút", "trước 11 giờ"); chỉ dùng mốc làm việc kế tiếp do hệ thống điền.
 - Bộ quy tắc càng gọn càng tốt: mỗi ý một quy tắc, không trùng, không mâu thuẫn.
 - Khách không được biết đang nhắn với AI/chatbot: không tự giới thiệu "em là trợ lý…", không nhắc AI/bot; chào hỏi tự nhiên như nhân viên."""
+UNSURE_GUIDANCE = ('- Không nói "chưa chắc" về việc bên em có làm hay không: Duy An thiết kế, in ấn mọi chất liệu, thi công bảng hiệu, '
+                   'mặt dựng alu và thi công trọn gói cửa hàng (vd VinFast). Khách đưa ít thông tin thì chào rồi hỏi thêm một câu cụ thể.')
 IDENTITY_GUIDANCE = '- Khách không được biết đang nhắn với AI/chatbot: không tự giới thiệu "em là trợ lý…", không nhắc AI/bot; chào hỏi tự nhiên như nhân viên.'
+
+# Lịch nghỉ lễ 2027 đã công bố (Thông báo 11483/TB-BNV ngày 9/10/2026 của Bộ Nội vụ; Bộ luật Lao động sửa đổi thông qua 21/11/2026,
+# hiệu lực 1/3/2027 thêm 27/7 và 24/11). Tết Nguyên đán theo lịch công chức: doanh nghiệp chọn 5 ngày và báo trước 30 ngày → sửa theo DAC.
+DEFAULT_HOLIDAYS = """01/01/2027 Tết Dương lịch
+04/02/2027-10/02/2027 Tết Nguyên đán Đinh Mùi (lịch công chức; sửa theo lịch nghỉ của Duy An)
+16/04/2027 Giỗ Tổ Hùng Vương
+30/04/2027-01/05/2027 Ngày Chiến thắng 30/4 và Quốc tế Lao động 1/5
+03/05/2027 Nghỉ bù 1/5 (rơi vào thứ 7)
+27/07/2027 Ngày Thương binh, liệt sĩ
+02/09/2027-03/09/2027 Quốc khánh
+24/11/2027 Ngày Văn hóa Việt Nam"""
+HOLIDAY_LINE = re.compile(r'^\s*(\d{1,2}/\d{1,2}/\d{4})(?:\s*[-–]\s*(\d{1,2}/\d{1,2}/\d{4}))?\s*(.*)$')
 
 DEPTHS = [
     ('quick', 'Nhanh: AI đọc 60 hội thoại'),
@@ -64,6 +79,12 @@ class ChatConfig(models.Model):
         help='Chỉ chào khách nhắn sau mốc này (không chào tồn đọng cũ).')
     greeting_approver_channel_id = fields.Many2one('dac.zalo.channel', string='Người duyệt (Zalo)', ondelete='set null',
         domain="[('thread_type', '=', 'user')]", help='Chat riêng Zalo của người duyệt lời chào (Trợ lý Zalo → Hội thoại).')
+    greeting_handoff_channel_id = fields.Many2one('dac.zalo.channel', string='Nhóm báo nhân viên vào tiếp', ondelete='set null',
+        domain="[('thread_type', '=', 'group')]",
+        help='Khi bot cần người thật (không chắc, khách cần báo giá/chốt/cọc…), bot báo ngay vào nhóm này và tag người phụ trách hội thoại.')
+    holidays_text = fields.Text(string='Ngày nghỉ lễ', default=lambda self: DEFAULT_HOLIDAYS,
+        help='Mỗi dòng một ngày hoặc một khoảng: "dd/mm/yyyy Tên" hoặc "dd/mm/yyyy-dd/mm/yyyy Tên". Chatbot coi các ngày này là ngoài giờ: '
+             'vẫn hỏi thông tin rồi hẹn mốc làm việc kế tiếp (đã bỏ qua ngày lễ).')
     last_weekly_run_id = fields.Many2one('dac.chat.analysis', string='Đợt tự động gần nhất', readonly=True, ondelete='set null')
     ai_ready = fields.Boolean(string='Có kết nối AI dùng được', compute='_compute_ai_ready')
 
@@ -77,6 +98,22 @@ class ChatConfig(models.Model):
         if vals.get('greeting_active') and not all(self.mapped('greeting_active')):
             vals = dict(vals, greeting_activated_at=fields.Datetime.now())
         return super().write(vals)
+
+    def _holidays(self):
+        """{date: tên ngày lễ} từ ô Ngày nghỉ lễ (dòng sai định dạng thì bỏ qua)."""
+        out = {}
+        for line in (self.holidays_text or '').splitlines():
+            match = HOLIDAY_LINE.match(line)
+            if not match:
+                continue
+            try:
+                start = datetime.strptime(match.group(1), '%d/%m/%Y').date()
+                end = datetime.strptime(match.group(2), '%d/%m/%Y').date() if match.group(2) else start
+            except ValueError:
+                continue
+            for offset in range(min((end - start).days, 60) + 1):
+                out[start + timedelta(days=offset)] = (match.group(3) or 'Nghỉ lễ').strip()
+        return out
 
     def action_open_greetings(self):
         return self.env['ir.actions.actions']._for_xml_id('dac_chat_playbook.chat_greeting_action')

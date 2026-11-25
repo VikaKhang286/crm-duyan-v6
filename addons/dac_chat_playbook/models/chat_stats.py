@@ -82,10 +82,10 @@ def local(moment):
     return moment.replace(tzinfo=timezone.utc).astimezone(TZ)
 
 
-def in_work_hours(moment, work_days=WORK_DAYS, shifts=WORK_SHIFTS):
-    """moment: naive UTC."""
+def in_work_hours(moment, work_days=WORK_DAYS, shifts=WORK_SHIFTS, holidays=()):
+    """moment: naive UTC. `holidays`: các ngày nghỉ lễ (date, hoặc dict date → tên)."""
     loc = local(moment)
-    if loc.weekday() not in work_days:
+    if loc.weekday() not in work_days or loc.date() in holidays:
         return False
     now = loc.time()
     return any(begin <= now < end for begin, end in shifts)
@@ -521,17 +521,17 @@ def _part_of_day(hour):
     return 'sáng' if hour < 12 else ('chiều' if hour < 18 else 'tối')
 
 
-def next_working(moment, work_days=WORK_DAYS, shifts=WORK_SHIFTS):
+def next_working(moment, work_days=WORK_DAYS, shifts=WORK_SHIFTS, holidays=()):
     """Mốc bắt đầu làm việc kế tiếp sau `moment` (naive UTC) → (mốc naive UTC hoặc None nếu đang trong giờ, nhãn tiếng Việt).
 
     Nhãn để chatbot nói với khách, vd "13:30 chiều nay", "8:00 sáng mai (thứ 7, 21/11)", "8:00 sáng thứ 2 (23/11)".
-    Chưa tính ngày lễ."""
-    if in_work_hours(moment, work_days, shifts):
+    Bỏ qua các ngày trong `holidays` (nghỉ lễ)."""
+    if in_work_hours(moment, work_days, shifts, holidays):
         return None, 'đang trong giờ làm việc'
     loc = local(moment)
-    for ahead in range(15):
+    for ahead in range(45):
         day = (loc + timedelta(days=ahead)).date()
-        if day.weekday() not in work_days:
+        if day.weekday() not in work_days or day in holidays:
             continue
         for begin, _end in shifts:
             start = datetime.combine(day, begin, tzinfo=TZ)

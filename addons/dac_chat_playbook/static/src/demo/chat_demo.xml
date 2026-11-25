@@ -37,6 +37,14 @@
                                 </t>
                             </select>
                         </label>
+                        <label class="dac_cd2_field is-small">
+                            <span>Giới tính khách</span>
+                            <select class="form-select form-select-sm" t-model="state.gender" aria-label="Giới tính khách để xưng hô">
+                                <t t-foreach="state.options.genders || []" t-as="g" t-key="g.key">
+                                    <option t-att-value="g.key" t-esc="g.label"/>
+                                </t>
+                            </select>
+                        </label>
                         <div class="dac_cd2_field is-wide">
                             <span>Giả lập lúc khách nhắn</span>
                             <div class="dac_cd2_presets">
@@ -127,13 +135,30 @@
                 <!-- Bảng chi tiết -->
                 <aside class="dac_cd2_panel">
                     <div class="dac_cd2_tabs" role="tablist">
-                        <t t-foreach="[['feedback', 'Góp ý' + (state.feedback.pending ? ' (' + state.feedback.pending + ')' : '')], ['turn', 'Lượt này'], ['prompt', 'System prompt'], ['request', 'Request gửi đi'], ['session', 'Cả phiên']]" t-as="tab" t-key="tab[0]">
+                        <t t-foreach="[['samples', 'Mẫu khách thật'], ['feedback', 'Góp ý' + (state.feedback.pending ? ' (' + state.feedback.pending + ')' : '')], ['turn', 'Lượt này'], ['prompt', 'System prompt'], ['request', 'Request gửi đi'], ['session', 'Cả phiên']]" t-as="tab" t-key="tab[0]">
                             <button type="button" role="tab" class="dac_cd2_tab" t-att-class="state.tab === tab[0] ? 'is-active' : ''"
-                                    t-att-aria-selected="state.tab === tab[0] ? 'true' : 'false'" t-on-click="() => this.setTab(tab[0])" t-esc="tab[1]"/>
+                                    t-att-aria-selected="state.tab === tab[0] ? 'true' : 'false'" t-on-click="() => tab[0] === 'samples' ? this.openSamples() : this.setTab(tab[0])" t-esc="tab[1]"/>
                         </t>
                     </div>
                     <div class="dac_cd2_panel_body">
-                        <t t-if="state.tab === 'feedback'">
+                        <t t-if="state.tab === 'samples'">
+                            <p class="text-muted small mb-2">Lượt nhắn đầu tiên của khách mới thật (90 ngày gần đây, SĐT đã che). Bấm một mẫu để
+                                thử: bot nhận đúng các tin khách đã nhắn, đúng giờ, kênh và giới tính của khách.</p>
+                            <input type="search" class="form-control form-control-sm mb-2" placeholder="Tìm theo tên hoặc nội dung…"
+                                   t-model="state.sampleFilter" aria-label="Tìm mẫu"/>
+                            <div t-if="!state.samples" class="text-muted small"><i class="fa fa-circle-o-notch fa-spin me-1"/>Đang tải mẫu…</div>
+                            <p t-elif="!filteredSamples.length" class="text-muted small">Không có mẫu phù hợp.</p>
+                            <ul class="dac_cd2_samples">
+                                <li t-foreach="filteredSamples" t-as="sample" t-key="sample.id">
+                                    <button type="button" class="dac_cd2_sample" t-att-class="state.sampleId === sample.id ? 'is-active' : ''"
+                                            t-on-click="() => this.useSample(sample)" t-att-disabled="state.sending">
+                                        <span class="dac_cd2_sample_head"><b t-esc="sample.name"/><span t-esc="sample.when"/></span>
+                                        <span class="dac_cd2_sample_text" t-esc="sample.messages.join(' / ')"/>
+                                    </button>
+                                </li>
+                            </ul>
+                        </t>
+                        <t t-elif="state.tab === 'feedback'">
                             <div class="dac_cd2_optimize">
                                 <button type="button" class="btn btn-primary w-100" t-on-click="optimize"
                                         t-att-disabled="state.optimizing or !state.feedback.pending">
@@ -181,6 +206,7 @@
                                 <dt>Bối cảnh</dt><dd><t t-esc="r.context.now"/> · <t t-esc="r.context.work_status"/></dd>
                                 <dt>Mốc hẹn</dt><dd t-esc="r.context.next"/>
                                 <dt>Kênh</dt><dd t-esc="r.context.channel"/>
+                                <dt>Giới tính</dt><dd><t t-esc="r.context.gender"/><t t-if="r.customer_gender and r.customer_gender !== 'unknown'"> · khách tự xưng: <t t-esc="r.customer_gender === 'male' ? 'nam' : 'nữ'"/></t></dd>
                                 <dt>Chuyển nhân viên</dt>
                                 <dd><span class="badge" t-att-class="r.handoff ? 'text-bg-warning' : 'text-bg-light'" t-esc="r.handoff ? 'Có' : 'Không'"/>
                                     <span t-if="r.handoff_reason" class="ms-1" t-esc="r.handoff_reason"/></dd>

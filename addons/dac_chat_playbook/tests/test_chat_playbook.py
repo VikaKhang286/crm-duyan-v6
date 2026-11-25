@@ -3,6 +3,7 @@ import re
 from datetime import date, datetime, timedelta
 from unittest.mock import patch
 
+from odoo import fields
 from odoo.exceptions import AccessError, UserError
 from odoo.tests import tagged
 from odoo.tests.common import TransactionCase
@@ -549,7 +550,7 @@ class TestChatbotPrompt(TransactionCase):
         self.assertEqual(len(bad['blocked']), 2)
         self.assertTrue(bad['handoff'])
         only_bad = Prompt._guard({'messages': ['350k nha chị'], 'handoff': False})
-        self.assertEqual(only_bad['messages'], ['Dạ em chuyển bạn phụ trách hỗ trợ mình ngay ạ.'])
+        self.assertEqual(only_bad['messages'], ['Dạ anh/chị chờ em chút nha.'], 'câu giữ chuyện, không nói chuyển người')
 
     def test_sandbox_sends_history_and_shows_reply(self):
         prompt = self.env['dac.chat.prompt'].create({
@@ -1138,6 +1139,8 @@ class TestGreeting(TransactionCase):
         sender = {'id': 'cus_%s' % conversation.id, 'name': conversation.customer_name}
         if who == 'staff':
             sender = {'id': 'pzl_greet_page', 'name': 'Duy An', 'admin_id': 'a1', 'admin_name': 'Tieu Bang'}
+        elif who == 'page':  # tin page gửi qua API (bot): không có tên nhân viên
+            sender = {'id': 'pzl_greet_page', 'name': 'Duy An'}
         raw = {'id': 'gm%s' % self.seq, 'type': 'INBOX', 'page_id': 'pzl_greet_page', 'from': sender, 'attachments': []}
         return self.env['dac.pancake.message'].create({
             'message_fm_id': raw['id'], 'conversation_id': conversation.id, 'content_html': '<div>%s</div>' % text, 'type_content': 'text',
@@ -1149,8 +1152,8 @@ class TestGreeting(TransactionCase):
     def patches(self):
         test = self
 
-        def fake_reply(prompt, history, now, customer_name='', channel='zalo', note=''):
-            test.replies.append({'note': note, 'history': history, 'channel': channel})
+        def fake_reply(prompt, history, now, customer_name='', channel='zalo', note='', gender=None):
+            test.replies.append({'note': note, 'history': history, 'channel': channel, 'gender': gender})
             return dict(test.answer, messages=list(test.answer['messages']))
 
         def fake_send(conversation, text):
@@ -1161,6 +1164,7 @@ class TestGreeting(TransactionCase):
                  patch(GREET + '.pancake_send', fake_send),
                  patch(GREET + '.shutil.which', lambda name: None),
                  patch(GREET + '.time.sleep', lambda s: None),
+                 patch('odoo.addons.dac_chat_playbook.models.chat_gender.fetch_image', lambda url: None),
                  patch.object(type(self.env['dac.pancake.conversation']), '_fetch_messages', lambda self: None)]
         from contextlib import ExitStack
         exit_stack = ExitStack()
@@ -1182,6 +1186,9 @@ class TestGreeting(TransactionCase):
         self.wait(conv, self.now - timedelta(minutes=5))
         self.env['dac.chat.greeting']._cron_run()
         return self.env['dac.chat.greeting'].search([('conversation_id', '=', conv.id)]), conv
+
+    def no_note(self):
+        return patch.object(type(self.env['dac.ai.model']), '_note', lambda *a, **k: None)
 
     # ── test ─────────────────────────────────────────────────────────────────
     def test_new_customer_is_drafted_sent_to_approver_then_sent_after_approval(self):
@@ -1360,20 +1367,23 @@ class TestGreeting(TransactionCase):
         self.assertIn('KHÔNG tự giới thiệu', self.prompt._runtime_prompt(self.now))
         calls = []
 
-        def fake_reply(prompt, history, now, customer_name='', channel='zalo', note=''):
-            calls.append(note)
+        def fake_vision(env, model, fallback, system, text, images, schema, name, desc, timeout):
+            calls.append(text)
             if len(calls) == 1:
-                return {'messages': ['Chị cần gì ạ?'], 'identity_blocked': ['Em là trợ lý của Duy An'], 'handoff': False,
-                        'returning_customer': False, 'usage': {'in': 10, 'out': 2}}
-            return {'messages': ['Dạ em chào chị ạ', 'Chị cần làm gì ạ?'], 'identity_blocked': [], 'handoff': False,
-                    'returning_customer': False, 'usage': {'in': 10, 'out': 3}}
+                return {'messages': ['Em là trợ lý của Duy An', 'Wobbler em chưa chắc bên em có làm'], 'handoff': False}, 'm', 0, {'in': 10, 'out': 2}
+            return {'messages': ['Dạ em chào anh ạ', 'Anh cần wobbler dùng cho cửa hàng hay sự kiện ạ?'], 'handoff': False}, 'm', 0, {'in': 10, 'out': 3}
 
-        with self.patches(), patch.object(type(Prompt), '_reply', fake_reply):
-            greeting, _conv = self.new_greeting()
-        self.assertEqual(len(calls), 2, 'bị chặn vì lộ AI → soạn lại một lần')
-        self.assertIn('bị chặn vì tự giới thiệu', calls[1])
-        self.assertEqual(greeting._messages(), ['Dạ em chào chị ạ', 'Chị cần làm gì ạ?'])
-        self.assertEqual((greeting.tokens_in, greeting.tokens_out), (20, 5))
+        with patch('odoo.addons.dac_chat_playbook.models.chat_prompt.vision_call', fake_vision), self.no_note():
+            result = self.prompt._reply([('customer', 'bên em làm wobbler không')], self.now, 'Lộc')
+        self.assertEqual(len(calls), 2, 'bị chặn (lộ AI, "chưa chắc") → soạn lại một lần')
+        self.assertIn('không nói "chưa chắc"', calls[1])
+        self.assertEqual(result['messages'], ['Dạ em chào anh ạ', 'Anh cần wobbler dùng cho cửa hàng hay sự kiện ạ?'])
+        self.assertEqual(result['usage'], {'in': 20, 'out': 5})
+        self.assertEqual(len(result['first_blocked']), 2)
+        runtime = self.prompt._runtime_prompt(self.now)
+        self.assertIn('Không bao giờ nói "chưa chắc"', runtime)
+        self.assertIn('thi công trọn gói cửa hàng', runtime, 'bộ Chào hỏi có kiến thức năng lực')
+        self.assertIn('wobbler', runtime, 'bộ Chào hỏi có danh mục tóm tắt')
 
     def test_late_feedback_is_saved_and_previewed(self):
         with self.patches():
@@ -1392,6 +1402,163 @@ class TestGreeting(TransactionCase):
         self.assertIn('1. Dạ em chào chị ạ', last)
         self.assertNotIn('Dạ chị cần gì ạ', [t for _r, t in self.replies[-1]['history']], 'bản xem lại dùng đoạn chat lúc soạn bản gốc')
         self.assertFalse(self.sent)
+
+
+    def test_history_labels_sticker_not_as_file(self):
+        conv = self.conversation('Khách Sticker')
+        message = self.message(conv, self.now - timedelta(minutes=5), 'customer', '')
+        raw = json.loads(message.raw_json)
+        raw['attachments'] = [{'type': 'sticker'}]
+        message.raw_json = json.dumps(raw)
+        self.message(conv, self.now - timedelta(minutes=4), 'customer', 'a nhận tke giấy khen k ạ')
+        greeting = self.env['dac.chat.greeting'].create({'conversation_id': conv.id, 'since': self.now - timedelta(minutes=5)})
+        history = greeting._history()
+        self.assertEqual(history[0], ('customer', '[Sticker]'))
+        self.assertNotIn('[Tệp', ' '.join(t for _r, t in history))
+        self.assertIn('[Sticker] chỉ là biểu tượng', self.prompt._runtime_prompt(self.now))
+
+    def test_gender_detection_rule_and_chat_override(self):
+        from odoo.addons.dac_chat_playbook.models import chat_gender
+        conv = self.conversation('Lan Anh')
+        conv.write({'avatar_url': False, 'pancake_gender': 'female'})
+        calls = []
+
+        def fake_vision(env, model, fallback, system, text, images, schema, name, desc, timeout):
+            calls.append(text)
+            return {'gender': 'female', 'confidence': 'high', 'reason': 'hồ sơ ghi nữ, tên nữ'}, 'm', 0, {}
+
+        with patch.object(chat_gender, 'vision_call', fake_vision):
+            self.assertEqual(conv._gender()[0], 'female')
+            self.assertEqual(conv._gender()[0], 'female')
+        self.assertEqual(len(calls), 1, 'nhận diện một lần rồi lưu')
+        self.assertIn('Nữ', calls[0])
+        shop = self.conversation('In Ấn ABC')
+        with patch.object(chat_gender, 'vision_call', lambda *a, **k: ({'gender': 'male', 'confidence': 'low'}, 'm', 0, {})):
+            self.assertEqual(shop._gender()[0], 'unknown', 'chưa chắc → gọi anh/chị')
+        self.assertTrue(conv._gender_from_chat('male'))
+        self.assertEqual((conv.customer_gender, conv.gender_source), ('male', 'Khách tự xưng trong chat'))
+        self.prompt.system_prompt = 'Trợ lý DAC. Mẫu: Dạ em chào anh/chị ạ. Anh/chị cần làm gì ạ?'
+        runtime = self.prompt._runtime_prompt(self.now, 'Lan Anh', 'zalo', ('female', 'AI'))
+        self.assertIn('gọi khách là "chị"', runtime)
+        self.assertIn('Dạ em chào chị ạ. Chị cần làm gì ạ?', runtime, 'đã biết nữ: câu mẫu đổi anh/chị → chị')
+        self.assertIn('anh/chị ạ', self.prompt._runtime_prompt(self.now), 'chưa rõ thì giữ anh/chị')
+        self.assertIn('đổi theo khách', runtime)
+        self.assertIn('gọi "anh/chị"', self.prompt._runtime_prompt(self.now))
+        row = {'id': 'pzl_u_gender_1', 'page_id': 'pzl_greet_page', 'from': {'id': 'pzl_u_9', 'name': 'Hưng Vũ'},
+               'page_customer': {'gender': 'male', 'name': 'Hưng Vũ'}}
+        fresh, _new = self.env['dac.pancake.conversation']._upsert(self.page, row)
+        self.assertEqual(fresh.pancake_gender, 'male', 'lưu giới tính hồ sơ Pancake khi kéo hội thoại')
+
+    def test_greeting_uses_gender_and_reminds_approver(self):
+        from odoo.addons.dac_chat_playbook.models import chat_gender
+        with self.patches(), patch.object(chat_gender, 'vision_call', lambda *a, **k: ({'gender': 'male', 'confidence': 'high', 'reason': 'ảnh nam'}, 'm', 0, {})):
+            greeting, conv = self.new_greeting('Hưng')
+            self.assertEqual(self.replies[0]['gender'][0], 'male')
+            self.assertIn('Xưng hô: anh', self.queued()[-1].text)
+            ask = self.queued()[-1]
+            ask.write({'state': 'sent', 'external_message_id': 'zm1'})
+            Greeting = self.env['dac.chat.greeting']
+            Greeting._check_pending(self.config)
+            self.assertEqual(greeting.remind_count, 0, 'chưa tới 5 phút thì chưa nhắc')
+            greeting.asked_at = fields.Datetime.now() - timedelta(minutes=6)
+            Greeting._check_pending(self.config)
+            Greeting._check_pending(self.config)
+            self.assertEqual(greeting.remind_count, 1, 'nhắc một lần cho mốc 5 phút')
+            remind = self.queued()[-1]
+            self.assertIn('Nhắc duyệt G%s' % greeting.id, remind.text)
+            self.assertEqual(remind.reply_to_id, ask, 'nhắc dưới dạng trả lời tin xin duyệt')
+            greeting.asked_at = fields.Datetime.now() - timedelta(minutes=16)
+            Greeting._check_pending(self.config)
+            self.assertEqual(greeting.remind_count, 2)
+
+    def test_real_samples_take_first_customer_turn(self):
+        conv = self.conversation('Hữu Lộc')
+        start = self.now - timedelta(days=1)
+        self.message(conv, start, 'customer', 'Shop ơi')
+        self.message(conv, start + timedelta(minutes=1), 'customer', 'bên em làm wobble không, sđt 0912345678')
+        self.message(conv, start + timedelta(minutes=5), 'staff', 'Dạ có ạ')
+        self.message(conv, start + timedelta(minutes=6), 'customer', 'tin sau khi nhân viên trả lời')
+        self.env['dac.new.contact'].create({'contact_at': start, 'source': 'pancake', 'name': 'Hữu Lộc', 'conversation_id': conv.id})
+        samples = self.env['dac.chat.prompt'].demo_samples()
+        sample = next(s for s in samples if s['id'] == conv.id)
+        self.assertEqual(sample['messages'][0], 'Shop ơi')
+        self.assertEqual(len(sample['messages']), 2, 'chỉ lượt đầu, dừng khi nhân viên trả lời')
+        self.assertNotIn('0912345678', sample['messages'][1], 'che số điện thoại')
+        self.assertEqual(sample['channel'], 'zalo')
+
+    def test_one_voice_and_no_later_promise_in_hours(self):
+        Prompt = self.env['dac.chat.prompt']
+        in_hours = Prompt._guard({'messages': ['Dạ em chào anh ạ', 'Em sẽ liên hệ anh sớm nha', 'Em chuyển bạn phụ trách hỗ trợ anh nha',
+                                               'Anh cần làm cho mặt tiền ngang bao nhiêu mét ạ?']}, in_hours=True)
+        self.assertNotIn('Em sẽ liên hệ anh sớm nha', in_hours['messages'])
+        self.assertNotIn('Em chuyển bạn phụ trách hỗ trợ anh nha', in_hours['messages'])
+        evening = Prompt._guard({'messages': ['Dạ em ghi nhận rồi, em sẽ liên hệ lại anh vào 8:00 sáng mai nha']}, in_hours=False)
+        self.assertEqual(evening['messages'], ['Dạ em ghi nhận rồi, em sẽ liên hệ lại anh vào 8:00 sáng mai nha'], 'ngoài giờ được hẹn mốc')
+        handoff = Prompt._guard({'messages': ['Giá 500.000đ nha'], 'handoff': True})
+        self.assertEqual(handoff['messages'], ['Dạ anh/chị chờ em chút nha.'], 'câu giữ chuyện, không nói chuyển người')
+        runtime_day = self.prompt._runtime_prompt(datetime(2026, 11, 24, 3, 0))
+        runtime_night = self.prompt._runtime_prompt(datetime(2026, 11, 24, 14, 0))
+        self.assertIn('MỘT mình em', runtime_day)
+        self.assertIn('không hẹn "liên hệ sau/sớm"', runtime_day)
+        self.assertIn('NGOÀI giờ làm việc: vẫn hỏi', runtime_night)
+        self.assertNotIn('sẽ trả lời sớm', runtime_day)
+
+    def test_bot_keeps_conversation_then_hands_off_to_group(self):
+        group = self.env['dac.zalo.channel'].create({'name': 'Nhóm sale thử', 'thread_id': 'g-sale', 'thread_type': 'group'})
+        self.config.greeting_handoff_channel_id = group
+        with self.patches():
+            first, conv = self.new_greeting('Anh Lộc')
+            self.kiet('duyệt')
+            self.assertEqual(first.state, 'sent')
+            # Tin bot hiện trên Pancake như tin của page; khách nhắn tiếp
+            for text in first._messages():
+                self.message(conv, self.now - timedelta(minutes=3), 'page', text)
+            self.message(conv, self.now - timedelta(minutes=2), 'customer', 'mình cần thi công cửa hàng')
+            self.wait(conv, self.now - timedelta(minutes=2), kind='ongoing')
+            self.answer['messages'] = ['Dạ cửa hàng mình kinh doanh gì vậy anh?']
+            self.env['dac.chat.greeting']._cron_run()
+            second = self.env['dac.chat.greeting'].search([('conversation_id', '=', conv.id), ('id', '!=', first.id)])
+            self.assertEqual((second.state, second.session_id, second.turn), ('waiting', first, 2), 'bot trả lời tiếp, không coi là khách cũ')
+            self.assertIn('nhắn tiếp (lượt 2', self.queued()[-1].text)
+            self.assertIn(('bot', 'Dạ em chào chị ạ'), second._history(), 'tin bot đã gửi không bị coi là nhân viên')
+            self.kiet('duyệt')
+            # Lượt 3: bot cần người thật → báo nhóm ngay, tag người phụ trách
+            self.message(conv, self.now - timedelta(minutes=1), 'page', 'Dạ cửa hàng mình kinh doanh gì vậy anh?')
+            self.message(conv, self.now - timedelta(seconds=30), 'customer', 'báo giá trọn gói cho anh luôn')
+            self.wait(conv, self.now - timedelta(seconds=30), kind='ongoing')
+            self.answer.update(messages=['Dạ anh chờ em chút nha.'], handoff=True, handoff_reason='Khách cần báo giá trọn gói')
+            self.env['dac.chat.greeting']._cron_run()
+        third = self.env['dac.chat.greeting'].search([('conversation_id', '=', conv.id)], order='id desc', limit=1)
+        self.assertEqual((third.turn, third.handoff_notified, first.handoff_notified), (3, True, True))
+        notice = self.env['dac.zalo.channel.message'].search([('channel_id', '=', group.id)])
+        self.assertEqual(len(notice), 1, 'báo nhóm một lần')
+        self.assertIn('Cần nhân viên vào nhắn tiếp', notice.text)
+        self.assertIn('Khách cần báo giá trọn gói', notice.text)
+        self.assertIn('báo giá trọn gói cho anh luôn', notice.text)
+        self.assertIn('đã báo nhóm', self.queued()[-1].text)
+
+    def test_human_staff_reply_ends_bot_session(self):
+        with self.patches():
+            first, conv = self.new_greeting()
+            self.kiet('duyệt')
+            self.message(conv, self.now - timedelta(minutes=3), 'staff', 'Dạ chị cần làm bảng hiệu loại nào ạ')
+            self.message(conv, self.now - timedelta(minutes=2), 'customer', 'loại hộp đèn')
+            self.wait(conv, self.now - timedelta(minutes=2), kind='ongoing')
+            self.env['dac.chat.greeting']._cron_run()
+        later = self.env['dac.chat.greeting'].search([('conversation_id', '=', conv.id), ('id', '!=', first.id)])
+        self.assertEqual((later.state, later.session_id.id), ('returning', False), 'nhân viên thật đã vào: bot không nhắn nữa')
+
+    def test_holidays_are_out_of_hours_and_skipped(self):
+        self.config.holidays_text = '01/01/2027 Tết Dương lịch\n04/02/2027-10/02/2027 Tết Nguyên đán\nsai định dạng'
+        days = self.config._holidays()
+        self.assertEqual(len(days), 8)
+        new_year = datetime(2027, 1, 1, 3, 0)  # thứ 6 1/1/2027 10:00 VN
+        values = self.prompt._context_values(new_year, 'Chị Lan')
+        self.assertIn('nghỉ lễ: Tết Dương lịch', values['{{work_status}}'])
+        self.assertEqual(values['{{next_working_time}}'], '8:00 sáng mai (thứ 7, 02/01)', 'thứ 7 vẫn làm (lịch Duy An)')
+        tet = self.prompt._context_values(datetime(2027, 2, 3, 13, 0), '')  # tối thứ 4 3/2 → bỏ qua 4–10/2
+        self.assertEqual(tet['{{next_working_time}}'], '8:00 sáng thứ 5 (11/02)')
+        self.assertIn('NGOÀI giờ làm việc: vẫn hỏi', self.prompt._runtime_prompt(new_year))
 
 
 @tagged('post_install', '-at_install', 'dac_chat_playbook')
@@ -1463,3 +1630,4 @@ class TestTraining(TransactionCase):
         self.assertEqual(result['usage'], {'prompt_tokens': 10, 'completion_tokens': 5})
         with self.assertRaises(UserError):
             merge_stream([b'data: {"error": {"message": "overloaded"}}'])
+
