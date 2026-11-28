@@ -655,7 +655,7 @@ class HrAttendanceWithGeolocation(models.Model):
 
     def _is_after_shift_work_cutoff(self, employee, now_utc=None):
         """Return whether the employee-local time has reached 17:30."""
-        now_utc = now_utc or fields.Datetime.now()
+        now_utc = fields.Datetime.to_datetime(now_utc) or fields.Datetime.now()
         employee_tz = ZoneInfo(self._get_employee_timezone(employee))
         now_local = now_utc.replace(
             tzinfo=ZoneInfo('UTC')).astimezone(employee_tz)
