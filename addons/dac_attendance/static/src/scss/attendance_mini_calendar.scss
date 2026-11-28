@@ -5,13 +5,54 @@
 }
 
 .o_dac_mini_calendar_header {
+    display: grid;
+    grid-template-columns: 32px 1fr 32px;
+    align-items: center;
     margin-bottom: 10px;
 }
 
 .o_dac_mini_calendar_month {
+    justify-self: center;
+    padding: 0;
+    border: 0;
+    background: transparent;
     font-weight: 700;
     font-size: 14px;
     color: #1e293b;
+    text-align: center;
+    text-transform: capitalize;
+    cursor: pointer;
+
+    &:hover {
+        color: #0f172a;
+        text-decoration: underline;
+        text-underline-offset: 3px;
+    }
+}
+
+.o_dac_month_picker {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.o_dac_calendar_nav {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: #64748b;
+    cursor: pointer;
+
+    &:hover {
+        background: #f1f5f9;
+        color: #0f172a;
+    }
 }
 
 .o_dac_mini_calendar_weekdays {

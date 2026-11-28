@@ -24,6 +24,8 @@ export class EmployeeDashboard extends Component {
             loading: true,
             error: null,
             actionLoading: false,
+            calendarMonth: new Date().getMonth() + 1,
+            calendarYear: new Date().getFullYear(),
             data: {
                 employee_name: "",
                 today_status: { checked_in: false, check_in_time: "", today_hours: 0, is_late: false, late_minutes: 0 },
@@ -57,6 +59,8 @@ export class EmployeeDashboard extends Component {
                 this.state.error = data.error;
             } else {
                 this.state.data = data;
+                this.state.calendarMonth = Number(data.month_label.slice(0, 2));
+                this.state.calendarYear = Number(data.month_label.slice(3));
             }
         } catch (e) {
             this.state.error = "Không tải được dữ liệu. Vui lòng thử lại.";
@@ -64,6 +68,41 @@ export class EmployeeDashboard extends Component {
         } finally {
             this.state.loading = false;
         }
+    }
+
+    async changeCalendarMonth(offset) {
+        const selected = new Date(this.state.calendarYear, this.state.calendarMonth - 1 + offset, 1);
+        await this.loadCalendarMonth(selected.getFullYear(), selected.getMonth() + 1);
+    }
+
+    async selectCalendarMonth(value) {
+        const [year, month] = value.split("-").map(Number);
+        await this.loadCalendarMonth(year, month);
+    }
+
+    async loadCalendarMonth(year, month) {
+        try {
+            const calendar = await this.orm.call(
+                "dac.attendance.dashboard",
+                "dac_get_month_calendar",
+                [year, month]
+            );
+            if (calendar.error) {
+                throw new Error(calendar.error);
+            }
+            this.state.calendarYear = year;
+            this.state.calendarMonth = month;
+            this.state.data.month_calendar = calendar.days;
+            this.state.data.month_label = calendar.month_label;
+            this.state.data.history = calendar.history;
+        } catch (e) {
+            this.notification.add("Không tải được lịch tháng. Vui lòng thử lại.", { type: "danger" });
+        }
+    }
+
+    get calendarMonthValue() {
+        const month = String(this.state.calendarMonth).padStart(2, "0");
+        return `${this.state.calendarYear}-${month}`;
     }
 
     get todayLabel() {

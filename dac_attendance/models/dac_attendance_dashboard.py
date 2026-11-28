@@ -202,11 +202,12 @@ class DacAttendanceDashboard(models.AbstractModel):
                 'state': amend.state,
             })
 
-        # ── History (current month, last 15 records) ──
+        # ── History for the selected calendar month ──
         history_atts = self.env['hr.attendance'].search([
             ('employee_id', '=', employee.id),
             ('check_in_date', '>=', month_start),
-        ], order='check_in desc', limit=15)
+            ('check_in_date', '<=', month_end),
+        ], order='check_in desc')
 
         history = []
         for att in history_atts:
@@ -274,8 +275,6 @@ class DacAttendanceDashboard(models.AbstractModel):
                 return date.min
 
         history.sort(key=_date_key, reverse=True)
-        history = history[:20]
-
         return {
             'employee_name': employee.name,
             'today_status': today_status,
@@ -285,6 +284,147 @@ class DacAttendanceDashboard(models.AbstractModel):
             'pending_requests': pending_requests,
             'history': history,
         }
+
+    @api.model
+    def dac_get_month_calendar(self, year, month):
+        """Return one employee's attendance calendar for the requested month."""
+        employee = self._get_current_employee()
+        if not employee:
+            return {'error': 'Không tìm thấy nhân viên cho tài khoản này'}
+
+        year = int(year)
+        month = int(month)
+        if year < 2000 or year > 2100 or month < 1 or month > 12:
+            return {'error': 'Tháng không hợp lệ'}
+
+        month_start = date(year, month, 1)
+        month_end = date(year, month, calendar.monthrange(year, month)[1])
+        today = fields.Date.context_today(self)
+        attendances = self.env['hr.attendance'].search([
+            ('employee_id', '=', employee.id),
+            ('check_in_date', '>=', month_start),
+            ('check_in_date', '<=', month_end),
+        ], order='check_in desc')
+        attendance_by_date = {}
+        for attendance in attendances:
+            attendance_by_date.setdefault(attendance.check_in_date, attendance)
+            if attendance.is_late and not attendance_by_date[attendance.check_in_date].is_late:
+                attendance_by_date[attendance.check_in_date] = attendance
+
+        approved_leaves = self.env['dac.attendance.leave'].search([
+            ('employee_id', '=', employee.id),
+            ('state', '=', 'approved'),
+            ('date_from', '<=', month_end),
+            ('date_to', '>=', month_start),
+        ])
+        leave_dates = set()
+        for leave in approved_leaves:
+            day = max(leave.date_from, month_start)
+            end = min(leave.date_to, month_end)
+            while day <= end:
+                leave_dates.add(day)
+                day += timedelta(days=1)
+
+        holidays = self._get_company_holidays(
+            employee.company_id, month_start, month_end)
+        days = []
+        day = month_start
+        while day <= month_end:
+            holiday_name = holidays.get((employee.company_id.id, day))
+            if holiday_name:
+                status = (
+                    'late' if attendance_by_date.get(day)
+                    and attendance_by_date[day].is_late else
+                    'on_time' if attendance_by_date.get(day) else 'holiday'
+                )
+            elif day > today:
+                status = 'future'
+            elif day.weekday() >= 6:
+                status = 'weekend'
+            elif day in leave_dates:
+                status = 'leave'
+            elif day in attendance_by_date:
+                status = 'late' if attendance_by_date[day].is_late else 'on_time'
+            else:
+                status = 'absent'
+            days.append({
+                'date': str(day),
+                'day': day.day,
+                'weekday': day.weekday(),
+                'status': status,
+                'holiday_name': holiday_name,
+            })
+            day += timedelta(days=1)
+
+        return {
+            'days': days,
+            'month_label': month_start.strftime('%m/%Y'),
+            'history': self._get_month_history(
+                employee, attendances, days, approved_leaves, today),
+        }
+
+    def _get_month_history(self, employee, attendances, calendar_days,
+                           approved_leaves, today):
+        history = []
+        attendance_dates = set(attendances.mapped('check_in_date'))
+        for attendance in attendances:
+            history.append({
+                'date': self._format_date(attendance.check_in_date),
+                'check_in': self._format_time(attendance.check_in),
+                'check_out': self._format_time(attendance.check_out) if attendance.check_out else '',
+                'worked_hours': round(attendance.worked_hours or 0, 2),
+                'is_late': attendance.is_late,
+                'late_minutes': attendance.late_minutes or 0,
+                'is_early_leave': attendance.is_early_leave,
+                'status': 'working' if not attendance.check_out else (
+                    'late' if attendance.is_late else 'on_time'),
+            })
+
+        type_labels = {
+            'annual': 'Phép năm',
+            'sick': 'Phép bệnh',
+            'unpaid': 'Không lương',
+            'other': 'Khác',
+        }
+        holiday_history_hours = (
+            8.0
+            if getattr(employee.sudo(), 'dac_employment_type', 'full_time') == 'full_time'
+            else 0.0
+        )
+        for calendar_day in calendar_days:
+            day = date.fromisoformat(calendar_day['date'])
+            if day in attendance_dates or day > today:
+                continue
+            status = calendar_day['status']
+            if status not in ('absent', 'holiday', 'leave'):
+                continue
+            leave = next(
+                (item for item in approved_leaves
+                 if item.date_from <= day <= item.date_to),
+                None,
+            )
+            history.append({
+                'date': self._format_date(day),
+                'check_in': '',
+                'check_out': '',
+                'worked_hours': holiday_history_hours if status == 'holiday' else 0,
+                'is_late': False,
+                'late_minutes': 0,
+                'is_early_leave': False,
+                'status': status,
+                'holiday_name': calendar_day['holiday_name'],
+                'leave_type': type_labels.get(leave.leave_type, 'Nghỉ phép') if leave else 'Nghỉ phép',
+            })
+
+        history.sort(
+            key=lambda row: date(
+                int(row['date'][6:10]),
+                int(row['date'][3:5]),
+                int(row['date'][0:2]),
+            ),
+            reverse=True,
+        )
+        return history
 
     # ── Manager Dashboard ─────────────────────────────────────────────────────
 

@@ -85,7 +85,10 @@
                     <div class="o_dac_card o_dac_calendar_card">
                         <AttendanceMiniCalendar
                             days="state.data.month_calendar"
-                            monthLabel="state.data.month_label"/>
+                            monthLabel="state.data.month_label"
+                            monthValue="calendarMonthValue"
+                            onChangeMonth="(offset) => this.changeCalendarMonth(offset)"
+                            onSelectMonth="(value) => this.selectCalendarMonth(value)"/>
                     </div>
 
                     <!-- Leave Balance -->
@@ -137,7 +140,7 @@
 
                 <!-- Attendance History -->
                 <div class="o_dac_card o_dac_history_card">
-                    <div class="o_dac_card_title">Lịch sử tháng này</div>
+                    <div class="o_dac_card_title">Lịch sử tháng <t t-esc="state.data.month_label"/></div>
                     <div class="o_dac_history_list">
                         <t t-if="!state.data.history.length">
                             <p class="text-muted text-center py-3">Chưa có dữ liệu chấm công</p>

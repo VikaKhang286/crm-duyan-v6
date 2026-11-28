@@ -1,12 +1,19 @@
 /** @odoo-module **/
-import { Component } from "@odoo/owl";
+import { Component, useRef } from "@odoo/owl";
 
 export class AttendanceMiniCalendar extends Component {
     static template = "dac_attendance.AttendanceMiniCalendar";
     static props = {
         days: Array,
         monthLabel: String,
+        monthValue: String,
+        onChangeMonth: Function,
+        onSelectMonth: Function,
     };
+
+    setup() {
+        this.monthPicker = useRef("monthPicker");
+    }
 
     get leadingBlanks() {
         if (!this.props.days.length) return [];
@@ -34,5 +41,24 @@ export class AttendanceMiniCalendar extends Component {
 
     get hasHolidays() {
         return this.props.days.some((day) => day.holiday_name);
+    }
+
+    changeMonth(offset) {
+        this.props.onChangeMonth(offset);
+    }
+
+    openMonthPicker() {
+        const picker = this.monthPicker.el;
+        if (picker?.showPicker) {
+            picker.showPicker();
+        } else {
+            picker?.click();
+        }
+    }
+
+    selectMonth(event) {
+        if (event.target.value) {
+            this.props.onSelectMonth(event.target.value);
+        }
     }
 }

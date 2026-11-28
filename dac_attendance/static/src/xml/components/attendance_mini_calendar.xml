@@ -4,7 +4,22 @@
 <t t-name="dac_attendance.AttendanceMiniCalendar">
     <div class="o_dac_mini_calendar">
         <div class="o_dac_mini_calendar_header">
-            <span class="o_dac_mini_calendar_month">Tháng <t t-esc="props.monthLabel"/></span>
+            <button type="button" class="o_dac_calendar_nav" aria-label="Tháng trước"
+                    t-on-click="() => this.changeMonth(-1)">
+                <i class="fa fa-chevron-left"/>
+            </button>
+            <button type="button" class="o_dac_mini_calendar_month"
+                    aria-label="Chọn tháng và năm" title="Chọn tháng và năm"
+                    t-on-click="openMonthPicker">
+                Tháng <t t-esc="props.monthLabel"/>
+            </button>
+            <input t-ref="monthPicker" class="o_dac_month_picker" type="month"
+                   t-att-value="props.monthValue" t-on-change="selectMonth"
+                   aria-label="Chọn tháng và năm"/>
+            <button type="button" class="o_dac_calendar_nav" aria-label="Tháng sau"
+                    t-on-click="() => this.changeMonth(1)">
+                <i class="fa fa-chevron-right"/>
+            </button>
         </div>
         <div class="o_dac_mini_calendar_weekdays">
             <span>T2</span><span>T3</span><span>T4</span>
